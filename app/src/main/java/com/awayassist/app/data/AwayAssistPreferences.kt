@@ -114,12 +114,37 @@ class AwayAssistPreferences(private val context: Context) {
     suspend fun setEnabled(enabled: Boolean) {
         dataStore.edit { preferences ->
             preferences[KEY_IS_ENABLED] = enabled
+            if (enabled) {
+                // Clearing override when user explicitly re-enables automation
+                preferences.remove(KEY_OVERRIDE_MODE)
+                preferences[KEY_PAUSE_UNTIL_TIMESTAMP] = 0L
+            }
         }
     }
 
     suspend fun setThemeMode(mode: ThemeMode) {
         dataStore.edit { preferences ->
             preferences[KEY_THEME_MODE] = mode.name
+        }
+    }
+
+    suspend fun forceRing() {
+        dataStore.edit { preferences ->
+            // Enabling Force Ring disables the automatic lock/unlock toggle
+            preferences[KEY_IS_ENABLED] = false
+            preferences[KEY_CURRENT_MODE] = RingerState.RING.name
+            preferences[KEY_OVERRIDE_MODE] = RingerState.RING.name
+            preferences[KEY_LAST_CHANGED_TIMESTAMP] = System.currentTimeMillis()
+        }
+    }
+
+    suspend fun forceSilent() {
+        dataStore.edit { preferences ->
+            // Enabling Force Silent disables the automatic lock/unlock toggle
+            preferences[KEY_IS_ENABLED] = false
+            preferences[KEY_CURRENT_MODE] = RingerState.VIBRATE.name
+            preferences[KEY_OVERRIDE_MODE] = RingerState.VIBRATE.name
+            preferences[KEY_LAST_CHANGED_TIMESTAMP] = System.currentTimeMillis()
         }
     }
 
@@ -148,6 +173,7 @@ class AwayAssistPreferences(private val context: Context) {
 
     suspend fun clearPause() {
         dataStore.edit { preferences ->
+            preferences[KEY_IS_ENABLED] = true
             preferences[KEY_PAUSE_UNTIL_TIMESTAMP] = 0L
             preferences.remove(KEY_OVERRIDE_MODE)
         }

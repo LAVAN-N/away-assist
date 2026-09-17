@@ -101,9 +101,9 @@ fun MainScreen(
     // Active ambient glow color corresponding to current ringer / app state
     val targetAmbientColor = when {
         !hasNotificationPolicyAccess -> colors.error
-        !appState.isEnabled -> colors.textSecondary
-        appState.isPaused -> colors.warning
         appState.overrideMode != null -> colors.azureGlow
+        appState.isPaused -> colors.warning
+        !appState.isEnabled -> colors.textSecondary
         appState.currentMode == RingerState.RING -> colors.ringState
         else -> colors.accentSilent
     }
@@ -175,9 +175,9 @@ fun MainScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     val badgeText = when {
                         !hasNotificationPolicyAccess -> "Setup"
-                        !appState.isEnabled -> "Off"
-                        appState.isPaused -> "Paused"
                         appState.overrideMode != null -> "Override"
+                        appState.isPaused -> "Paused"
+                        !appState.isEnabled -> "Off"
                         appState.currentMode == RingerState.RING -> "Ring"
                         else -> "Vibrate"
                     }
@@ -398,13 +398,27 @@ private fun CompactStatusCard(
                 Icons.Default.Warning
             )
         }
-        !appState.isEnabled -> {
-            Quad(
-                colors.textSecondary,
-                "Automation Off",
-                "Enable toggle below to automate ringer",
-                Icons.Default.NotificationsOff
-            )
+        appState.overrideMode != null -> {
+            when (appState.overrideMode) {
+                RingerState.RING -> Quad(
+                    colors.ringState,
+                    "Force Ring Active",
+                    "Automation disabled • Tap Resume to reactivate",
+                    Icons.Default.Notifications
+                )
+                RingerState.VIBRATE, RingerState.SILENT -> Quad(
+                    colors.accentSilent,
+                    "Force Silent Active",
+                    "Automation disabled • Tap Resume to reactivate",
+                    Icons.Default.Vibration
+                )
+                else -> Quad(
+                    colors.warning,
+                    "Override Active",
+                    "Manual override active",
+                    Icons.Default.Notifications
+                )
+            }
         }
         appState.isPaused -> {
             val remainingMins = ((appState.pauseUntilTimestamp - System.currentTimeMillis()) / 60000L).coerceAtLeast(1)
@@ -415,27 +429,13 @@ private fun CompactStatusCard(
                 Icons.Default.PauseCircle
             )
         }
-        appState.overrideMode != null -> {
-            when (appState.overrideMode) {
-                RingerState.RING -> Quad(
-                    colors.ringState,
-                    "Force Ring",
-                    "Manual override • Resets on next unlock",
-                    Icons.Default.Notifications
-                )
-                RingerState.VIBRATE, RingerState.SILENT -> Quad(
-                    colors.accentSilent,
-                    "Force Silent",
-                    "Manual override • Resets on next lock",
-                    Icons.Default.Vibration
-                )
-                else -> Quad(
-                    colors.warning,
-                    "Override Active",
-                    "Manual override active",
-                    Icons.Default.Notifications
-                )
-            }
+        !appState.isEnabled -> {
+            Quad(
+                colors.textSecondary,
+                "Automation Off",
+                "Enable toggle below to automate ringer",
+                Icons.Default.NotificationsOff
+            )
         }
         appState.currentMode == RingerState.RING -> {
             Quad(
@@ -534,22 +534,23 @@ private fun CompactStatusCard(
             }
 
             // Compact Quick Actions
-            if (hasPolicyAccess && appState.isEnabled) {
-                Spacer(modifier = Modifier.height(14.dp))
+            if (hasPolicyAccess) {
+                if (appState.isPaused || appState.overrideMode != null) {
+                    Spacer(modifier = Modifier.height(14.dp))
+                    AppleStyleButton(
+                        text = "Resume Automation",
+                        onClick = onResumeAutomation,
+                        style = AppleButtonStyle.PRIMARY,
+                        modifier = Modifier.fillMaxWidth(),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 9.dp)
+                    )
+                } else if (appState.isEnabled) {
+                    Spacer(modifier = Modifier.height(14.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    if (appState.isPaused || appState.overrideMode != null) {
-                        AppleStyleButton(
-                            text = "Resume",
-                            onClick = onResumeAutomation,
-                            style = AppleButtonStyle.PRIMARY,
-                            modifier = Modifier.fillMaxWidth(),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 9.dp)
-                        )
-                    } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         if (appState.currentMode == RingerState.RING) {
                             AppleStyleButton(
                                 text = "Force Silent",

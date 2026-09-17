@@ -173,23 +173,17 @@ class RingerService : Service() {
 
     private fun handleForceRing() {
         serviceScope.launch {
-            Log.d(TAG, "Handling Force Ring override")
+            Log.d(TAG, "Handling Force Ring override: setting ringer to RING and disabling automation toggle")
             ringerController.setRingMode()
-            preferences.updateRingerState(
-                mode = RingerState.RING,
-                overrideMode = RingerState.RING
-            )
+            preferences.forceRing()
         }
     }
 
     private fun handleForceSilent() {
         serviceScope.launch {
-            Log.d(TAG, "Handling Force Silent override")
+            Log.d(TAG, "Handling Force Silent override: setting ringer to VIBRATE and disabling automation toggle")
             ringerController.setVibrateMode()
-            preferences.updateRingerState(
-                mode = RingerState.VIBRATE,
-                overrideMode = RingerState.VIBRATE
-            )
+            preferences.forceSilent()
         }
     }
 
