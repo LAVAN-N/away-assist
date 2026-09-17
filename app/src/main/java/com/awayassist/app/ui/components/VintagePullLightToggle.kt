@@ -128,8 +128,8 @@ fun VintagePullLightToggle(
         val sensor = sensorManager?.getDefaultSensor(Sensor.TYPE_GRAVITY)
             ?: sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
 
-        val maxSwayXPx = with(density) { 22.dp.toPx() }
-        val maxSwayYPx = with(density) { 8.dp.toPx() }
+        val maxSwayXPx = with(density) { 48.dp.toPx() }
+        val maxSwayYPx = with(density) { 16.dp.toPx() }
 
         val listener = object : SensorEventListener {
             override fun onSensorChanged(event: SensorEvent?) {
@@ -138,11 +138,11 @@ fun VintagePullLightToggle(
                 // event.values[1]: Y axis gravity
                 val gx = event.values[0]
                 val gy = event.values[1]
-                // Tilting phone right (gx negative) sways cord to the right (+X screen)
-                val targetSwayX = (-gx / 9.81f).coerceIn(-1.0f, 1.0f) * maxSwayXPx
-                val targetSwayY = ((9.81f - gy) / 9.81f).coerceIn(-0.3f, 0.6f) * maxSwayYPx
-                rawTiltXPx = targetSwayX
-                rawTiltYPx = targetSwayY
+                // Boosted sensitivity: subtle 15°-30° tilt creates expressive real-time sway
+                val normalizedTiltX = (-gx / 4.2f).coerceIn(-1.0f, 1.0f)
+                val normalizedTiltY = ((9.81f - gy) / 5.5f).coerceIn(-0.4f, 0.8f)
+                rawTiltXPx = normalizedTiltX * maxSwayXPx
+                rawTiltYPx = normalizedTiltY * maxSwayYPx
             }
 
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
@@ -157,20 +157,20 @@ fun VintagePullLightToggle(
         }
     }
 
-    // Smooth Spring-damped Gyro Pendulum Response
+    // Reactive Spring-damped Gyro Pendulum Response
     val animatedTiltX by animateFloatAsState(
         targetValue = rawTiltXPx,
         animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
+            dampingRatio = 0.52f, // Bouncy natural metal pendulum sway
+            stiffness = 140f
         ),
         label = "gyroTiltX"
     )
     val animatedTiltY by animateFloatAsState(
         targetValue = rawTiltYPx,
         animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
+            dampingRatio = 0.52f,
+            stiffness = 140f
         ),
         label = "gyroTiltY"
     )
