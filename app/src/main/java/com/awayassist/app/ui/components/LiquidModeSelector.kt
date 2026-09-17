@@ -73,8 +73,8 @@ fun LiquidModeSelector(
                 ),
                 shape = SquircleMedium
             )
-            .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
+            .padding(5.dp),
+        horizontalArrangement = Arrangement.spacedBy(5.dp)
     ) {
         OperationMode.entries.forEach { mode ->
             val isSelected = selectedMode == mode
@@ -119,7 +119,7 @@ fun LiquidModeSelector(
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .height(38.dp)
+                    .height(48.dp)
                     .clip(SquircleMedium)
                     .background(itemBgColor)
                     .then(
@@ -147,14 +147,15 @@ fun LiquidModeSelector(
                         imageVector = mode.icon,
                         contentDescription = null,
                         tint = iconColor,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = mode.label,
                         style = MaterialTheme.typography.labelMedium.copy(
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            fontSize = 13.sp
+                            fontSize = 13.5.sp,
+                            letterSpacing = 0.2.sp
                         ),
                         color = itemTextColor
                     )
