@@ -88,6 +88,7 @@ import com.awayassist.app.ui.components.LiquidPillBadge
 import com.awayassist.app.ui.components.LiquidPulsingHalo
 import com.awayassist.app.ui.components.LiquidThemeSelector
 import com.awayassist.app.ui.components.OperationMode
+import com.awayassist.app.ui.components.VintagePullLightToggle
 import com.awayassist.app.ui.components.glassmorphic
 import com.awayassist.app.ui.theme.AwayAssistTheme
 import com.awayassist.app.ui.theme.SquircleLarge
@@ -211,7 +212,14 @@ fun MainScreen(
                 currentMode = currentOperationMode,
                 onSelectMode = onSelectMode,
                 onPauseForDuration = onPauseForDuration,
-                onSelectTheme = onSelectTheme,
+                isDark = isDark,
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+
+            // Realistic Vintage Pull-Cord Light Switch Theme Toggle
+            VintagePullLightToggle(
+                currentTheme = appState.themeMode,
+                onThemeSelected = onSelectTheme,
                 isDark = isDark,
                 modifier = Modifier.padding(bottom = 12.dp)
             )
@@ -681,7 +689,6 @@ private fun UnifiedControlsCard(
     currentMode: OperationMode,
     onSelectMode: (OperationMode) -> Unit,
     onPauseForDuration: (Long) -> Unit,
-    onSelectTheme: (ThemeMode) -> Unit,
     isDark: Boolean,
     modifier: Modifier = Modifier
 ) {
@@ -898,55 +905,6 @@ private fun UnifiedControlsCard(
                     }
                 }
             }
-        }
-
-        HorizontalDivider(
-            modifier = Modifier.padding(horizontal = 14.dp),
-            thickness = 0.5.dp,
-            color = colors.divider
-        )
-
-        // Appearance Theme Row
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(28.dp)
-                        .clip(CircleShape)
-                        .background(colors.cyanGlow.copy(alpha = 0.15f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Palette,
-                        contentDescription = null,
-                        tint = colors.cyanGlow,
-                        modifier = Modifier.size(15.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    text = "Appearance",
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 15.sp
-                    ),
-                    color = colors.textPrimary
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            LiquidThemeSelector(
-                currentTheme = appState.themeMode,
-                onThemeSelected = onSelectTheme
-            )
         }
     }
 }
