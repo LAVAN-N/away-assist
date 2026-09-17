@@ -301,7 +301,7 @@ fun VintagePullLightToggle(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Interactive Stage with Enclosed Lamp Chamber
+            // Interactive Stage with Frosted Gradient Chamber
             BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -309,14 +309,30 @@ fun VintagePullLightToggle(
                     .clip(SquircleMedium)
                     .background(
                         if (isDark) {
-                            Color(0xFF0D0E13)
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color(0x22FFFFFF),
+                                    Color(0x0CFFFFFF)
+                                )
+                            )
                         } else {
-                            Color(0xFF1A1B24)
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color(0x30FFFFFF),
+                                    Color(0x10FFFFFF)
+                                )
+                            )
                         }
                     )
                     .border(
-                        width = 0.7.dp,
-                        color = if (isDark) Color(0x1FFFFFFF) else Color(0x15FFFFFF),
+                        width = 0.8.dp,
+                        brush = Brush.linearGradient(
+                            colors = if (isDark) {
+                                listOf(Color(0x30FFFFFF), Color(0x0CFFFFFF))
+                            } else {
+                                listOf(Color(0x80FFFFFF), Color(0x25FFFFFF))
+                            }
+                        ),
                         shape = SquircleMedium
                     )
             ) {
@@ -644,9 +660,17 @@ fun VintagePullLightToggle(
                         .padding(bottom = 8.dp)
                         .clip(SquirclePill)
                         .background(
-                            if (isCurrentlyLit) Color(0x35FFE082) else Color(0x22000000)
+                            if (isCurrentlyLit) {
+                                if (isDark) Color(0x35FFE082) else Color(0x24FFB300)
+                            } else {
+                                if (isDark) Color(0x22FFFFFF) else Color(0x14000000)
+                            }
                         )
-                        .border(0.6.dp, if (isCurrentlyLit) Color(0x50FFD54F) else Color(0x18FFFFFF), SquirclePill)
+                        .border(
+                            0.6.dp,
+                            if (isCurrentlyLit) Color(0x50FFD54F) else if (isDark) Color(0x25FFFFFF) else Color(0x18000000),
+                            SquirclePill
+                        )
                         .padding(horizontal = 10.dp, vertical = 3.dp)
                 ) {
                     Text(
@@ -656,7 +680,11 @@ fun VintagePullLightToggle(
                             fontSize = 9.5.sp,
                             letterSpacing = 0.8.sp
                         ),
-                        color = if (isCurrentlyLit) Color(0xFFFFD54F) else Color(0xFFB0B0C0)
+                        color = if (isCurrentlyLit) {
+                            if (isDark) Color(0xFFFFD54F) else Color(0xFFB45309)
+                        } else {
+                            colors.textSecondary
+                        }
                     )
                 }
             }
