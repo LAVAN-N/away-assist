@@ -167,6 +167,7 @@ fun MainScreen(
                 hasPolicyAccess = hasNotificationPolicyAccess,
                 onForceRing = onForceRing,
                 onForceSilent = onForceSilent,
+                onDefaultPause = { onPauseForDuration(3600_000L) },
                 onOpenPauseSheet = { showPauseSheet = true },
                 onResumeAutomation = onResumeAutomation,
                 isDark = isDark,
@@ -488,6 +489,7 @@ private fun CompactStatusCard(
     hasPolicyAccess: Boolean,
     onForceRing: () -> Unit,
     onForceSilent: () -> Unit,
+    onDefaultPause: () -> Unit,
     onOpenPauseSheet: () -> Unit,
     onResumeAutomation: () -> Unit,
     isDark: Boolean,
@@ -639,7 +641,7 @@ private fun CompactStatusCard(
                 }
             }
 
-            // Compact Quick Actions
+            // Compact Quick Actions with Default Preset and Separate Custom Option
             if (hasPolicyAccess) {
                 if (appState.isPaused || appState.overrideMode != null) {
                     Spacer(modifier = Modifier.height(12.dp))
@@ -655,32 +657,51 @@ private fun CompactStatusCard(
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
+                        // Action 1: Force mode toggle
                         if (appState.currentMode == RingerState.RING) {
                             AppleStyleButton(
                                 text = "Force Silent",
                                 onClick = onForceSilent,
                                 style = AppleButtonStyle.PRIMARY,
-                                modifier = Modifier.weight(1f),
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.5.dp)
+                                modifier = Modifier.weight(1.15f),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.5.dp)
                             )
                         } else {
                             AppleStyleButton(
                                 text = "Force Ring",
                                 onClick = onForceRing,
                                 style = AppleButtonStyle.ACCENT,
-                                modifier = Modifier.weight(1f),
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.5.dp)
+                                modifier = Modifier.weight(1.15f),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.5.dp)
                             )
                         }
 
+                        // Action 2: Single Default Preset (1h)
                         AppleStyleButton(
-                            text = "Pause...",
+                            text = "Pause 1h",
+                            onClick = onDefaultPause,
+                            style = AppleButtonStyle.GLASS,
+                            modifier = Modifier.weight(1.0f),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.5.dp)
+                        )
+
+                        // Action 3: Separate Custom Option
+                        AppleStyleButton(
+                            text = "Custom",
                             onClick = onOpenPauseSheet,
                             style = AppleButtonStyle.GLASS,
-                            modifier = Modifier.weight(1f),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.5.dp)
+                            modifier = Modifier.weight(0.95f),
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.5.dp),
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Schedule,
+                                    contentDescription = null,
+                                    tint = colors.textPrimary,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                            }
                         )
                     }
                 }
