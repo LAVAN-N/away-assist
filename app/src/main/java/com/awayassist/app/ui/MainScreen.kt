@@ -2,10 +2,15 @@ package com.awayassist.app.ui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -54,16 +59,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.awayassist.app.R
 import com.awayassist.app.data.AppState
 import com.awayassist.app.data.RingerState
 import com.awayassist.app.data.ThemeMode
@@ -126,102 +129,14 @@ fun MainScreen(
                 .verticalScroll(scrollState)
                 .padding(horizontal = 16.dp, vertical = 10.dp)
         ) {
-            // Sleek Header Bar
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 26.dp, bottom = 14.dp, start = 2.dp, end = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(38.dp)
-                            .clip(SquircleMedium)
-                            .shadow(4.dp, SquircleMedium)
-                            .border(
-                                width = 0.8.dp,
-                                brush = Brush.linearGradient(
-                                    colors = listOf(Color(0x80FFFFFF), Color(0x20FFFFFF))
-                                ),
-                                shape = SquircleMedium
-                            )
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.ic_app_logo),
-                            contentDescription = "App Icon",
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(10.dp))
-
-                    Column {
-                        Text(
-                            text = "Away Assist",
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 20.sp,
-                                letterSpacing = (-0.2).sp
-                            ),
-                            color = colors.textPrimary
-                        )
-                        Text(
-                            text = if (appState.isEnabled) "Automated Ringer" else "Automation Off",
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                            color = colors.textSecondary
-                        )
-                    }
-                }
-
-                // Header Cluster: Pill Badge + Perfectly Proportioned (i) Touchpoint
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    val badgeText = when {
-                        !hasNotificationPolicyAccess -> "Setup"
-                        appState.overrideMode != null -> "Override"
-                        appState.isPaused -> "Paused"
-                        !appState.isEnabled -> "Off"
-                        appState.currentMode == RingerState.RING -> "Ring"
-                        else -> "Vibrate"
-                    }
-                    LiquidPillBadge(
-                        text = badgeText,
-                        tintColor = animatedAmbientColor
-                    )
-
-                    // Sleek, well-aligned (i) touchpoint
-                    val infoInteractionSource = remember { MutableInteractionSource() }
-                    Box(
-                        modifier = Modifier
-                            .size(26.dp)
-                            .clip(CircleShape)
-                            .background(if (isDark) Color(0x25FFFFFF) else Color(0x12000000))
-                            .border(
-                                width = 0.8.dp,
-                                color = if (isDark) Color(0x35FFFFFF) else Color(0x18000000),
-                                shape = CircleShape
-                            )
-                            .clickable(
-                                interactionSource = infoInteractionSource,
-                                indication = null,
-                                role = Role.Button,
-                                onClick = { showInfoSheet = true }
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Info,
-                            contentDescription = "About Away Assist",
-                            tint = colors.textPrimary.copy(alpha = 0.85f),
-                            modifier = Modifier.size(13.dp)
-                        )
-                    }
-                }
-            }
+            // Sophisticated Editorial Glass Header
+            EditorialHeader(
+                appState = appState,
+                hasPolicyAccess = hasNotificationPolicyAccess,
+                statusColor = animatedAmbientColor,
+                isDark = isDark,
+                onInfoClick = { showInfoSheet = true }
+            )
 
             // Compact Missing Permission Card
             AnimatedVisibility(
@@ -389,6 +304,150 @@ fun MainScreen(
                 dragHandle = null
             ) {
                 InfoBottomSheetContent(onClose = { showInfoSheet = false })
+            }
+        }
+    }
+}
+
+/**
+ * Sophisticated Editorial Glass Header
+ */
+@Composable
+private fun EditorialHeader(
+    appState: AppState,
+    hasPolicyAccess: Boolean,
+    statusColor: Color,
+    isDark: Boolean,
+    onInfoClick: () -> Unit
+) {
+    val colors = AwayAssistTheme.colors
+
+    val infiniteTransition = rememberInfiniteTransition(label = "beaconPulse")
+    val beaconAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.4f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1400, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "beaconAlpha"
+    )
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 24.dp, bottom = 16.dp, start = 2.dp, end = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        // App Title & Live Beacon
+        Column {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Away Assist",
+                    style = MaterialTheme.typography.displayLarge.copy(
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 24.sp,
+                        letterSpacing = (-0.6).sp
+                    ),
+                    color = colors.textPrimary
+                )
+
+                if (appState.isEnabled && hasPolicyAccess) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(7.dp)
+                            .alpha(beaconAlpha)
+                            .clip(CircleShape)
+                            .background(statusColor)
+                    )
+                }
+            }
+
+            Text(
+                text = "Dynamic Lock & Unlock Assist",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontSize = 11.sp,
+                    letterSpacing = 0.2.sp
+                ),
+                color = colors.textSecondary
+            )
+        }
+
+        // Dynamic Glass Island Capsule (Status Pill + Seamless Info Touchpoint)
+        val infoInteractionSource = remember { MutableInteractionSource() }
+
+        val badgeText = when {
+            !hasPolicyAccess -> "Setup"
+            appState.overrideMode != null -> "Override"
+            appState.isPaused -> "Paused"
+            !appState.isEnabled -> "Off"
+            appState.currentMode == RingerState.RING -> "Ring"
+            else -> "Vibrate"
+        }
+
+        Box(
+            modifier = Modifier
+                .clip(SquirclePill)
+                .background(if (isDark) Color(0x22FFFFFF) else Color(0x0E000000))
+                .border(
+                    width = 0.8.dp,
+                    brush = Brush.horizontalGradient(
+                        colors = if (isDark) {
+                            listOf(Color(0x35FFFFFF), Color(0x10FFFFFF))
+                        } else {
+                            listOf(Color(0x50FFFFFF), Color(0x15000000))
+                        }
+                    ),
+                    shape = SquirclePill
+                )
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                // Live status dot
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .clip(CircleShape)
+                        .background(statusColor)
+                )
+
+                Text(
+                    text = badgeText.uppercase(),
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 10.sp,
+                        letterSpacing = 0.7.sp
+                    ),
+                    color = statusColor
+                )
+
+                // Hairline Divider
+                Box(
+                    modifier = Modifier
+                        .size(width = 1.dp, height = 11.dp)
+                        .background(if (isDark) Color(0x30FFFFFF) else Color(0x20000000))
+                )
+
+                // Seamless Info Icon
+                Icon(
+                    imageVector = Icons.Outlined.Info,
+                    contentDescription = "About",
+                    tint = colors.textPrimary.copy(alpha = 0.7f),
+                    modifier = Modifier
+                        .size(13.dp)
+                        .clickable(
+                            interactionSource = infoInteractionSource,
+                            indication = null,
+                            role = Role.Button,
+                            onClick = onInfoClick
+                        )
+                )
             }
         }
     }
