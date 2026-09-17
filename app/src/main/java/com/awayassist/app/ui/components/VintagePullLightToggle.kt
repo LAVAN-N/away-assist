@@ -85,14 +85,15 @@ import kotlin.math.hypot
 import kotlin.math.roundToInt
 
 /**
- * Realistic Vintage Pull-Cord Light Switch Card.
+ * Realistic Vintage Pull-Cord Light Switch Card with Natural Lamp Circular Pool of Light.
  *
- * - Edison bulb hanging independently with living tungsten filament flicker and ambient bloom.
- * - Beaded metal chain on the right side with extra gap, anchored from its own ceiling rosette.
+ * - The card background remains an elegant glassmorphic surface.
+ * - When lit, light radiates as a realistic circular lamp glow with soft radial falloff centered at the bulb.
+ * - Beaded metal chain on the right side with comfortable spacing.
  * - Hardware gyroscope/accelerometer gravity physics causing natural real-time metal pendulum sway.
  * - 2D catenary rope physics with Bézier curve dynamics and 360° omnidirectional drag.
  * - Only the bottom antique brass acorn tip is interactable for dragging and tap rebound.
- * - Radial theme illumination wave burst originating directly from the center of the bulb on theme change.
+ * - Animated radial ripple wave burst originating directly from the bulb center on theme change.
  */
 @Composable
 fun VintagePullLightToggle(
@@ -196,7 +197,7 @@ fun VintagePullLightToggle(
             lightBurstProgress.snapTo(0f)
             lightBurstProgress.animateTo(
                 targetValue = 1f,
-                animationSpec = tween(durationMillis = 800, easing = FastOutSlowInEasing)
+                animationSpec = tween(durationMillis = 750, easing = FastOutSlowInEasing)
             )
         }
     }
@@ -213,26 +214,16 @@ fun VintagePullLightToggle(
             .fillMaxWidth()
             .clip(SquircleMedium)
             .background(
-                Brush.verticalGradient(
-                    colors = if (isCurrentlyLit) {
-                        listOf(Color(0xFFFFF9EE), Color(0xFFF3EAD8))
-                    } else {
-                        if (isDark) {
-                            listOf(Color(0xFF161622), Color(0xFF0F0F17))
-                        } else {
-                            listOf(Color(0xFFF0F0F5), Color(0xFFE5E5EB))
-                        }
-                    }
-                )
+                if (isDark) {
+                    Brush.verticalGradient(listOf(Color(0xFF18181F), Color(0xFF131318)))
+                } else {
+                    Brush.verticalGradient(listOf(Color(0xFFFFFFFF), Color(0xFFF4F4F8)))
+                }
             )
             .border(
                 width = 0.8.dp,
                 brush = Brush.verticalGradient(
-                    colors = if (isCurrentlyLit) {
-                        listOf(Color(0xFFFFDF9E), Color(0x30E5B65A))
-                    } else {
-                        if (isDark) listOf(Color(0x30FFFFFF), Color(0x10FFFFFF)) else listOf(Color(0x60FFFFFF), Color(0x15000000))
-                    }
+                    colors = if (isDark) listOf(Color(0x30FFFFFF), Color(0x10FFFFFF)) else listOf(Color(0x70FFFFFF), Color(0x15000000))
                 ),
                 shape = SquircleMedium
             )
@@ -319,20 +310,32 @@ fun VintagePullLightToggle(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Interactive Stage with Independent Lamp, Gyro Pendulum Physics, and Catenary Rope
+            // Interactive Stage with Enclosed Lamp Chamber
             BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(168.dp)
+                    .height(172.dp)
                     .clip(SquircleMedium)
-                    .background(if (isCurrentlyLit) Color(0x20FFD54F) else if (isDark) Color(0x22000000) else Color(0x0A000000))
+                    .background(
+                        if (isDark) {
+                            Color(0xFF0D0E13)
+                        } else {
+                            Color(0xFF1A1B24)
+                        }
+                    )
+                    .border(
+                        width = 0.7.dp,
+                        color = if (isDark) Color(0x1FFFFFFF) else Color(0x15FFFFFF),
+                        shape = SquircleMedium
+                    )
             ) {
                 val stageWidthPx = with(density) { maxWidth.toPx() }
                 val stageHeightPx = with(density) { maxHeight.toPx() }
 
                 // Bulb position (Left-center of stage)
                 val bulbCx = stageWidthPx / 2f - with(density) { 26.dp.toPx() }
-                val bulbCenter = Offset(bulbCx, with(density) { 38.dp.toPx() })
+                val bulbCenterY = with(density) { 38.dp.toPx() }
+                val bulbCenter = Offset(bulbCx, bulbCenterY)
 
                 // String mount position (Right side with extra gap)
                 val anchorXPx = stageWidthPx / 2f + with(density) { 36.dp.toPx() }
@@ -351,11 +354,64 @@ fun VintagePullLightToggle(
                     y = anchorYPx + restLengthPx + liveTiltY + curY
                 )
 
-                // 1. Radial Light Wave Expansion from Bulb across the Card on Theme Change
+                // 1. Realistic Circular Lamp Glow & Theme Transition Wave
                 Canvas(modifier = Modifier.matchParentSize()) {
+                    // Realistic Lamp Circular Illumination Glow (Concentrated Radial Falloff)
+                    if (isCurrentlyLit) {
+                        val flicker = filamentFlicker
+
+                        // Layer A: Broad Soft Circular Ambient Light Cast on the Wall
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                colors = listOf(
+                                    Color(0x38FFD54F).copy(alpha = 0.35f * flicker),
+                                    Color(0x22FFB300).copy(alpha = 0.22f * flicker),
+                                    Color(0x0CFF8F00).copy(alpha = 0.12f),
+                                    Color.Transparent
+                                ),
+                                center = bulbCenter,
+                                radius = 120.dp.toPx()
+                            ),
+                            center = bulbCenter,
+                            radius = 120.dp.toPx()
+                        )
+
+                        // Layer B: Focused Warm Circle of Light (Lamp Beam Pool)
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                colors = listOf(
+                                    Color(0x75FFE082).copy(alpha = 0.70f * flicker),
+                                    Color(0x45FFB300).copy(alpha = 0.45f * flicker),
+                                    Color(0x18FF8F00).copy(alpha = 0.20f),
+                                    Color.Transparent
+                                ),
+                                center = bulbCenter,
+                                radius = 72.dp.toPx()
+                            ),
+                            center = bulbCenter,
+                            radius = 72.dp.toPx()
+                        )
+
+                        // Layer C: Intense Hot Core Bloom around Filament
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                colors = listOf(
+                                    Color(0xCCFFF9C4).copy(alpha = 0.85f * flicker),
+                                    Color(0x80FFD54F).copy(alpha = 0.60f * flicker),
+                                    Color(0x00FFB300)
+                                ),
+                                center = bulbCenter,
+                                radius = 32.dp.toPx()
+                            ),
+                            center = bulbCenter,
+                            radius = 32.dp.toPx()
+                        )
+                    }
+
+                    // Theme Change Shockwave Pulse
                     val progress = lightBurstProgress.value
                     if (progress > 0f && progress < 1f) {
-                        val maxRadius = hypot(stageWidthPx, stageHeightPx) * 1.2f
+                        val maxRadius = hypot(stageWidthPx, stageHeightPx) * 1.1f
                         val currentRadius = maxRadius * progress
                         val alpha = (1f - progress).coerceIn(0f, 1f)
 
@@ -363,8 +419,8 @@ fun VintagePullLightToggle(
                             drawCircle(
                                 brush = Brush.radialGradient(
                                     colors = listOf(
-                                        Color(0x70FFE082).copy(alpha = 0.6f * alpha),
-                                        Color(0x35FFB300).copy(alpha = 0.35f * alpha),
+                                        Color(0x80FFE082).copy(alpha = 0.70f * alpha),
+                                        Color(0x40FFB300).copy(alpha = 0.40f * alpha),
                                         Color.Transparent
                                     ),
                                     center = bulbCenter,
@@ -374,7 +430,7 @@ fun VintagePullLightToggle(
                                 radius = currentRadius
                             )
                             drawCircle(
-                                color = Color(0x90FFF59D).copy(alpha = 0.65f * alpha),
+                                color = Color(0xB0FFF59D).copy(alpha = 0.75f * alpha),
                                 center = bulbCenter,
                                 radius = currentRadius,
                                 style = Stroke(width = (3.5f * (1f - progress)).coerceAtLeast(1f))
@@ -383,8 +439,8 @@ fun VintagePullLightToggle(
                             drawCircle(
                                 brush = Brush.radialGradient(
                                     colors = listOf(
-                                        Color(0x706366F1).copy(alpha = 0.55f * alpha),
-                                        Color(0x304F46E5).copy(alpha = 0.30f * alpha),
+                                        Color(0x756366F1).copy(alpha = 0.60f * alpha),
+                                        Color(0x354F46E5).copy(alpha = 0.30f * alpha),
                                         Color.Transparent
                                     ),
                                     center = bulbCenter,
@@ -394,29 +450,12 @@ fun VintagePullLightToggle(
                                 radius = currentRadius
                             )
                             drawCircle(
-                                color = Color(0x90818CF8).copy(alpha = 0.55f * alpha),
+                                color = Color(0xA0818CF8).copy(alpha = 0.60f * alpha),
                                 center = bulbCenter,
                                 radius = currentRadius,
                                 style = Stroke(width = (3.0f * (1f - progress)).coerceAtLeast(1f))
                             )
                         }
-                    }
-
-                    // Background Ambient Radial Glow around Bulb
-                    if (isCurrentlyLit) {
-                        drawCircle(
-                            brush = Brush.radialGradient(
-                                colors = listOf(
-                                    Color(0x60FFE082),
-                                    Color(0x25FFCA28),
-                                    Color(0x00FFB300)
-                                ),
-                                center = bulbCenter,
-                                radius = size.width * 0.65f
-                            ),
-                            radius = size.width * 0.65f,
-                            center = bulbCenter
-                        )
                     }
                 }
 
@@ -613,8 +652,10 @@ fun VintagePullLightToggle(
                         .align(Alignment.BottomCenter)
                         .padding(bottom = 8.dp)
                         .clip(SquirclePill)
-                        .background(if (isCurrentlyLit) Color(0x40FFFFFF) else if (isDark) Color(0x33000000) else Color(0x18000000))
-                        .border(0.6.dp, if (isCurrentlyLit) Color(0x60FFD54F) else Color(0x15FFFFFF), SquirclePill)
+                        .background(
+                            if (isCurrentlyLit) Color(0x35FFE082) else Color(0x22000000)
+                        )
+                        .border(0.6.dp, if (isCurrentlyLit) Color(0x50FFD54F) else Color(0x18FFFFFF), SquirclePill)
                         .padding(horizontal = 10.dp, vertical = 3.dp)
                 ) {
                     Text(
@@ -624,7 +665,7 @@ fun VintagePullLightToggle(
                             fontSize = 9.5.sp,
                             letterSpacing = 0.8.sp
                         ),
-                        color = if (isCurrentlyLit) Color(0xFFB45309) else colors.textSecondary
+                        color = if (isCurrentlyLit) Color(0xFFFFD54F) else Color(0xFFB0B0C0)
                     )
                 }
             }
@@ -729,9 +770,9 @@ private fun DrawScope.drawVintageEdisonBulb(
             path = bulbPath,
             brush = Brush.radialGradient(
                 colors = listOf(
-                    Color(0xFFFFF176).copy(alpha = 0.55f * flickerScale),
-                    Color(0xFFFFB300).copy(alpha = 0.35f),
-                    Color(0xFFFF8F00).copy(alpha = 0.15f)
+                    Color(0xFFFFF176).copy(alpha = 0.65f * flickerScale),
+                    Color(0xFFFFB300).copy(alpha = 0.40f),
+                    Color(0xFFFF8F00).copy(alpha = 0.18f)
                 ),
                 center = bulbCenter,
                 radius = bulbRadius * 1.4f
@@ -747,13 +788,13 @@ private fun DrawScope.drawVintageEdisonBulb(
     // Glass Specular Rim
     drawPath(
         path = bulbPath,
-        color = if (isLit) Color(0x60FFFFFF) else Color(0x35FFFFFF),
+        color = if (isLit) Color(0x75FFFFFF) else Color(0x35FFFFFF),
         style = Stroke(width = 1.2.dp.toPx())
     )
 
     // Glass Curved Reflection Arc
     drawArc(
-        color = Color.White.copy(alpha = if (isLit) 0.5f else 0.25f),
+        color = Color.White.copy(alpha = if (isLit) 0.6f else 0.25f),
         startAngle = 140f,
         sweepAngle = 70f,
         useCenter = false,
@@ -776,7 +817,7 @@ private fun DrawScope.drawVintageEdisonBulb(
     if (isLit) {
         drawPath(
             path = filamentPath,
-            color = Color(0xFFFF9100).copy(alpha = 0.9f),
+            color = Color(0xFFFF9100).copy(alpha = 0.95f),
             style = Stroke(width = 2.4.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
         )
         drawPath(
