@@ -445,18 +445,12 @@ fun VintagePullLightToggle(
                                 center = bulbCenter,
                                 radius = currentRadius
                             )
-                            drawCircle(
-                                color = Color(0xB0FFF59D).copy(alpha = 0.75f * alpha),
-                                center = bulbCenter,
-                                radius = currentRadius,
-                                style = Stroke(width = (3.5f * (1f - progress)).coerceAtLeast(1f))
-                            )
                         } else {
                             drawCircle(
                                 brush = Brush.radialGradient(
                                     colors = listOf(
-                                        Color(0x756366F1).copy(alpha = 0.60f * alpha),
-                                        Color(0x354F46E5).copy(alpha = 0.30f * alpha),
+                                        Color(0x656366F1).copy(alpha = 0.50f * alpha),
+                                        Color(0x254F46E5).copy(alpha = 0.25f * alpha),
                                         Color.Transparent
                                     ),
                                     center = bulbCenter,
@@ -464,12 +458,6 @@ fun VintagePullLightToggle(
                                 ),
                                 center = bulbCenter,
                                 radius = currentRadius
-                            )
-                            drawCircle(
-                                color = Color(0xA0818CF8).copy(alpha = 0.60f * alpha),
-                                center = bulbCenter,
-                                radius = currentRadius,
-                                style = Stroke(width = (3.0f * (1f - progress)).coerceAtLeast(1f))
                             )
                         }
                     }
