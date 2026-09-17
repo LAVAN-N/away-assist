@@ -68,6 +68,8 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -101,7 +103,8 @@ fun VintagePullLightToggle(
     currentTheme: ThemeMode,
     onThemeSelected: (ThemeMode) -> Unit,
     modifier: Modifier = Modifier,
-    isDark: Boolean = AwayAssistTheme.colors.isDark
+    isDark: Boolean = AwayAssistTheme.colors.isDark,
+    onBulbPositioned: ((Offset) -> Unit)? = null
 ) {
     val colors = AwayAssistTheme.colors
     val density = LocalDensity.current
@@ -335,6 +338,12 @@ fun VintagePullLightToggle(
                         ),
                         shape = SquircleMedium
                     )
+                    .onGloballyPositioned { coordinates ->
+                        val rootPos = coordinates.positionInRoot()
+                        val bulbCx = coordinates.size.width / 2f - with(density) { 26.dp.toPx() }
+                        val bulbCy = with(density) { 38.dp.toPx() }
+                        onBulbPositioned?.invoke(Offset(rootPos.x + bulbCx, rootPos.y + bulbCy))
+                    }
             ) {
                 val stageWidthPx = with(density) { maxWidth.toPx() }
                 val stageHeightPx = with(density) { maxHeight.toPx() }

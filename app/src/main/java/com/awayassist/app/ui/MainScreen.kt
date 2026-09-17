@@ -68,6 +68,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
@@ -79,6 +80,7 @@ import com.awayassist.app.data.RingerState
 import com.awayassist.app.data.ThemeMode
 import com.awayassist.app.ui.components.AppleButtonStyle
 import com.awayassist.app.ui.components.AppleStyleButton
+import com.awayassist.app.ui.components.FullScreenThemeWaveOverlay
 import com.awayassist.app.ui.components.GroupedListCard
 import com.awayassist.app.ui.components.GroupedListRow
 import com.awayassist.app.ui.components.LiquidClockPicker
@@ -135,6 +137,7 @@ fun MainScreen(
     val isDark = colors.isDark
 
     var showInfoSheet by remember { mutableStateOf(false) }
+    var bulbScreenPosition by remember { mutableStateOf<Offset?>(null) }
     val countdownText = rememberCountdownFormatted(appState.pauseUntilTimestamp)
 
     val currentOperationMode = when {
@@ -222,6 +225,7 @@ fun MainScreen(
                     currentTheme = appState.themeMode,
                     onThemeSelected = onSelectTheme,
                     isDark = isDark,
+                    onBulbPositioned = { bulbScreenPosition = it },
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
 
@@ -273,6 +277,12 @@ fun MainScreen(
                     )
                 }
             }
+
+            // Full-Screen Theme Wave Transition (Emits from bulb across whole screen in Light mode / Absorbed back into bulb in Dark mode)
+            FullScreenThemeWaveOverlay(
+                isDark = isDark,
+                bulbScreenPosition = bulbScreenPosition
+            )
 
             // Info Modal Bottom Sheet
             if (showInfoSheet) {
