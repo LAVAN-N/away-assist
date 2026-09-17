@@ -201,7 +201,7 @@ fun VintagePullLightToggle(
             lightBurstProgress.snapTo(0f)
             lightBurstProgress.animateTo(
                 targetValue = 1f,
-                animationSpec = tween(durationMillis = 750, easing = FastOutSlowInEasing)
+                animationSpec = tween(durationMillis = 1600, easing = FastOutSlowInEasing)
             )
         }
     }
