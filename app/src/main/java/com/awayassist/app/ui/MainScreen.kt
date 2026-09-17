@@ -113,8 +113,8 @@ fun MainScreen(
     var showInfoSheet by remember { mutableStateOf(false) }
 
     val currentOperationMode = when {
-        appState.overrideMode == RingerState.RING -> OperationMode.FORCE_RING
         appState.isPaused -> OperationMode.PAUSE
+        appState.overrideMode == RingerState.RING -> OperationMode.FORCE_RING
         else -> OperationMode.AUTO
     }
 
