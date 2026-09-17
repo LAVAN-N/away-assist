@@ -110,7 +110,7 @@ class MainActivity : ComponentActivity() {
                                 sendServiceAction(NotificationHelper.ACTION_FORCE_RING)
                             }
                             OperationMode.PAUSE -> {
-                                RingerService.pauseService(this@MainActivity, 3600_000L)
+                                RingerService.pauseService(this@MainActivity, 300_000L)
                             }
                         }
                     },

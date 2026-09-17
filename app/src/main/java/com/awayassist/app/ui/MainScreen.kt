@@ -664,6 +664,7 @@ private fun CompactRulesGrid(modifier: Modifier = Modifier) {
 }
 
 enum class PausePreset(val label: String, val minutes: Int) {
+    M5("5m", 5),
     M10("10m", 10),
     M30("30m", 30),
     H1("1h", 60),
@@ -687,7 +688,7 @@ private fun UnifiedControlsCard(
 ) {
     val colors = AwayAssistTheme.colors
 
-    var selectedPreset by remember { mutableStateOf(PausePreset.H1) }
+    var selectedPreset by remember { mutableStateOf(PausePreset.M5) }
 
     GroupedListCard(modifier = modifier) {
         Column(
