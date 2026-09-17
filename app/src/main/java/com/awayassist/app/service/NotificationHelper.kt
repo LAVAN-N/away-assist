@@ -61,8 +61,12 @@ class NotificationHelper(private val context: Context) {
         val contentText = when {
             !appState.isEnabled && appState.overrideMode == null -> "Automation disabled"
             appState.isPaused -> {
-                val remainingMinutes = ((appState.pauseUntilTimestamp - System.currentTimeMillis()) / 60000L).coerceAtLeast(1)
-                "⏸ Paused for next ${remainingMinutes}m"
+                val diffSecs = ((appState.pauseUntilTimestamp - System.currentTimeMillis()) / 1000L).coerceAtLeast(0L)
+                val hrs = diffSecs / 3600
+                val mins = (diffSecs % 3600) / 60
+                val secs = diffSecs % 60
+                val countdown = String.format(java.util.Locale.getDefault(), "%02d:%02d:%02d", hrs, mins, secs)
+                "⏸ Paused ($countdown)"
             }
             appState.overrideMode != null -> {
                 when (appState.overrideMode) {

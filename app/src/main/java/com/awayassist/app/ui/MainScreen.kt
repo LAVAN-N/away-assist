@@ -97,6 +97,28 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.ui.text.font.FontFamily
+import kotlinx.coroutines.delay
+
+@Composable
+fun rememberCountdownFormatted(targetTimestamp: Long): String {
+    var currentTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(targetTimestamp) {
+        while (targetTimestamp > System.currentTimeMillis()) {
+            currentTime = System.currentTimeMillis()
+            delay(1000L)
+        }
+        currentTime = System.currentTimeMillis()
+    }
+    val diffSecs = ((targetTimestamp - currentTime) / 1000L).coerceAtLeast(0L)
+    val hrs = diffSecs / 3600
+    val mins = (diffSecs % 3600) / 60
+    val secs = diffSecs % 60
+    return String.format(Locale.getDefault(), "%02d:%02d:%02d", hrs, mins, secs)
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
@@ -112,6 +134,7 @@ fun MainScreen(
     val isDark = colors.isDark
 
     var showInfoSheet by remember { mutableStateOf(false) }
+    val countdownText = rememberCountdownFormatted(appState.pauseUntilTimestamp)
 
     val currentOperationMode = when {
         appState.isPaused -> OperationMode.PAUSE
@@ -147,6 +170,7 @@ fun MainScreen(
             // Editorial Glass Header
             EditorialHeader(
                 currentMode = currentOperationMode,
+                countdownText = countdownText,
                 hasPolicyAccess = hasNotificationPolicyAccess,
                 statusColor = animatedAmbientColor,
                 isDark = isDark,
@@ -170,6 +194,7 @@ fun MainScreen(
             CompactStatusCard(
                 appState = appState,
                 currentMode = currentOperationMode,
+                countdownText = countdownText,
                 hasPolicyAccess = hasNotificationPolicyAccess,
                 onResumeAuto = { onSelectMode(OperationMode.AUTO) },
                 isDark = isDark,
@@ -185,6 +210,7 @@ fun MainScreen(
             UnifiedControlsCard(
                 appState = appState,
                 currentMode = currentOperationMode,
+                countdownText = countdownText,
                 onSelectMode = onSelectMode,
                 onPauseForDuration = onPauseForDuration,
                 onSelectTheme = onSelectTheme,
@@ -262,6 +288,7 @@ fun MainScreen(
 @Composable
 private fun EditorialHeader(
     currentMode: OperationMode,
+    countdownText: String,
     hasPolicyAccess: Boolean,
     statusColor: Color,
     isDark: Boolean,
@@ -328,7 +355,7 @@ private fun EditorialHeader(
         val badgeText = when {
             !hasPolicyAccess -> "Setup"
             currentMode == OperationMode.FORCE_RING -> "Ring"
-            currentMode == OperationMode.PAUSE -> "Paused"
+            currentMode == OperationMode.PAUSE -> countdownText
             else -> "Auto"
         }
 
@@ -366,7 +393,8 @@ private fun EditorialHeader(
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontWeight = FontWeight.Bold,
                         fontSize = 10.sp,
-                        letterSpacing = 0.7.sp
+                        letterSpacing = 0.7.sp,
+                        fontFamily = if (currentMode == OperationMode.PAUSE) FontFamily.Monospace else FontFamily.Default
                     ),
                     color = statusColor
                 )
@@ -402,6 +430,7 @@ private fun EditorialHeader(
 private fun CompactStatusCard(
     appState: AppState,
     currentMode: OperationMode,
+    countdownText: String,
     hasPolicyAccess: Boolean,
     onResumeAuto: () -> Unit,
     isDark: Boolean,
@@ -427,11 +456,13 @@ private fun CompactStatusCard(
             )
         }
         currentMode == OperationMode.PAUSE -> {
-            val remainingMins = ((appState.pauseUntilTimestamp - System.currentTimeMillis()) / 60000L).coerceAtLeast(1)
+            val expiryTime = if (appState.pauseUntilTimestamp > 0L) {
+                SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(appState.pauseUntilTimestamp))
+            } else ""
             Quad(
                 colors.warning,
-                "Paused (${remainingMins}m left)",
-                "Automation paused • Resumes automatically",
+                "Paused ($countdownText)",
+                "Automation paused • Resumes at $expiryTime",
                 Icons.Default.PauseCircle
             )
         }
@@ -652,6 +683,7 @@ enum class PausePreset(val label: String, val minutes: Int) {
 private fun UnifiedControlsCard(
     appState: AppState,
     currentMode: OperationMode,
+    countdownText: String,
     onSelectMode: (OperationMode) -> Unit,
     onPauseForDuration: (Long) -> Unit,
     onSelectTheme: (ThemeMode) -> Unit,
@@ -688,11 +720,12 @@ private fun UnifiedControlsCard(
                     text = when (currentMode) {
                         OperationMode.AUTO -> "Dynamic Lock/Unlock"
                         OperationMode.FORCE_RING -> "Always Ring"
-                        OperationMode.PAUSE -> "Paused"
+                        OperationMode.PAUSE -> "Paused ($countdownText)"
                     },
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontWeight = FontWeight.Medium,
-                        fontSize = 11.5.sp
+                        fontSize = 11.5.sp,
+                        fontFamily = if (currentMode == OperationMode.PAUSE) FontFamily.Monospace else FontFamily.Default
                     ),
                     color = when (currentMode) {
                         OperationMode.AUTO -> colors.accentSilent
@@ -770,12 +803,13 @@ private fun UnifiedControlsCard(
                         }
                         if (expiryTime.isNotEmpty()) {
                             Text(
-                                text = "Resumes at $expiryTime",
+                                text = "$countdownText (Resumes $expiryTime)",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontWeight = FontWeight.SemiBold,
-                                    fontSize = 11.sp
+                                    fontSize = 11.sp,
+                                    fontFamily = FontFamily.Monospace
                                 ),
-                                color = colors.textSecondary
+                                color = colors.warning
                             )
                         }
                     }
