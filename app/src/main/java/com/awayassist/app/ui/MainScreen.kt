@@ -664,7 +664,6 @@ private fun CompactRulesGrid(modifier: Modifier = Modifier) {
 }
 
 enum class PausePreset(val label: String, val minutes: Int) {
-    M5("5m", 5),
     M10("10m", 10),
     M30("30m", 30),
     H1("1h", 60),
@@ -688,7 +687,7 @@ private fun UnifiedControlsCard(
 ) {
     val colors = AwayAssistTheme.colors
 
-    var selectedPreset by remember { mutableStateOf(PausePreset.M5) }
+    var selectedPreset by remember { mutableStateOf<PausePreset?>(null) }
 
     GroupedListCard(modifier = modifier) {
         Column(
@@ -737,14 +736,16 @@ private fun UnifiedControlsCard(
                 onModeSelected = { mode ->
                     onSelectMode(mode)
                     if (mode == OperationMode.PAUSE) {
-                        val duration = if (selectedPreset == PausePreset.CUSTOM) {
-                            if (appState.pauseUntilTimestamp > System.currentTimeMillis()) {
-                                appState.pauseUntilTimestamp - System.currentTimeMillis()
-                            } else {
-                                3600_000L
+                        val duration = when (selectedPreset) {
+                            null -> 300_000L // 5 minutes default
+                            PausePreset.CUSTOM -> {
+                                if (appState.pauseUntilTimestamp > System.currentTimeMillis()) {
+                                    appState.pauseUntilTimestamp - System.currentTimeMillis()
+                                } else {
+                                    3600_000L
+                                }
                             }
-                        } else {
-                            selectedPreset.minutes * 60_000L
+                            else -> selectedPreset!!.minutes * 60_000L
                         }
                         onPauseForDuration(duration)
                     }
