@@ -8,6 +8,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,6 +27,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Palette
@@ -32,11 +37,20 @@ import androidx.compose.material.icons.filled.PauseCircle
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -65,6 +79,7 @@ import com.awayassist.app.ui.theme.AwayAssistTheme
 import com.awayassist.app.ui.theme.SquircleLarge
 import com.awayassist.app.ui.theme.SquircleMedium
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
     appState: AppState,
@@ -80,6 +95,8 @@ fun MainScreen(
     val scrollState = rememberScrollState()
     val colors = AwayAssistTheme.colors
     val isDark = colors.isDark
+
+    var showInfoSheet by remember { mutableStateOf(false) }
 
     // Active ambient glow color corresponding to current ringer / app state
     val targetAmbientColor = when {
@@ -105,23 +122,22 @@ fun MainScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(scrollState)
-                .padding(horizontal = 20.dp, vertical = 20.dp)
+                .padding(horizontal = 18.dp, vertical = 12.dp)
         ) {
-            // Header with Glassmorphic App Icon & Liquid Badge
+            // Compact Header: Logo, Title, Badge & Info Button
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 28.dp, bottom = 22.dp),
+                    .padding(top = 28.dp, bottom = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Glassmorphic App Icon Logo
                     Box(
                         modifier = Modifier
-                            .size(48.dp)
+                            .size(40.dp)
                             .clip(SquircleMedium)
-                            .shadow(8.dp, SquircleMedium)
+                            .shadow(6.dp, SquircleMedium)
                             .border(
                                 width = 1.dp,
                                 brush = Brush.linearGradient(
@@ -132,60 +148,79 @@ fun MainScreen(
                     ) {
                         Image(
                             painter = painterResource(id = R.drawable.ic_app_logo),
-                            contentDescription = "Away Assist App Icon",
+                            contentDescription = "App Icon",
                             modifier = Modifier.fillMaxSize()
                         )
                     }
 
-                    Spacer(modifier = Modifier.width(14.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
 
                     Column {
                         Text(
                             text = "Away Assist",
-                            style = MaterialTheme.typography.displayLarge.copy(
-                                fontSize = 28.sp,
-                                fontWeight = FontWeight.Bold
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 22.sp
                             ),
                             color = colors.textPrimary
                         )
                         Text(
-                            text = "Liquid Lock-Aware Audio",
-                            style = MaterialTheme.typography.bodyMedium,
+                            text = if (appState.isEnabled) "Automated Ringer Active" else "Automation Disabled",
+                            style = MaterialTheme.typography.labelSmall,
                             color = colors.textSecondary
                         )
                     }
                 }
 
-                // Status Pill Badge
-                val badgeText = when {
-                    !hasNotificationPolicyAccess -> "Setup"
-                    !appState.isEnabled -> "Disabled"
-                    appState.isPaused -> "Paused"
-                    appState.overrideMode != null -> "Override"
-                    appState.currentMode == RingerState.RING -> "Ring"
-                    else -> "Vibrate"
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    val badgeText = when {
+                        !hasNotificationPolicyAccess -> "Setup"
+                        !appState.isEnabled -> "Off"
+                        appState.isPaused -> "Paused"
+                        appState.overrideMode != null -> "Override"
+                        appState.currentMode == RingerState.RING -> "Ring"
+                        else -> "Vibrate"
+                    }
+                    LiquidPillBadge(
+                        text = badgeText,
+                        tintColor = animatedAmbientColor
+                    )
+
+                    Spacer(modifier = Modifier.width(6.dp))
+
+                    // Info (i) button for clean informative details
+                    IconButton(
+                        onClick = { showInfoSheet = true },
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(if (isDark) Color(0x20FFFFFF) else Color(0x15000000))
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Info,
+                            contentDescription = "About and Help",
+                            tint = colors.textPrimary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                 }
-                LiquidPillBadge(
-                    text = badgeText,
-                    tintColor = animatedAmbientColor
-                )
             }
 
-            // Permission Warning Card if missing
+            // Compact Missing Permission Card
             AnimatedVisibility(
                 visible = !hasNotificationPolicyAccess,
                 enter = fadeIn(),
                 exit = fadeOut()
             ) {
-                PermissionRequiredCard(
+                CompactPermissionCard(
                     onRequestPolicyAccess = onRequestPolicyAccess,
                     isDark = isDark,
-                    modifier = Modifier.padding(bottom = 20.dp)
+                    modifier = Modifier.padding(bottom = 14.dp)
                 )
             }
 
-            // Hero Live Status Glassmorphic Card
-            LiveStatusCard(
+            // Compact Hero Status Card with Glanceable Actions
+            CompactStatusCard(
                 appState = appState,
                 hasPolicyAccess = hasNotificationPolicyAccess,
                 onForceRing = onForceRing,
@@ -193,22 +228,25 @@ fun MainScreen(
                 onPause1h = onPause1h,
                 onResumeAutomation = onResumeAutomation,
                 isDark = isDark,
-                modifier = Modifier.padding(bottom = 24.dp)
+                modifier = Modifier.padding(bottom = 14.dp)
             )
 
-            // Master Automation Toggle Card
+            // Compact 2-Tile Rules Grid (Screen Locked vs Screen Unlocked)
+            CompactRulesGrid(
+                modifier = Modifier.padding(bottom = 14.dp)
+            )
+
+            // Settings & Controls Card (Toggle & Theme)
             GroupedListCard(
-                header = "Automation Engine",
-                footer = "Away Assist continuously listens for hardware lock/unlock events with zero battery polling.",
-                modifier = Modifier.padding(bottom = 24.dp)
+                modifier = Modifier.padding(bottom = 14.dp)
             ) {
                 GroupedListRow(
-                    title = "Enable Automation",
-                    subtitle = if (appState.isEnabled) "Service running in background" else "Automation paused",
+                    title = "Automation",
+                    subtitle = if (appState.isEnabled) "Running in background" else "Paused",
                     leadingIcon = {
                         Box(
                             modifier = Modifier
-                                .size(32.dp)
+                                .size(30.dp)
                                 .clip(CircleShape)
                                 .background(colors.accentSilent.copy(alpha = 0.15f)),
                             contentAlignment = Alignment.Center
@@ -217,7 +255,7 @@ fun MainScreen(
                                 imageVector = if (appState.isEnabled) Icons.Default.Notifications else Icons.Default.NotificationsOff,
                                 contentDescription = null,
                                 tint = colors.accentSilent,
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(16.dp)
                             )
                         }
                     },
@@ -227,56 +265,46 @@ fun MainScreen(
                             onCheckedChange = onToggleEnabled,
                             activeColor = colors.ringState
                         )
-                    }
+                    },
+                    showDivider = true
                 )
-            }
 
-            // Theme Appearance Card
-            GroupedListCard(
-                header = "Appearance",
-                footer = "Switch between dynamic liquid Light mode, Midnight Glass Dark mode, or follow your System setting.",
-                modifier = Modifier.padding(bottom = 24.dp)
-            ) {
+                // Compact Theme Selector Row
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 14.dp)
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clip(CircleShape)
-                                .background(colors.cyanGlow.copy(alpha = 0.15f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Palette,
-                                contentDescription = null,
-                                tint = colors.cyanGlow,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(30.dp)
+                                    .clip(CircleShape)
+                                    .background(colors.cyanGlow.copy(alpha = 0.15f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Palette,
+                                    contentDescription = null,
+                                    tint = colors.cyanGlow,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
                             Text(
-                                text = "Theme Mode",
+                                text = "Appearance",
                                 style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
                                 color = colors.textPrimary
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "Current: ${appState.themeMode.displayName}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = colors.textSecondary
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     LiquidThemeSelector(
                         currentTheme = appState.themeMode,
@@ -285,79 +313,17 @@ fun MainScreen(
                 }
             }
 
-            // Automation Rules Glassmorphic Card
+            // System Status Compact Row
             GroupedListCard(
-                header = "State Rules",
-                footer = "Deterministic switching: Screen locked triggers Normal audible mode; screen unlocked restores Vibrate mode.",
                 modifier = Modifier.padding(bottom = 24.dp)
             ) {
                 GroupedListRow(
-                    title = "Screen Locked",
-                    subtitle = "When phone is put away on desk or in pocket",
-                    leadingIcon = {
-                        Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clip(CircleShape)
-                                .background(colors.ringState.copy(alpha = 0.15f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Notifications,
-                                contentDescription = null,
-                                tint = colors.ringState,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    },
-                    trailingContent = {
-                        LiquidPillBadge(
-                            text = "Ring (Normal)",
-                            tintColor = colors.ringState
-                        )
-                    },
-                    showDivider = true
-                )
-                GroupedListRow(
-                    title = "Screen Unlocked",
-                    subtitle = "When phone is actively being handled",
-                    leadingIcon = {
-                        Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clip(CircleShape)
-                                .background(colors.accentSilent.copy(alpha = 0.15f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Vibration,
-                                contentDescription = null,
-                                tint = colors.accentSilent,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    },
-                    trailingContent = {
-                        LiquidPillBadge(
-                            text = "Vibrate",
-                            tintColor = colors.accentSilent
-                        )
-                    }
-                )
-            }
-
-            // System & Permissions Status Card
-            GroupedListCard(
-                header = "System Integrity",
-                modifier = Modifier.padding(bottom = 36.dp)
-            ) {
-                GroupedListRow(
                     title = "Do Not Disturb Access",
-                    subtitle = if (hasNotificationPolicyAccess) "Granted • Ringer switching authorized" else "Required • Tap to grant in Settings",
+                    subtitle = if (hasNotificationPolicyAccess) "Access granted" else "Tap to grant",
                     leadingIcon = {
                         Box(
                             modifier = Modifier
-                                .size(32.dp)
+                                .size(30.dp)
                                 .clip(CircleShape)
                                 .background(
                                     if (hasNotificationPolicyAccess) colors.ringState.copy(alpha = 0.15f) else colors.error.copy(alpha = 0.15f)
@@ -368,7 +334,7 @@ fun MainScreen(
                                 imageVector = Icons.Default.Shield,
                                 contentDescription = null,
                                 tint = if (hasNotificationPolicyAccess) colors.ringState else colors.error,
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(16.dp)
                             )
                         }
                     },
@@ -379,52 +345,39 @@ fun MainScreen(
                                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                                 color = if (hasNotificationPolicyAccess) colors.ringState else colors.error
                             )
-                            Spacer(modifier = Modifier.width(6.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
                                 contentDescription = null,
                                 tint = colors.textSecondary,
-                                modifier = Modifier.size(14.dp)
+                                modifier = Modifier.size(12.dp)
                             )
                         }
                     },
-                    onClick = onRequestPolicyAccess,
-                    showDivider = true
+                    onClick = onRequestPolicyAccess
                 )
-                GroupedListRow(
-                    title = "Background Service",
-                    subtitle = if (appState.isEnabled) "Active with low-priority notification" else "Service stopped",
-                    leadingIcon = {
-                        Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clip(CircleShape)
-                                .background(colors.azureGlow.copy(alpha = 0.15f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Notifications,
-                                contentDescription = null,
-                                tint = colors.azureGlow,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    },
-                    trailingContent = {
-                        Text(
-                            text = if (appState.isEnabled) "Active" else "Stopped",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = if (appState.isEnabled) colors.ringState else colors.textSecondary
-                        )
-                    }
-                )
+            }
+        }
+
+        // Informative Info Modal Bottom Sheet
+        if (showInfoSheet) {
+            ModalBottomSheet(
+                onDismissRequest = { showInfoSheet = false },
+                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                containerColor = if (isDark) Color(0xFF141520) else Color(0xFFFAFAFC),
+                dragHandle = null
+            ) {
+                InfoBottomSheetContent(onClose = { showInfoSheet = false })
             }
         }
     }
 }
 
+/**
+ * Compact Glanceable Hero Status Card
+ */
 @Composable
-private fun LiveStatusCard(
+private fun CompactStatusCard(
     appState: AppState,
     hasPolicyAccess: Boolean,
     onForceRing: () -> Unit,
@@ -441,15 +394,15 @@ private fun LiveStatusCard(
             Quad(
                 colors.error,
                 "Permission Required",
-                "Grant Notification Policy Access so Away Assist can switch ringer modes",
+                "Grant DND access to enable automated ringer switching",
                 Icons.Default.Warning
             )
         }
         !appState.isEnabled -> {
             Quad(
                 colors.textSecondary,
-                "Automation Disabled",
-                "Enable the toggle below to activate automatic ringer switching",
+                "Automation Off",
+                "Enable toggle below to automate ringer",
                 Icons.Default.NotificationsOff
             )
         }
@@ -457,8 +410,8 @@ private fun LiveStatusCard(
             val remainingMins = ((appState.pauseUntilTimestamp - System.currentTimeMillis()) / 60000L).coerceAtLeast(1)
             Quad(
                 colors.warning,
-                "Automation Paused",
-                "Paused for next ${remainingMins}m • Tap Resume to reactivate",
+                "Paused (${remainingMins}m)",
+                "Automation temporarily paused",
                 Icons.Default.PauseCircle
             )
         }
@@ -466,14 +419,14 @@ private fun LiveStatusCard(
             when (appState.overrideMode) {
                 RingerState.RING -> Quad(
                     colors.ringState,
-                    "Force Ring Active",
-                    "Manual override • Resets on next screen unlock",
+                    "Force Ring",
+                    "Manual override • Resets on next unlock",
                     Icons.Default.Notifications
                 )
                 RingerState.VIBRATE, RingerState.SILENT -> Quad(
                     colors.accentSilent,
-                    "Force Silent Active",
-                    "Manual override • Resets on next screen lock",
+                    "Force Silent",
+                    "Manual override • Resets on next lock",
                     Icons.Default.Vibration
                 )
                 else -> Quad(
@@ -488,7 +441,7 @@ private fun LiveStatusCard(
             Quad(
                 colors.ringState,
                 "Ring Mode Active",
-                "Screen locked • Incoming calls and alerts are audible",
+                "Screen locked • Calls & alerts audible",
                 Icons.Default.Notifications
             )
         }
@@ -496,15 +449,15 @@ private fun LiveStatusCard(
             Quad(
                 colors.accentSilent,
                 "Vibrate Mode Active",
-                "Screen unlocked • Silent vibration during active use",
+                "Screen unlocked • Silent vibration in use",
                 Icons.Default.Vibration
             )
         }
         else -> {
             Quad(
                 colors.accentSilent,
-                "Monitoring Lock State",
-                "Ready to switch ringer mode on lock/unlock events",
+                "Ready",
+                "Monitoring lock/unlock transitions",
                 Icons.Default.Notifications
             )
         }
@@ -524,18 +477,17 @@ private fun LiveStatusCard(
                 tintColor = animatedStatusColor,
                 isDark = isDark
             )
-            .padding(22.dp)
+            .padding(16.dp)
     ) {
         Column {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                // Liquid Pulsing Halo around status icon
                 LiquidPulsingHalo(glowColor = animatedStatusColor) {
                     Box(
                         modifier = Modifier
-                            .size(54.dp)
+                            .size(44.dp)
                             .clip(CircleShape)
                             .background(
                                 Brush.radialGradient(
@@ -556,45 +508,46 @@ private fun LiveStatusCard(
                             imageVector = statusIcon,
                             contentDescription = null,
                             tint = animatedStatusColor,
-                            modifier = Modifier.size(28.dp)
+                            modifier = Modifier.size(22.dp)
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.width(16.dp))
+                Spacer(modifier = Modifier.width(12.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = statusTitle,
-                        style = MaterialTheme.typography.titleLarge.copy(
+                        style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
-                            fontSize = 20.sp
+                            fontSize = 17.sp
                         ),
                         color = colors.textPrimary
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(1.dp))
                     Text(
                         text = statusSubtitle,
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp),
                         color = colors.textSecondary
                     )
                 }
             }
 
-            // Glassmorphic Quick Action Buttons
+            // Compact Quick Actions
             if (hasPolicyAccess && appState.isEnabled) {
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     if (appState.isPaused || appState.overrideMode != null) {
                         AppleStyleButton(
-                            text = "Resume Automation",
+                            text = "Resume",
                             onClick = onResumeAutomation,
                             style = AppleButtonStyle.PRIMARY,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 9.dp)
                         )
                     } else {
                         if (appState.currentMode == RingerState.RING) {
@@ -603,7 +556,7 @@ private fun LiveStatusCard(
                                 onClick = onForceSilent,
                                 style = AppleButtonStyle.PRIMARY,
                                 modifier = Modifier.weight(1f),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 11.dp)
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 9.dp)
                             )
                         } else {
                             AppleStyleButton(
@@ -611,7 +564,7 @@ private fun LiveStatusCard(
                                 onClick = onForceRing,
                                 style = AppleButtonStyle.ACCENT,
                                 modifier = Modifier.weight(1f),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 11.dp)
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 9.dp)
                             )
                         }
 
@@ -620,7 +573,7 @@ private fun LiveStatusCard(
                             onClick = onPause1h,
                             style = AppleButtonStyle.GLASS,
                             modifier = Modifier.weight(1f),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 11.dp)
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 9.dp)
                         )
                     }
                 }
@@ -629,8 +582,95 @@ private fun LiveStatusCard(
     }
 }
 
+/**
+ * Compact 2-Tile Rules Grid
+ */
 @Composable
-private fun PermissionRequiredCard(
+private fun CompactRulesGrid(modifier: Modifier = Modifier) {
+    val colors = AwayAssistTheme.colors
+    val isDark = colors.isDark
+
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        // Tile 1: Locked -> Ring
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .glassmorphic(shape = SquircleMedium, tintColor = colors.ringState, isDark = isDark)
+                .padding(12.dp)
+        ) {
+            Column {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Lock,
+                        contentDescription = null,
+                        tint = colors.textSecondary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    LiquidPillBadge(text = "Ring", tintColor = colors.ringState)
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Screen Locked",
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold, fontSize = 14.sp),
+                    color = colors.textPrimary
+                )
+                Text(
+                    text = "Audible calls",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.textSecondary
+                )
+            }
+        }
+
+        // Tile 2: Unlocked -> Vibrate
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .glassmorphic(shape = SquircleMedium, tintColor = colors.accentSilent, isDark = isDark)
+                .padding(12.dp)
+        ) {
+            Column {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.LockOpen,
+                        contentDescription = null,
+                        tint = colors.textSecondary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    LiquidPillBadge(text = "Vibrate", tintColor = colors.accentSilent)
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Screen Unlocked",
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold, fontSize = 14.sp),
+                    color = colors.textPrimary
+                )
+                Text(
+                    text = "Silent in use",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.textSecondary
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Compact Missing Permission Banner
+ */
+@Composable
+private fun CompactPermissionCard(
     onRequestPolicyAccess: () -> Unit,
     isDark: Boolean,
     modifier: Modifier = Modifier
@@ -640,54 +680,124 @@ private fun PermissionRequiredCard(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .glassmorphic(
-                shape = SquircleLarge,
-                tintColor = colors.error,
-                isDark = isDark
-            )
-            .padding(20.dp)
+            .glassmorphic(shape = SquircleMedium, tintColor = colors.error, isDark = isDark)
+            .padding(14.dp)
     ) {
-        Column {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(colors.error.copy(alpha = 0.2f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Shield,
-                        contentDescription = null,
-                        tint = colors.error,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.width(12.dp))
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(
+                imageVector = Icons.Default.Warning,
+                contentDescription = null,
+                tint = colors.error,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Permission Setup Required",
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    text = "DND Permission Needed",
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold, fontSize = 14.sp),
                     color = colors.error
                 )
+                Text(
+                    text = "Required to switch ringer mode",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.textPrimary
+                )
             }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Text(
-                text = "Android requires Notification Policy Access (Do Not Disturb access) so Away Assist can switch between Ring and Vibrate modes silently in the background.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.textPrimary
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
             AppleStyleButton(
-                text = "Grant Permission in Settings",
+                text = "Grant",
                 onClick = onRequestPolicyAccess,
                 style = AppleButtonStyle.DESTRUCTIVE,
-                modifier = Modifier.fillMaxWidth()
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
             )
         }
+    }
+}
+
+/**
+ * Clean Info Bottom Sheet with full details when (i) is tapped
+ */
+@Composable
+private fun InfoBottomSheetContent(onClose: () -> Unit) {
+    val colors = AwayAssistTheme.colors
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(24.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.Info,
+                    contentDescription = null,
+                    tint = colors.accentSilent,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = "How Away Assist Works",
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    color = colors.textPrimary
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(18.dp))
+
+        InfoItem(
+            title = "Deterministic Switching",
+            description = "When you lock your phone, it switches to Normal Audible Ring mode so you never miss a call while away. When you unlock it, it restores Vibrate mode to prevent disturbances during active use."
+        )
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        InfoItem(
+            title = "Zero Battery Cost & No Polling",
+            description = "Away Assist uses event-driven hardware broadcast triggers (ACTION_SCREEN_OFF / ACTION_USER_PRESENT). It never runs background polling loops or periodic battery-draining alarms."
+        )
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        InfoItem(
+            title = "100% On-Device & Privacy Safe",
+            description = "No internet permissions requested. All logic and preferences remain strictly on your device."
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        AppleStyleButton(
+            text = "Got it",
+            onClick = onClose,
+            style = AppleButtonStyle.PRIMARY,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+    }
+}
+
+@Composable
+private fun InfoItem(title: String, description: String) {
+    val colors = AwayAssistTheme.colors
+    Column {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+            color = colors.textPrimary
+        )
+        Spacer(modifier = Modifier.height(3.dp))
+        Text(
+            text = description,
+            style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp),
+            color = colors.textSecondary
+        )
     }
 }
 
