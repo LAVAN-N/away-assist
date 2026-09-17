@@ -43,6 +43,18 @@ class RingerService : Service() {
             }
             context.startService(intent)
         }
+
+        fun pauseService(context: Context, durationMs: Long) {
+            val intent = Intent(context, RingerService::class.java).apply {
+                action = NotificationHelper.ACTION_PAUSE
+                putExtra(NotificationHelper.EXTRA_PAUSE_DURATION_MS, durationMs)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
+        }
     }
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -85,6 +97,10 @@ class RingerService : Service() {
             }
             NotificationHelper.ACTION_FORCE_SILENT -> {
                 handleForceSilent()
+            }
+            NotificationHelper.ACTION_PAUSE -> {
+                val durationMs = intent?.getLongExtra(NotificationHelper.EXTRA_PAUSE_DURATION_MS, 3600_000L) ?: 3600_000L
+                handlePause(durationMs)
             }
             NotificationHelper.ACTION_PAUSE_1H -> {
                 handlePause(3600_000L)

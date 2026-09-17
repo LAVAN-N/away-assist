@@ -20,10 +20,12 @@ class NotificationHelper(private val context: Context) {
 
         const val ACTION_FORCE_RING = "com.awayassist.app.ACTION_FORCE_RING"
         const val ACTION_FORCE_SILENT = "com.awayassist.app.ACTION_FORCE_SILENT"
+        const val ACTION_PAUSE = "com.awayassist.app.ACTION_PAUSE"
         const val ACTION_PAUSE_1H = "com.awayassist.app.ACTION_PAUSE_1H"
         const val ACTION_RESUME = "com.awayassist.app.ACTION_RESUME"
         const val ACTION_START = "com.awayassist.app.ACTION_START"
         const val ACTION_STOP = "com.awayassist.app.ACTION_STOP"
+        const val EXTRA_PAUSE_DURATION_MS = "com.awayassist.app.EXTRA_PAUSE_DURATION_MS"
     }
 
     private val notificationManager =
@@ -57,7 +59,7 @@ class NotificationHelper(private val context: Context) {
         )
 
         val contentText = when {
-            !appState.isEnabled -> "Automation disabled"
+            !appState.isEnabled && appState.overrideMode == null -> "Automation disabled"
             appState.isPaused -> {
                 val remainingMinutes = ((appState.pauseUntilTimestamp - System.currentTimeMillis()) / 60000L).coerceAtLeast(1)
                 "⏸ Paused for next ${remainingMinutes}m"

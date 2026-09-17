@@ -33,6 +33,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
@@ -41,6 +42,8 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PauseCircle
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Vibration
@@ -50,10 +53,13 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -84,6 +90,9 @@ import com.awayassist.app.ui.theme.AwayAssistTheme
 import com.awayassist.app.ui.theme.SquircleLarge
 import com.awayassist.app.ui.theme.SquircleMedium
 import com.awayassist.app.ui.theme.SquirclePill
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -93,7 +102,7 @@ fun MainScreen(
     onToggleEnabled: (Boolean) -> Unit,
     onForceRing: () -> Unit,
     onForceSilent: () -> Unit,
-    onPause1h: () -> Unit,
+    onPauseForDuration: (Long) -> Unit,
     onResumeAutomation: () -> Unit,
     onRequestPolicyAccess: () -> Unit,
     onSelectTheme: (ThemeMode) -> Unit
@@ -103,6 +112,7 @@ fun MainScreen(
     val isDark = colors.isDark
 
     var showInfoSheet by remember { mutableStateOf(false) }
+    var showPauseSheet by remember { mutableStateOf(false) }
 
     val targetAmbientColor = when {
         !hasNotificationPolicyAccess -> colors.error
@@ -157,7 +167,7 @@ fun MainScreen(
                 hasPolicyAccess = hasNotificationPolicyAccess,
                 onForceRing = onForceRing,
                 onForceSilent = onForceSilent,
-                onPause1h = onPause1h,
+                onOpenPauseSheet = { showPauseSheet = true },
                 onResumeAutomation = onResumeAutomation,
                 isDark = isDark,
                 modifier = Modifier.padding(bottom = 12.dp)
@@ -306,6 +316,25 @@ fun MainScreen(
                 InfoBottomSheetContent(onClose = { showInfoSheet = false })
             }
         }
+
+        // Custom Pause Modal Bottom Sheet
+        if (showPauseSheet) {
+            ModalBottomSheet(
+                onDismissRequest = { showPauseSheet = false },
+                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                containerColor = if (isDark) Color(0xFF141520) else Color(0xFFFAFAFC),
+                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                dragHandle = null
+            ) {
+                CustomPauseBottomSheetContent(
+                    onConfirm = { durationMs ->
+                        onPauseForDuration(durationMs)
+                        showPauseSheet = false
+                    },
+                    onClose = { showPauseSheet = false }
+                )
+            }
+        }
     }
 }
 
@@ -366,7 +395,7 @@ private fun EditorialHeader(
             }
 
             Text(
-                text = "Dynamic Lock & Unlock Assist",
+                text = "Dynamic Lock & Unlock Automation",
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontSize = 11.sp,
                     letterSpacing = 0.2.sp
@@ -375,7 +404,7 @@ private fun EditorialHeader(
             )
         }
 
-        // Dynamic Glass Island Capsule (Status Pill + Seamless Info Touchpoint)
+        // Dynamic Glass Island Capsule
         val infoInteractionSource = remember { MutableInteractionSource() }
 
         val badgeText = when {
@@ -409,7 +438,6 @@ private fun EditorialHeader(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                // Live status dot
                 Box(
                     modifier = Modifier
                         .size(6.dp)
@@ -427,14 +455,12 @@ private fun EditorialHeader(
                     color = statusColor
                 )
 
-                // Hairline Divider
                 Box(
                     modifier = Modifier
                         .size(width = 1.dp, height = 11.dp)
                         .background(if (isDark) Color(0x30FFFFFF) else Color(0x20000000))
                 )
 
-                // Seamless Info Icon
                 Icon(
                     imageVector = Icons.Outlined.Info,
                     contentDescription = "About",
@@ -462,7 +488,7 @@ private fun CompactStatusCard(
     hasPolicyAccess: Boolean,
     onForceRing: () -> Unit,
     onForceSilent: () -> Unit,
-    onPause1h: () -> Unit,
+    onOpenPauseSheet: () -> Unit,
     onResumeAutomation: () -> Unit,
     isDark: Boolean,
     modifier: Modifier = Modifier
@@ -504,8 +530,8 @@ private fun CompactStatusCard(
             val remainingMins = ((appState.pauseUntilTimestamp - System.currentTimeMillis()) / 60000L).coerceAtLeast(1)
             Quad(
                 colors.warning,
-                "Paused (${remainingMins}m)",
-                "Automation temporarily paused",
+                "Paused (${remainingMins}m remaining)",
+                "Automation paused • Resumes automatically",
                 Icons.Default.PauseCircle
             )
         }
@@ -650,8 +676,8 @@ private fun CompactStatusCard(
                         }
 
                         AppleStyleButton(
-                            text = "Pause 1h",
-                            onClick = onPause1h,
+                            text = "Pause...",
+                            onClick = onOpenPauseSheet,
                             style = AppleButtonStyle.GLASS,
                             modifier = Modifier.weight(1f),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.5.dp)
@@ -801,6 +827,253 @@ private fun CompactPermissionCard(
                 onClick = onRequestPolicyAccess,
                 style = AppleButtonStyle.DESTRUCTIVE,
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+            )
+        }
+    }
+}
+
+enum class PausePreset(val label: String, val minutes: Int) {
+    M10("10m", 10),
+    M30("30m", 30),
+    H1("1h", 60),
+    CUSTOM("Custom", -1)
+}
+
+/**
+ * Custom Pause Bottom Sheet supporting 10min, 30min, 1hr and Custom options
+ */
+@Composable
+private fun CustomPauseBottomSheetContent(
+    onConfirm: (Long) -> Unit,
+    onClose: () -> Unit
+) {
+    val colors = AwayAssistTheme.colors
+    val isDark = colors.isDark
+
+    var selectedPreset by remember { mutableStateOf(PausePreset.H1) }
+    var customMinutes by remember { mutableIntStateOf(45) }
+
+    val activeMinutes = if (selectedPreset == PausePreset.CUSTOM) customMinutes else selectedPreset.minutes
+    val durationMs = activeMinutes * 60_000L
+
+    val expiryTime = remember(activeMinutes) {
+        val target = System.currentTimeMillis() + durationMs
+        SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(target))
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 20.dp)
+    ) {
+        // Drag Handle
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .size(width = 36.dp, height = 4.dp)
+                .clip(CircleShape)
+                .background(if (isDark) Color(0x40FFFFFF) else Color(0x30000000))
+        )
+
+        Spacer(modifier = Modifier.height(18.dp))
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(
+                imageVector = Icons.Default.Schedule,
+                contentDescription = null,
+                tint = colors.warning,
+                modifier = Modifier.size(22.dp)
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            Text(
+                text = "Pause Automation",
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 19.sp
+                ),
+                color = colors.textPrimary
+            )
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        Text(
+            text = "Temporarily suspend automatic ringer switching. Resumes automatically after time expires.",
+            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp),
+            color = colors.textSecondary
+        )
+
+        Spacer(modifier = Modifier.height(18.dp))
+
+        // Preset Chips Row (10m, 30m, 1h, Custom)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(SquircleMedium)
+                .background(if (isDark) Color(0x1CFFFFFF) else Color(0x10000000))
+                .padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            PausePreset.values().forEach { preset ->
+                val isSelected = selectedPreset == preset
+                val itemBg by animateColorAsState(
+                    targetValue = if (isSelected) {
+                        if (isDark) Color(0x45FFFFFF) else Color.White
+                    } else Color.Transparent,
+                    animationSpec = spring(),
+                    label = "pauseChipBg"
+                )
+                val itemText by animateColorAsState(
+                    targetValue = if (isSelected) {
+                        if (isDark) Color.White else colors.warning
+                    } else colors.textSecondary,
+                    animationSpec = spring(),
+                    label = "pauseChipText"
+                )
+
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(34.dp)
+                        .clip(SquircleMedium)
+                        .background(itemBg)
+                        .then(
+                            if (isSelected) {
+                                Modifier.border(
+                                    width = 0.8.dp,
+                                    color = if (isDark) Color(0x55FFFFFF) else Color(0x28000000),
+                                    shape = SquircleMedium
+                                )
+                            } else Modifier
+                        )
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = { selectedPreset = preset }
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = preset.label,
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            fontSize = 12.sp
+                        ),
+                        color = itemText
+                    )
+                }
+            }
+        }
+
+        // Custom Slider if "Custom" is selected
+        if (selectedPreset == PausePreset.CUSTOM) {
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .glassmorphic(shape = SquircleMedium, tintColor = colors.warning, isDark = isDark)
+                    .padding(14.dp)
+            ) {
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Custom Duration",
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 14.sp
+                            ),
+                            color = colors.textPrimary
+                        )
+                        Text(
+                            text = if (customMinutes >= 60) {
+                                val hrs = customMinutes / 60
+                                val mins = customMinutes % 60
+                                if (mins == 0) "${hrs}h" else "${hrs}h ${mins}m"
+                            } else {
+                                "${customMinutes}m"
+                            },
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = colors.warning
+                            )
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Slider(
+                        value = customMinutes.toFloat(),
+                        onValueChange = { customMinutes = (it.toInt() / 5) * 5 },
+                        valueRange = 5f..480f,
+                        steps = 94,
+                        colors = SliderDefaults.colors(
+                            thumbColor = colors.warning,
+                            activeTrackColor = colors.warning,
+                            inactiveTrackColor = if (isDark) Color(0x30FFFFFF) else Color(0x20000000)
+                        )
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("5 min", style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
+                        Text("8 hrs", style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Expiry Summary Pill
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(SquircleMedium)
+                .background(colors.warning.copy(alpha = 0.12f))
+                .border(width = 0.8.dp, color = colors.warning.copy(alpha = 0.35f), shape = SquircleMedium)
+                .padding(vertical = 10.dp, horizontal = 14.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "Automation will resume at $expiryTime",
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 13.sp
+                ),
+                color = colors.warning
+            )
+        }
+
+        Spacer(modifier = Modifier.height(18.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            AppleStyleButton(
+                text = "Cancel",
+                onClick = onClose,
+                style = AppleButtonStyle.GLASS,
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(vertical = 12.dp)
+            )
+
+            AppleStyleButton(
+                text = "Pause (${activeMinutes}m)",
+                onClick = { onConfirm(durationMs) },
+                style = AppleButtonStyle.PRIMARY,
+                modifier = Modifier.weight(1.5f),
+                contentPadding = PaddingValues(vertical = 12.dp)
             )
         }
     }

@@ -111,8 +111,8 @@ class MainActivity : ComponentActivity() {
                     onForceSilent = {
                         sendServiceAction(NotificationHelper.ACTION_FORCE_SILENT)
                     },
-                    onPause1h = {
-                        sendServiceAction(NotificationHelper.ACTION_PAUSE_1H)
+                    onPauseForDuration = { durationMs ->
+                        RingerService.pauseService(this@MainActivity, durationMs)
                     },
                     onResumeAutomation = {
                         sendServiceAction(NotificationHelper.ACTION_RESUME)
