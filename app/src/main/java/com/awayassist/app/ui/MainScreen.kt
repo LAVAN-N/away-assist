@@ -688,7 +688,6 @@ private fun UnifiedControlsCard(
     val colors = AwayAssistTheme.colors
 
     var selectedPreset by remember { mutableStateOf(PausePreset.H1) }
-    var customMinutes by remember { mutableIntStateOf(45) }
 
     GroupedListCard(modifier = modifier) {
         Column(
@@ -738,7 +737,11 @@ private fun UnifiedControlsCard(
                     onSelectMode(mode)
                     if (mode == OperationMode.PAUSE) {
                         val duration = if (selectedPreset == PausePreset.CUSTOM) {
-                            customMinutes * 60_000L
+                            if (appState.pauseUntilTimestamp > System.currentTimeMillis()) {
+                                appState.pauseUntilTimestamp - System.currentTimeMillis()
+                            } else {
+                                3600_000L
+                            }
                         } else {
                             selectedPreset.minutes * 60_000L
                         }
@@ -856,7 +859,11 @@ private fun UnifiedControlsCard(
                                         onClick = {
                                             selectedPreset = preset
                                             val newDuration = if (preset == PausePreset.CUSTOM) {
-                                                customMinutes * 60_000L
+                                                if (appState.pauseUntilTimestamp > System.currentTimeMillis()) {
+                                                    appState.pauseUntilTimestamp - System.currentTimeMillis()
+                                                } else {
+                                                    3600_000L
+                                                }
                                             } else {
                                                 preset.minutes * 60_000L
                                             }

@@ -60,6 +60,8 @@ import java.util.Calendar
 import kotlin.math.cos
 import kotlin.math.sin
 
+import androidx.compose.runtime.mutableLongStateOf
+
 /**
  * High-end Liquid Glassmorphic Real-Time Clock Time Picker.
  * Lets users pick the exact resume time with interactive digital dials,
@@ -74,36 +76,37 @@ fun LiquidClockPicker(
 ) {
     val colors = AwayAssistTheme.colors
 
-    // Initialize calendar to current pause target or (now + 1 hour)
-    val cal = remember(initialTargetTimestamp) {
-        Calendar.getInstance().apply {
-            val target = if (initialTargetTimestamp > System.currentTimeMillis()) {
+    // Track target timestamp in millis
+    var targetTimestamp by remember {
+        mutableLongStateOf(
+            if (initialTargetTimestamp > System.currentTimeMillis() + 60_000L) {
                 initialTargetTimestamp
             } else {
                 System.currentTimeMillis() + 3600_000L
             }
-            timeInMillis = target
+        )
+    }
+
+    // Sync with external target timestamp if changed significantly
+    LaunchedEffect(initialTargetTimestamp) {
+        if (initialTargetTimestamp > System.currentTimeMillis() + 60_000L &&
+            Math.abs(initialTargetTimestamp - targetTimestamp) > 3000L
+        ) {
+            targetTimestamp = initialTargetTimestamp
         }
     }
 
-    var hour24 by remember { mutableIntStateOf(cal.get(Calendar.HOUR_OF_DAY)) }
-    var minute by remember { mutableIntStateOf(cal.get(Calendar.MINUTE)) }
-
-    fun computeAndEmitDuration(newHour24: Int, newMinute: Int) {
+    fun updateTargetAndEmit(newTargetMillis: Long) {
         val now = System.currentTimeMillis()
-        val targetCal = Calendar.getInstance().apply {
-            timeInMillis = now
-            set(Calendar.HOUR_OF_DAY, newHour24)
-            set(Calendar.MINUTE, newMinute)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-            if (timeInMillis <= now) {
-                add(Calendar.DAY_OF_YEAR, 1)
-            }
-        }
-        val durationMs = (targetCal.timeInMillis - now).coerceAtLeast(300_000L) // at least 5 mins
+        val clamped = newTargetMillis.coerceAtLeast(now + 300_000L) // at least 5 mins from now
+        targetTimestamp = clamped
+        val durationMs = clamped - now
         onDurationChanged(durationMs)
     }
+
+    val displayCal = Calendar.getInstance().apply { timeInMillis = targetTimestamp }
+    val hour24 = displayCal.get(Calendar.HOUR_OF_DAY)
+    val minute = displayCal.get(Calendar.MINUTE)
 
     val displayHour = when {
         hour24 == 0 -> 12
@@ -113,17 +116,7 @@ fun LiquidClockPicker(
     val isPm = hour24 >= 12
 
     val now = System.currentTimeMillis()
-    val targetCal = Calendar.getInstance().apply {
-        timeInMillis = now
-        set(Calendar.HOUR_OF_DAY, hour24)
-        set(Calendar.MINUTE, minute)
-        set(Calendar.SECOND, 0)
-        set(Calendar.MILLISECOND, 0)
-        if (timeInMillis <= now) {
-            add(Calendar.DAY_OF_YEAR, 1)
-        }
-    }
-    val remainingMs = (targetCal.timeInMillis - now).coerceAtLeast(0L)
+    val remainingMs = (targetTimestamp - now).coerceAtLeast(0L)
     val remainingHours = remainingMs / 3600_000L
     val remainingMins = (remainingMs % 3600_000L) / 60_000L
 
@@ -212,12 +205,22 @@ fun LiquidClockPicker(
                         value = "%02d".format(displayHour),
                         label = "HOUR",
                         onIncrement = {
-                            hour24 = (hour24 + 1) % 24
-                            computeAndEmitDuration(hour24, minute)
+                            val cal = Calendar.getInstance().apply {
+                                timeInMillis = if (targetTimestamp > System.currentTimeMillis()) targetTimestamp else System.currentTimeMillis()
+                                add(Calendar.HOUR_OF_DAY, 1)
+                                set(Calendar.SECOND, 0)
+                                set(Calendar.MILLISECOND, 0)
+                            }
+                            updateTargetAndEmit(cal.timeInMillis)
                         },
                         onDecrement = {
-                            hour24 = (hour24 - 1 + 24) % 24
-                            computeAndEmitDuration(hour24, minute)
+                            val cal = Calendar.getInstance().apply {
+                                timeInMillis = if (targetTimestamp > System.currentTimeMillis()) targetTimestamp else System.currentTimeMillis()
+                                add(Calendar.HOUR_OF_DAY, -1)
+                                set(Calendar.SECOND, 0)
+                                set(Calendar.MILLISECOND, 0)
+                            }
+                            updateTargetAndEmit(cal.timeInMillis)
                         },
                         isDark = isDark
                     )
@@ -234,17 +237,31 @@ fun LiquidClockPicker(
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
 
-                    // Minute Dial
+                    // Minute Dial (Increments / decrements in 5-min intervals and rolls over hours)
                     ClockDigitDial(
                         value = "%02d".format(minute),
                         label = "MIN",
                         onIncrement = {
-                            minute = ((minute / 5) * 5 + 5) % 60
-                            computeAndEmitDuration(hour24, minute)
+                            val cal = Calendar.getInstance().apply {
+                                timeInMillis = if (targetTimestamp > System.currentTimeMillis()) targetTimestamp else System.currentTimeMillis()
+                                val curMin = get(Calendar.MINUTE)
+                                val nextMin = ((curMin / 5) * 5) + 5
+                                set(Calendar.MINUTE, nextMin)
+                                set(Calendar.SECOND, 0)
+                                set(Calendar.MILLISECOND, 0)
+                            }
+                            updateTargetAndEmit(cal.timeInMillis)
                         },
                         onDecrement = {
-                            minute = ((minute / 5) * 5 - 5 + 60) % 60
-                            computeAndEmitDuration(hour24, minute)
+                            val cal = Calendar.getInstance().apply {
+                                timeInMillis = if (targetTimestamp > System.currentTimeMillis()) targetTimestamp else System.currentTimeMillis()
+                                val curMin = get(Calendar.MINUTE)
+                                val prevMin = ((curMin / 5) * 5) - 5
+                                set(Calendar.MINUTE, prevMin)
+                                set(Calendar.SECOND, 0)
+                                set(Calendar.MILLISECOND, 0)
+                            }
+                            updateTargetAndEmit(cal.timeInMillis)
                         },
                         isDark = isDark
                     )
@@ -266,8 +283,16 @@ fun LiquidClockPicker(
                             isSelected = !isPm,
                             onClick = {
                                 if (isPm) {
-                                    hour24 -= 12
-                                    computeAndEmitDuration(hour24, minute)
+                                    val cal = Calendar.getInstance().apply {
+                                        timeInMillis = targetTimestamp
+                                        set(Calendar.AM_PM, Calendar.AM)
+                                        set(Calendar.SECOND, 0)
+                                        set(Calendar.MILLISECOND, 0)
+                                        if (timeInMillis <= System.currentTimeMillis()) {
+                                            add(Calendar.DAY_OF_YEAR, 1)
+                                        }
+                                    }
+                                    updateTargetAndEmit(cal.timeInMillis)
                                 }
                             },
                             isDark = isDark,
@@ -278,8 +303,16 @@ fun LiquidClockPicker(
                             isSelected = isPm,
                             onClick = {
                                 if (!isPm) {
-                                    hour24 += 12
-                                    computeAndEmitDuration(hour24, minute)
+                                    val cal = Calendar.getInstance().apply {
+                                        timeInMillis = targetTimestamp
+                                        set(Calendar.AM_PM, Calendar.PM)
+                                        set(Calendar.SECOND, 0)
+                                        set(Calendar.MILLISECOND, 0)
+                                        if (timeInMillis <= System.currentTimeMillis()) {
+                                            add(Calendar.DAY_OF_YEAR, 1)
+                                        }
+                                    }
+                                    updateTargetAndEmit(cal.timeInMillis)
                                 }
                             },
                             isDark = isDark,
@@ -299,7 +332,7 @@ fun LiquidClockPicker(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Quick Delta Adjustment Chips
+            // Quick Delta Adjustment Chips (Accumulate onto the active target time)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -322,11 +355,9 @@ fun LiquidClockPicker(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
                                 onClick = {
-                                    val newTarget = System.currentTimeMillis() + (deltaMins * 60_000L)
-                                    val c = Calendar.getInstance().apply { timeInMillis = newTarget }
-                                    hour24 = c.get(Calendar.HOUR_OF_DAY)
-                                    minute = (c.get(Calendar.MINUTE) / 5) * 5
-                                    computeAndEmitDuration(hour24, minute)
+                                    val base = if (targetTimestamp > System.currentTimeMillis()) targetTimestamp else System.currentTimeMillis()
+                                    val newTarget = base + (deltaMins * 60_000L)
+                                    updateTargetAndEmit(newTarget)
                                 }
                             ),
                         contentAlignment = Alignment.Center
