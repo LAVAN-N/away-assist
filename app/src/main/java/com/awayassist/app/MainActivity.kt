@@ -33,6 +33,8 @@ import com.awayassist.app.ui.theme.AwayAssistTheme
 import com.awayassist.app.util.RingerModeController
 import kotlinx.coroutines.launch
 
+import com.awayassist.app.ui.components.OperationMode
+
 class MainActivity : ComponentActivity() {
 
     private lateinit var preferences: AwayAssistPreferences
@@ -91,39 +93,29 @@ class MainActivity : ComponentActivity() {
                 MainScreen(
                     appState = appState,
                     hasNotificationPolicyAccess = hasPolicyAccess,
-                    onToggleEnabled = { enabled ->
-                        scope.launch {
-                            preferences.setEnabled(enabled)
-                            if (enabled) {
-                                if (hasPolicyAccess) {
-                                    RingerService.startService(this@MainActivity)
-                                } else {
-                                    openNotificationPolicyAccessSettings()
+                    onSelectMode = { mode ->
+                        when (mode) {
+                            OperationMode.AUTO -> {
+                                scope.launch {
+                                    preferences.setEnabled(true)
+                                    if (hasPolicyAccess) {
+                                        RingerService.startService(this@MainActivity)
+                                    } else {
+                                        openNotificationPolicyAccessSettings()
+                                    }
                                 }
-                            } else {
-                                RingerService.stopService(this@MainActivity)
+                                sendServiceAction(NotificationHelper.ACTION_RESUME)
                             }
-                        }
-                    },
-                    onToggleForceRing = { enabled ->
-                        if (enabled) {
-                            sendServiceAction(NotificationHelper.ACTION_FORCE_RING)
-                        } else {
-                            sendServiceAction(NotificationHelper.ACTION_RESUME)
-                        }
-                    },
-                    onTogglePause = { enabled, durationMs ->
-                        if (enabled) {
-                            RingerService.pauseService(this@MainActivity, durationMs)
-                        } else {
-                            sendServiceAction(NotificationHelper.ACTION_RESUME)
+                            OperationMode.FORCE_RING -> {
+                                sendServiceAction(NotificationHelper.ACTION_FORCE_RING)
+                            }
+                            OperationMode.PAUSE -> {
+                                RingerService.pauseService(this@MainActivity, 3600_000L)
+                            }
                         }
                     },
                     onPauseForDuration = { durationMs ->
                         RingerService.pauseService(this@MainActivity, durationMs)
-                    },
-                    onResumeAutomation = {
-                        sendServiceAction(NotificationHelper.ACTION_RESUME)
                     },
                     onRequestPolicyAccess = {
                         openNotificationPolicyAccessSettings()
