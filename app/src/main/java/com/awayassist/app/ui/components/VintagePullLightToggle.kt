@@ -19,6 +19,7 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -73,11 +74,11 @@ import kotlin.math.hypot
 import kotlin.math.roundToInt
 
 /**
- * Realistic Vintage Pull-Cord Light Switch with Authentic Rope Catenary Physics.
+ * Realistic Vintage Pull-Cord Light Switch with Interactable Tip & Independent Fixture.
  *
- * - The cord is positioned comfortably away from the glass bulb with a brass conduit arm.
- * - Simulates realistic flexible rope catenary curvature, progressive drag resistance,
- *   and 2D damped harmonic pendulum recoil in any direction.
+ * - The string hangs independently beside the bulb from its own ceiling mount with NO horizontal attachment to the bulb.
+ * - The cord exhibits realistic catenary rope physics.
+ * - ONLY the tip (brass acorn handle) is interactable/draggable in all directions.
  */
 @Composable
 fun VintagePullLightToggle(
@@ -97,7 +98,6 @@ fun VintagePullLightToggle(
     val maxPullYPx = with(density) { 75.dp.toPx() }
     val thresholdDistPx = with(density) { 34.dp.toPx() }
     val restLengthPx = with(density) { 72.dp.toPx() }
-    val outriggerOffsetXPx = with(density) { 36.dp.toPx() } // String offset away from bulb
 
     // 2D Rope Physics Animatable Offsets
     val offsetX = remember { Animatable(0f) }
@@ -234,18 +234,31 @@ fun VintagePullLightToggle(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Interactive Vintage Pull-Lamp Stage with Catenary Rope Physics
-            Box(
+            // Interactive Stage with Independent Lamp and Separate Pull Cord
+            BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(168.dp)
                     .clip(SquircleMedium)
                     .background(if (isCurrentlyLit) Color(0x20FFD54F) else if (isDark) Color(0x22000000) else Color(0x0A000000))
             ) {
-                // Background Light Glow Cone
+                val stageWidthPx = with(density) { maxWidth.toPx() }
+                val bulbCx = stageWidthPx / 2f - with(density) { 24.dp.toPx() }
+                val anchorXPx = stageWidthPx / 2f + with(density) { 26.dp.toPx() }
+                val anchorYPx = with(density) { 6.dp.toPx() }
+
+                val curX = offsetX.value
+                val curY = offsetY.value
+
+                // Acorn Tip Position
+                val acornPoint = Offset(
+                    x = anchorXPx + curX,
+                    y = anchorYPx + restLengthPx + curY
+                )
+
+                // 1. Background Ambient Radial Glow
                 Canvas(modifier = Modifier.matchParentSize()) {
                     if (isCurrentlyLit) {
-                        val bulbCenterX = size.width / 2f - 14.dp.toPx()
                         drawCircle(
                             brush = Brush.radialGradient(
                                 colors = listOf(
@@ -253,56 +266,44 @@ fun VintagePullLightToggle(
                                     Color(0x25FFCA28),
                                     Color(0x00FFB300)
                                 ),
-                                center = Offset(bulbCenterX, 42.dp.toPx()),
+                                center = Offset(bulbCx, 42.dp.toPx()),
                                 radius = size.width * 0.65f
                             ),
                             radius = size.width * 0.65f,
-                            center = Offset(bulbCenterX, 42.dp.toPx())
+                            center = Offset(bulbCx, 42.dp.toPx())
                         )
                     }
                 }
 
-                val curX = offsetX.value
-                val curY = offsetY.value
-
-                // Coordinated Canvas: Bulb, Brass Bracket Arm, Catenary Rope Chain, Acorn Finial
+                // 2. Coordinated Visual Canvas: Lamp + Separate Cord Mount + Catenary Rope
                 Canvas(modifier = Modifier.fillMaxSize()) {
-                    val bulbCx = size.width / 2f - 14.dp.toPx()
-
-                    // 1. Draw Vintage Edison Bulb with Top Brass Socket and Outrigger Cord Arm
-                    drawVintageEdisonBulbWithOutrigger(
+                    // Draw Edison Bulb (Completely Independent, No Horizontal Pipe)
+                    drawVintageEdisonBulb(
                         bulbCx = bulbCx,
-                        outriggerX = outriggerOffsetXPx,
                         isLit = isCurrentlyLit,
                         flickerScale = if (isCurrentlyLit) filamentFlicker else 1.0f
                     )
 
-                    // 2. Chain Anchor at the Outrigger Eyelet (Comfortably Away from Bulb)
-                    val anchorPoint = Offset(bulbCx + outriggerOffsetXPx, 9.dp.toPx())
-
-                    // 3. Current Acorn Finial Position
-                    val acornPoint = Offset(
-                        x = anchorPoint.x + curX,
-                        y = anchorPoint.y + restLengthPx + curY
+                    // Draw Separate Top Ceiling Brass Rosette Mount for the Cord
+                    drawCordCeilingMount(
+                        anchor = Offset(anchorXPx, anchorYPx)
                     )
 
-                    // 4. Realistic Rope Catenary Bézier Simulation
+                    // Catenary Rope Physics Computation
+                    val anchorPoint = Offset(anchorXPx, anchorYPx)
                     val straightDistance = hypot(acornPoint.x - anchorPoint.x, acornPoint.y - anchorPoint.y)
                     val tautRatio = (straightDistance / restLengthPx).coerceIn(0.5f, 2.0f)
 
-                    // Control point calculation for natural sag and elasticity
                     val midX = (anchorPoint.x + acornPoint.x) / 2f
                     val midY = (anchorPoint.y + acornPoint.y) / 2f
 
-                    // Natural gravity sag when relaxed, straightening when pulled taut
                     val gravitySag = if (tautRatio < 1.0f) {
                         (1.0f - tautRatio) * 14.dp.toPx() + 2.dp.toPx()
                     } else {
                         2.dp.toPx() / tautRatio
                     }
 
-                    // Lateral curvature lag
-                    val lateralSag = if (abs(curX) > 10f) {
+                    val lateralSag = if (abs(curX) > 8f) {
                         -curX * 0.12f
                     } else 0f
 
@@ -311,7 +312,7 @@ fun VintagePullLightToggle(
                         y = midY + gravitySag
                     )
 
-                    // 5. Draw Flexible Beaded Chain along Bézier Curve
+                    // Draw Flexible Beaded Chain along Bézier Curve
                     val beadSpacing = 5.0.dp.toPx()
                     val totalBeads = (straightDistance / beadSpacing).toInt().coerceAtLeast(4)
                     val beadRadius = 2.0.dp.toPx()
@@ -327,7 +328,6 @@ fun VintagePullLightToggle(
                         radius = beadRadius * 1.5f
                     )
 
-                    // Connecting flexible wire path
                     val ropePath = Path().apply {
                         moveTo(anchorPoint.x, anchorPoint.y)
                         quadraticTo(controlPoint.x, controlPoint.y, acornPoint.x, acornPoint.y)
@@ -339,7 +339,7 @@ fun VintagePullLightToggle(
                         style = Stroke(width = 0.9.dp.toPx(), cap = StrokeCap.Round)
                     )
 
-                    // Spherical Brass Beads along Catenary Curve: B(t) = (1-t)^2 A + 2(1-t)t C + t^2 P
+                    // Brass Beads along Catenary Curve
                     for (i in 0..totalBeads) {
                         val t = i.toFloat() / totalBeads.toFloat()
                         val u = 1f - t
@@ -358,13 +358,13 @@ fun VintagePullLightToggle(
                         )
                     }
 
-                    // 6. Tangent angle at the acorn tip (end of the curve)
-                    val tangentX = 2f * (1f - 1f) * (controlPoint.x - anchorPoint.x) + 2f * 1f * (acornPoint.x - controlPoint.x)
-                    val tangentY = 2f * (1f - 1f) * (controlPoint.y - anchorPoint.y) + 2f * 1f * (acornPoint.y - controlPoint.y)
+                    // Tangent angle at the acorn tip
+                    val tangentX = 2f * (acornPoint.x - controlPoint.x)
+                    val tangentY = 2f * (acornPoint.y - controlPoint.y)
                     val acornAngleRad = atan2(tangentX, tangentY)
                     val acornAngleDeg = (acornAngleRad * 180.0 / Math.PI).toFloat()
 
-                    // Draw Antique Brass Acorn Pendant rotated along rope tangent
+                    // Draw Antique Brass Acorn Pendant Handle at Tip
                     drawBrassAcornPendant(
                         center = acornPoint,
                         angleDegrees = -acornAngleDeg,
@@ -372,21 +372,20 @@ fun VintagePullLightToggle(
                     )
                 }
 
-                // Generous Interactive Touch Target for the Acorn & Cord
-                val outriggerXDp = with(density) { 36.dp - 14.dp }
-                val anchorYDp = with(density) { 9.dp }
-                val restLengthDp = with(density) { restLengthPx.toDp() }
+                // 3. ONLY THE TIP IS INTERACTABLE (Acorn Handle Hit Target)
+                val acornXDp = with(density) { acornPoint.x.toDp() }
+                val acornYDp = with(density) { acornPoint.y.toDp() }
 
                 Box(
                     modifier = Modifier
-                        .align(Alignment.TopCenter)
                         .offset {
                             IntOffset(
-                                x = (outriggerXDp.roundToPx() + curX).roundToInt() - 32.dp.roundToPx(),
-                                y = (anchorYDp.roundToPx() + restLengthDp.roundToPx() + curY).roundToInt() - 32.dp.roundToPx()
+                                x = (acornPoint.x - with(density) { 26.dp.toPx() }).roundToInt(),
+                                y = (acornPoint.y - with(density) { 26.dp.toPx() }).roundToInt()
                             )
                         }
-                        .size(64.dp)
+                        .size(52.dp)
+                        .clip(CircleShape)
                         .pointerInput(Unit) {
                             detectDragGestures(
                                 onDragStart = {
@@ -434,7 +433,6 @@ fun VintagePullLightToggle(
                                 onDrag = { change, dragAmount ->
                                     change.consume()
                                     val curDist = hypot(offsetX.value, offsetY.value)
-                                    // Smooth progressive rope tension damping
                                     val damping = 1f / (1f + (curDist / maxPullYPx) * 1.4f)
 
                                     val nextX = (offsetX.value + dragAmount.x * damping).coerceIn(-maxPullXPx, maxPullXPx)
@@ -451,7 +449,7 @@ fun VintagePullLightToggle(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
                             onClick = {
-                                // Tap triggers a natural 2D pull-snap and pendulum oscillation
+                                // Tap on the tip triggers instant pull-snap & spring rebound
                                 coroutineScope.launch {
                                     launch {
                                         offsetX.animateTo(12f, tween(110, easing = FastOutSlowInEasing))
@@ -479,7 +477,7 @@ fun VintagePullLightToggle(
                         .padding(horizontal = 10.dp, vertical = 3.dp)
                 ) {
                     Text(
-                        text = if (isCurrentlyLit) "PULL CORD IN ANY DIRECTION TO TURN OFF" else "PULL CORD IN ANY DIRECTION TO TURN ON",
+                        text = if (isCurrentlyLit) "PULL BRASS TIP TO TURN OFF" else "PULL BRASS TIP TO TURN ON",
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontWeight = FontWeight.Bold,
                             fontSize = 9.5.sp,
@@ -494,11 +492,47 @@ fun VintagePullLightToggle(
 }
 
 /**
- * Draw Vintage Edison Lamp with Top Brass Socket and Outrigger Bracket Arm.
+ * Draw Independent Top Brass Ceiling Rosette / Eyelet Mount for the Cord.
  */
-private fun DrawScope.drawVintageEdisonBulbWithOutrigger(
+private fun DrawScope.drawCordCeilingMount(anchor: Offset) {
+    val brassGradient = Brush.horizontalGradient(
+        colors = listOf(
+            Color(0xFF8D6E3F),
+            Color(0xFFD4AF37),
+            Color(0xFFFFDF79),
+            Color(0xFFB8860B),
+            Color(0xFF5C4018)
+        ),
+        startX = anchor.x - 8.dp.toPx(),
+        endX = anchor.x + 8.dp.toPx()
+    )
+
+    // Ceiling Bracket Rosette
+    drawRoundRect(
+        brush = brassGradient,
+        topLeft = Offset(anchor.x - 8.dp.toPx(), 0f),
+        size = Size(16.dp.toPx(), 4.dp.toPx()),
+        cornerRadius = androidx.compose.ui.geometry.CornerRadius(1.dp.toPx(), 1.dp.toPx())
+    )
+
+    // Eyelet Bushing
+    drawCircle(
+        brush = brassGradient,
+        radius = 3.2.dp.toPx(),
+        center = anchor
+    )
+    drawCircle(
+        color = Color(0xFF2B1D0E),
+        radius = 1.4.dp.toPx(),
+        center = anchor
+    )
+}
+
+/**
+ * Draw Vintage Edison Lamp (Completely Independent, No Outrigger Pipe).
+ */
+private fun DrawScope.drawVintageEdisonBulb(
     bulbCx: Float,
-    outriggerX: Float,
     isLit: Boolean,
     flickerScale: Float
 ) {
@@ -527,30 +561,7 @@ private fun DrawScope.drawVintageEdisonBulbWithOutrigger(
         size = Size(22.dp.toPx(), 10.dp.toPx())
     )
 
-    // 2. Outrigger Conduit Pipe extending horizontally to the right (Spacing string away from bulb)
-    val pipeStartY = 9.dp.toPx()
-    val pipeEndX = bulbCx + outriggerX
-
-    drawRoundRect(
-        brush = brassGradient,
-        topLeft = Offset(bulbCx + 8.dp.toPx(), pipeStartY - 2.dp.toPx()),
-        size = Size(outriggerX - 8.dp.toPx(), 4.dp.toPx()),
-        cornerRadius = androidx.compose.ui.geometry.CornerRadius(1.dp.toPx(), 1.dp.toPx())
-    )
-
-    // Brass Grommet / Eyelet Ring at the end of the outrigger arm
-    drawCircle(
-        brush = brassGradient,
-        radius = 3.6.dp.toPx(),
-        center = Offset(pipeEndX, pipeStartY)
-    )
-    drawCircle(
-        color = Color(0xFF2B1D0E),
-        radius = 1.6.dp.toPx(),
-        center = Offset(pipeEndX, pipeStartY)
-    )
-
-    // 3. Glass Teardrop Edison Bulb Envelope
+    // 2. Glass Teardrop Edison Bulb Envelope
     val bulbTopY = 16.dp.toPx()
     val bulbRadius = 18.dp.toPx()
     val bulbCenter = Offset(bulbCx, bulbTopY + bulbRadius)
@@ -610,7 +621,7 @@ private fun DrawScope.drawVintageEdisonBulbWithOutrigger(
         style = Stroke(width = 1.4.dp.toPx(), cap = StrokeCap.Round)
     )
 
-    // 4. Vintage Squirrel-Cage Filament Wire
+    // 3. Vintage Squirrel-Cage Filament Wire
     val filamentPath = Path().apply {
         val startY = bulbTopY + 7.dp.toPx()
         moveTo(bulbCx - 3.dp.toPx(), startY)
@@ -642,7 +653,7 @@ private fun DrawScope.drawVintageEdisonBulbWithOutrigger(
 }
 
 /**
- * Draw Lathed Antique Brass Acorn Pendant rotated along Rope Tangent.
+ * Draw Lathed Antique Brass Acorn Pendant Handle.
  */
 private fun DrawScope.drawBrassAcornPendant(
     center: Offset,
