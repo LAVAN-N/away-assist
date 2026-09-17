@@ -46,6 +46,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -84,13 +85,14 @@ import kotlin.math.hypot
 import kotlin.math.roundToInt
 
 /**
- * Realistic Vintage Pull-Cord Light Switch with Gyroscope/Accelerometer Gravity Sway.
+ * Realistic Vintage Pull-Cord Light Switch Card.
  *
- * - Real-time device tilt & gravity dynamics: tilting the phone makes the beaded cord sway
- *   naturally like a real hanging metal chain.
- * - String hangs independently beside the bulb from its own ceiling rosette (no attachment to bulb).
- * - Catenary rope curvature & damped 2D harmonic spring physics.
- * - Only the bottom acorn tip is interactable for grabbing, dragging, and pulling in any direction.
+ * - Edison bulb hanging independently with living tungsten filament flicker and ambient bloom.
+ * - Beaded metal chain on the right side with extra gap, anchored from its own ceiling rosette.
+ * - Hardware gyroscope/accelerometer gravity physics causing natural real-time metal pendulum sway.
+ * - 2D catenary rope physics with Bézier curve dynamics and 360° omnidirectional drag.
+ * - Only the bottom antique brass acorn tip is interactable for dragging and tap rebound.
+ * - Radial theme illumination wave burst originating directly from the center of the bulb on theme change.
  */
 @Composable
 fun VintagePullLightToggle(
@@ -108,10 +110,10 @@ fun VintagePullLightToggle(
     val currentIsLit by rememberUpdatedState(isCurrentlyLit)
     val currentOnThemeSelected by rememberUpdatedState(onThemeSelected)
 
-    // Physical measurements in px
-    val maxPullXPx = with(density) { 80.dp.toPx() }
-    val maxPullYPx = with(density) { 75.dp.toPx() }
-    val thresholdDistPx = with(density) { 34.dp.toPx() }
+    // Pull Physics Measurements
+    val maxPullXPx = with(density) { 85.dp.toPx() }
+    val maxPullYPx = with(density) { 80.dp.toPx() }
+    val thresholdDistPx = with(density) { 36.dp.toPx() }
     val restLengthPx = with(density) { 72.dp.toPx() }
 
     // 2D Rope Physics Animatable Drag Offsets
@@ -134,11 +136,8 @@ fun VintagePullLightToggle(
         val listener = object : SensorEventListener {
             override fun onSensorChanged(event: SensorEvent?) {
                 if (event == null) return
-                // event.values[0]: X axis gravity (-9.8 to +9.8 m/s²)
-                // event.values[1]: Y axis gravity
                 val gx = event.values[0]
                 val gy = event.values[1]
-                // Boosted sensitivity: subtle 15°-30° tilt creates expressive real-time sway
                 val normalizedTiltX = (-gx / 4.2f).coerceIn(-1.0f, 1.0f)
                 val normalizedTiltY = ((9.81f - gy) / 5.5f).coerceIn(-0.4f, 0.8f)
                 rawTiltXPx = normalizedTiltX * maxSwayXPx
@@ -161,8 +160,8 @@ fun VintagePullLightToggle(
     val animatedTiltX by animateFloatAsState(
         targetValue = rawTiltXPx,
         animationSpec = spring(
-            dampingRatio = 0.52f, // Bouncy natural metal pendulum sway
-            stiffness = 140f
+            dampingRatio = 0.52f,
+            stiffness = 135f
         ),
         label = "gyroTiltX"
     )
@@ -170,22 +169,37 @@ fun VintagePullLightToggle(
         targetValue = rawTiltYPx,
         animationSpec = spring(
             dampingRatio = 0.52f,
-            stiffness = 140f
+            stiffness = 135f
         ),
         label = "gyroTiltY"
     )
 
-    // Filament breathing transition
+    // Filament living warmth flicker
     val infiniteTransition = rememberInfiniteTransition(label = "filamentWarmth")
     val filamentFlicker by infiniteTransition.animateFloat(
-        initialValue = 0.95f,
-        targetValue = 1.05f,
+        initialValue = 0.94f,
+        targetValue = 1.06f,
         animationSpec = infiniteRepeatable(
-            animation = tween(2200, easing = LinearEasing),
+            animation = tween(2400, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "filamentFlicker"
     )
+
+    // Animated Theme Change Radial Burst Wave (starts from bulb center)
+    val lightBurstProgress = remember { Animatable(0f) }
+    var previousLitState by remember { mutableStateOf(isCurrentlyLit) }
+
+    LaunchedEffect(isCurrentlyLit) {
+        if (isCurrentlyLit != previousLitState) {
+            previousLitState = isCurrentlyLit
+            lightBurstProgress.snapTo(0f)
+            lightBurstProgress.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = 800, easing = FastOutSlowInEasing)
+            )
+        }
+    }
 
     // Ambient glow colors
     val glowColor by animateColorAsState(
@@ -314,8 +328,14 @@ fun VintagePullLightToggle(
                     .background(if (isCurrentlyLit) Color(0x20FFD54F) else if (isDark) Color(0x22000000) else Color(0x0A000000))
             ) {
                 val stageWidthPx = with(density) { maxWidth.toPx() }
-                val bulbCx = stageWidthPx / 2f - with(density) { 24.dp.toPx() }
-                val anchorXPx = stageWidthPx / 2f + with(density) { 26.dp.toPx() }
+                val stageHeightPx = with(density) { maxHeight.toPx() }
+
+                // Bulb position (Left-center of stage)
+                val bulbCx = stageWidthPx / 2f - with(density) { 26.dp.toPx() }
+                val bulbCenter = Offset(bulbCx, with(density) { 38.dp.toPx() })
+
+                // String mount position (Right side with extra gap)
+                val anchorXPx = stageWidthPx / 2f + with(density) { 36.dp.toPx() }
                 val anchorYPx = with(density) { 6.dp.toPx() }
 
                 val curX = offsetX.value
@@ -331,8 +351,58 @@ fun VintagePullLightToggle(
                     y = anchorYPx + restLengthPx + liveTiltY + curY
                 )
 
-                // 1. Background Ambient Radial Glow
+                // 1. Radial Light Wave Expansion from Bulb across the Card on Theme Change
                 Canvas(modifier = Modifier.matchParentSize()) {
+                    val progress = lightBurstProgress.value
+                    if (progress > 0f && progress < 1f) {
+                        val maxRadius = hypot(stageWidthPx, stageHeightPx) * 1.2f
+                        val currentRadius = maxRadius * progress
+                        val alpha = (1f - progress).coerceIn(0f, 1f)
+
+                        if (isCurrentlyLit) {
+                            drawCircle(
+                                brush = Brush.radialGradient(
+                                    colors = listOf(
+                                        Color(0x70FFE082).copy(alpha = 0.6f * alpha),
+                                        Color(0x35FFB300).copy(alpha = 0.35f * alpha),
+                                        Color.Transparent
+                                    ),
+                                    center = bulbCenter,
+                                    radius = currentRadius.coerceAtLeast(10f)
+                                ),
+                                center = bulbCenter,
+                                radius = currentRadius
+                            )
+                            drawCircle(
+                                color = Color(0x90FFF59D).copy(alpha = 0.65f * alpha),
+                                center = bulbCenter,
+                                radius = currentRadius,
+                                style = Stroke(width = (3.5f * (1f - progress)).coerceAtLeast(1f))
+                            )
+                        } else {
+                            drawCircle(
+                                brush = Brush.radialGradient(
+                                    colors = listOf(
+                                        Color(0x706366F1).copy(alpha = 0.55f * alpha),
+                                        Color(0x304F46E5).copy(alpha = 0.30f * alpha),
+                                        Color.Transparent
+                                    ),
+                                    center = bulbCenter,
+                                    radius = currentRadius.coerceAtLeast(10f)
+                                ),
+                                center = bulbCenter,
+                                radius = currentRadius
+                            )
+                            drawCircle(
+                                color = Color(0x90818CF8).copy(alpha = 0.55f * alpha),
+                                center = bulbCenter,
+                                radius = currentRadius,
+                                style = Stroke(width = (3.0f * (1f - progress)).coerceAtLeast(1f))
+                            )
+                        }
+                    }
+
+                    // Background Ambient Radial Glow around Bulb
                     if (isCurrentlyLit) {
                         drawCircle(
                             brush = Brush.radialGradient(
@@ -341,16 +411,16 @@ fun VintagePullLightToggle(
                                     Color(0x25FFCA28),
                                     Color(0x00FFB300)
                                 ),
-                                center = Offset(bulbCx, 42.dp.toPx()),
+                                center = bulbCenter,
                                 radius = size.width * 0.65f
                             ),
                             radius = size.width * 0.65f,
-                            center = Offset(bulbCx, 42.dp.toPx())
+                            center = bulbCenter
                         )
                     }
                 }
 
-                // 2. Coordinated Visual Canvas: Lamp + Separate Cord Mount + Gyro Catenary Rope
+                // 2. Coordinated Visual Canvas: Lamp + Separate Cord Mount on Right + Gyro Catenary Rope
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     // Draw Edison Bulb (Completely Independent, No Horizontal Pipe)
                     drawVintageEdisonBulb(
@@ -359,7 +429,7 @@ fun VintagePullLightToggle(
                         flickerScale = if (isCurrentlyLit) filamentFlicker else 1.0f
                     )
 
-                    // Draw Separate Top Ceiling Brass Rosette Mount for the Cord
+                    // Draw Separate Top Ceiling Brass Rosette Mount for the Cord on Right
                     drawCordCeilingMount(
                         anchor = Offset(anchorXPx, anchorYPx)
                     )
@@ -389,7 +459,7 @@ fun VintagePullLightToggle(
 
                     // Draw Flexible Beaded Chain along Bézier Curve
                     val beadSpacing = 5.0.dp.toPx()
-                    val totalBeads = (straightDistance / beadSpacing).toInt().coerceAtLeast(4)
+                    val totalBeads = (straightDistance / beadSpacing).toInt().coerceAtLeast(6)
                     val beadRadius = 2.0.dp.toPx()
 
                     val beadBrush = Brush.radialGradient(
@@ -466,7 +536,7 @@ fun VintagePullLightToggle(
                                 onDragEnd = {
                                     isDragging = false
                                     val dist = hypot(offsetX.value, offsetY.value)
-                                    val isTriggered = dist >= thresholdDistPx && (offsetY.value > 10f || abs(offsetX.value) > 20f)
+                                    val isTriggered = dist >= thresholdDistPx && (offsetY.value > 10f || abs(offsetX.value) > 18f)
 
                                     coroutineScope.launch {
                                         if (isTriggered) {
@@ -521,7 +591,6 @@ fun VintagePullLightToggle(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
                             onClick = {
-                                // Tap on the tip triggers instant pull-snap & spring rebound
                                 coroutineScope.launch {
                                     launch {
                                         offsetX.animateTo(12f, tween(110, easing = FastOutSlowInEasing))

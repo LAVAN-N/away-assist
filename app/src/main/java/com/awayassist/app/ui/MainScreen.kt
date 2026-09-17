@@ -158,131 +158,133 @@ fun MainScreen(
         label = "ambientMeshColor"
     )
 
-    LiquidMeshBackground(
-        activeColor = animatedAmbientColor,
-        isDark = isDark
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(scrollState)
-                .padding(horizontal = 16.dp, vertical = 10.dp)
+    Box(modifier = Modifier.fillMaxSize()) {
+        LiquidMeshBackground(
+            activeColor = animatedAmbientColor,
+            isDark = isDark
         ) {
-            // Editorial Glass Header
-            EditorialHeader(
-                currentMode = currentOperationMode,
-                hasPolicyAccess = hasNotificationPolicyAccess,
-                statusColor = animatedAmbientColor,
-                isDark = isDark,
-                onInfoClick = { showInfoSheet = true }
-            )
-
-            // Missing Permission Card
-            AnimatedVisibility(
-                visible = !hasNotificationPolicyAccess,
-                enter = fadeIn(),
-                exit = fadeOut()
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(scrollState)
+                    .padding(horizontal = 16.dp, vertical = 10.dp)
             ) {
-                CompactPermissionCard(
-                    onRequestPolicyAccess = onRequestPolicyAccess,
+                // Editorial Glass Header
+                EditorialHeader(
+                    currentMode = currentOperationMode,
+                    hasPolicyAccess = hasNotificationPolicyAccess,
+                    statusColor = animatedAmbientColor,
+                    isDark = isDark,
+                    onInfoClick = { showInfoSheet = true }
+                )
+
+                // Missing Permission Card
+                AnimatedVisibility(
+                    visible = !hasNotificationPolicyAccess,
+                    enter = fadeIn(),
+                    exit = fadeOut()
+                ) {
+                    CompactPermissionCard(
+                        onRequestPolicyAccess = onRequestPolicyAccess,
+                        isDark = isDark,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+                }
+
+                // Hero Status Card
+                CompactStatusCard(
+                    appState = appState,
+                    currentMode = currentOperationMode,
+                    countdownText = countdownText,
+                    hasPolicyAccess = hasNotificationPolicyAccess,
+                    onResumeAuto = { onSelectMode(OperationMode.AUTO) },
                     isDark = isDark,
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
-            }
 
-            // Hero Status Card
-            CompactStatusCard(
-                appState = appState,
-                currentMode = currentOperationMode,
-                countdownText = countdownText,
-                hasPolicyAccess = hasNotificationPolicyAccess,
-                onResumeAuto = { onSelectMode(OperationMode.AUTO) },
-                isDark = isDark,
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
-
-            // 2-Tile Rules Grid (Screen Locked vs Screen Unlocked)
-            CompactRulesGrid(
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
-
-            // Unified Single-Toggle Controls Card
-            UnifiedControlsCard(
-                appState = appState,
-                currentMode = currentOperationMode,
-                onSelectMode = onSelectMode,
-                onPauseForDuration = onPauseForDuration,
-                isDark = isDark,
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
-
-            // Realistic Vintage Pull-Cord Light Switch Theme Toggle
-            VintagePullLightToggle(
-                currentTheme = appState.themeMode,
-                onThemeSelected = onSelectTheme,
-                isDark = isDark,
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
-
-            // System Status Card (DND Permission)
-            GroupedListCard(
-                modifier = Modifier.padding(bottom = 20.dp)
-            ) {
-                GroupedListRow(
-                    title = "Do Not Disturb Access",
-                    subtitle = if (hasNotificationPolicyAccess) "Access granted" else "Required to modify ringer",
-                    leadingIcon = {
-                        Box(
-                            modifier = Modifier
-                                .size(28.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    if (hasNotificationPolicyAccess) colors.ringState.copy(alpha = 0.15f) else colors.error.copy(alpha = 0.15f)
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Shield,
-                                contentDescription = null,
-                                tint = if (hasNotificationPolicyAccess) colors.ringState else colors.error,
-                                modifier = Modifier.size(15.dp)
-                            )
-                        }
-                    },
-                    trailingContent = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = if (hasNotificationPolicyAccess) "Granted" else "Grant",
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 13.sp
-                                ),
-                                color = if (hasNotificationPolicyAccess) colors.ringState else colors.error
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
-                                contentDescription = null,
-                                tint = colors.textSecondary,
-                                modifier = Modifier.size(11.dp)
-                            )
-                        }
-                    },
-                    onClick = onRequestPolicyAccess
+                // 2-Tile Rules Grid (Screen Locked vs Screen Unlocked)
+                CompactRulesGrid(
+                    modifier = Modifier.padding(bottom = 12.dp)
                 )
-            }
-        }
 
-        // Info Modal Bottom Sheet
-        if (showInfoSheet) {
-            ModalBottomSheet(
-                onDismissRequest = { showInfoSheet = false },
-                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-                containerColor = if (isDark) Color(0xFF141520) else Color(0xFFFAFAFC),
-                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-                dragHandle = null
-            ) {
-                InfoBottomSheetContent(onClose = { showInfoSheet = false })
+                // Unified Single-Toggle Controls Card
+                UnifiedControlsCard(
+                    appState = appState,
+                    currentMode = currentOperationMode,
+                    onSelectMode = onSelectMode,
+                    onPauseForDuration = onPauseForDuration,
+                    isDark = isDark,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+
+                // Realistic Vintage Pull-Cord Light Switch Theme Toggle Card
+                VintagePullLightToggle(
+                    currentTheme = appState.themeMode,
+                    onThemeSelected = onSelectTheme,
+                    isDark = isDark,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+
+                // System Status Card (DND Permission)
+                GroupedListCard(
+                    modifier = Modifier.padding(bottom = 20.dp)
+                ) {
+                    GroupedListRow(
+                        title = "Do Not Disturb Access",
+                        subtitle = if (hasNotificationPolicyAccess) "Access granted" else "Required to modify ringer",
+                        leadingIcon = {
+                            Box(
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (hasNotificationPolicyAccess) colors.ringState.copy(alpha = 0.15f) else colors.error.copy(alpha = 0.15f)
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Shield,
+                                    contentDescription = null,
+                                    tint = if (hasNotificationPolicyAccess) colors.ringState else colors.error,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                            }
+                        },
+                        trailingContent = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = if (hasNotificationPolicyAccess) "Granted" else "Grant",
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 13.sp
+                                    ),
+                                    color = if (hasNotificationPolicyAccess) colors.ringState else colors.error
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+                                    contentDescription = null,
+                                    tint = colors.textSecondary,
+                                    modifier = Modifier.size(11.dp)
+                                )
+                            }
+                        },
+                        onClick = onRequestPolicyAccess
+                    )
+                }
+            }
+
+            // Info Modal Bottom Sheet
+            if (showInfoSheet) {
+                ModalBottomSheet(
+                    onDismissRequest = { showInfoSheet = false },
+                    sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                    containerColor = if (isDark) Color(0xFF141520) else Color(0xFFFAFAFC),
+                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                    dragHandle = null
+                ) {
+                    InfoBottomSheetContent(onClose = { showInfoSheet = false })
+                }
             }
         }
     }
@@ -671,12 +673,14 @@ private fun CompactRulesGrid(modifier: Modifier = Modifier) {
     }
 }
 
-enum class PausePreset(val label: String, val minutes: Int) {
-    M10("10m", 10),
-    M30("30m", 30),
-    H1("1h", 60),
-    CUSTOM("Custom", -1)
-}
+private data class PauseOption(val id: String, val label: String, val durationMs: Long)
+
+private val PAUSE_OPTIONS = listOf(
+    PauseOption("10m", "10m", 10 * 60_000L),
+    PauseOption("30m", "30m", 30 * 60_000L),
+    PauseOption("1h", "1h", 60 * 60_000L),
+    PauseOption("custom", "Custom", -1L)
+)
 
 /**
  * Unified Single-Toggle Controls Card:
@@ -694,7 +698,7 @@ private fun UnifiedControlsCard(
 ) {
     val colors = AwayAssistTheme.colors
 
-    var selectedPreset by remember { mutableStateOf<PausePreset?>(null) }
+    var selectedOption by remember { mutableStateOf<PauseOption?>(null) }
 
     GroupedListCard(modifier = modifier) {
         Column(
@@ -743,16 +747,16 @@ private fun UnifiedControlsCard(
                 onModeSelected = { mode ->
                     onSelectMode(mode)
                     if (mode == OperationMode.PAUSE) {
-                        val duration = when (selectedPreset) {
-                            null -> 300_000L // 5 minutes default
-                            PausePreset.CUSTOM -> {
+                        val duration = when {
+                            selectedOption == null -> 300_000L // 5 minutes default
+                            selectedOption?.id == "custom" -> {
                                 if (appState.pauseUntilTimestamp > System.currentTimeMillis()) {
                                     appState.pauseUntilTimestamp - System.currentTimeMillis()
                                 } else {
                                     3600_000L
                                 }
                             }
-                            else -> selectedPreset!!.minutes * 60_000L
+                            else -> selectedOption!!.durationMs
                         }
                         onPauseForDuration(duration)
                     }
@@ -830,8 +834,8 @@ private fun UnifiedControlsCard(
                             .padding(3.dp),
                         horizontalArrangement = Arrangement.spacedBy(3.dp)
                     ) {
-                        PausePreset.values().forEach { preset ->
-                            val isSelected = selectedPreset == preset
+                        PAUSE_OPTIONS.forEach { option ->
+                            val isSelected = selectedOption == option
                             val itemBg by animateColorAsState(
                                 targetValue = if (isSelected) {
                                     if (isDark) Color(0x50FFFFFF) else Color.White
@@ -866,15 +870,15 @@ private fun UnifiedControlsCard(
                                         interactionSource = remember { MutableInteractionSource() },
                                         indication = null,
                                         onClick = {
-                                            selectedPreset = preset
-                                            val newDuration = if (preset == PausePreset.CUSTOM) {
+                                            selectedOption = option
+                                            val newDuration = if (option.id == "custom") {
                                                 if (appState.pauseUntilTimestamp > System.currentTimeMillis()) {
                                                     appState.pauseUntilTimestamp - System.currentTimeMillis()
                                                 } else {
                                                     3600_000L
                                                 }
                                             } else {
-                                                preset.minutes * 60_000L
+                                                option.durationMs
                                             }
                                             onPauseForDuration(newDuration)
                                         }
@@ -882,7 +886,7 @@ private fun UnifiedControlsCard(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = preset.label,
+                                    text = option.label,
                                     style = MaterialTheme.typography.labelMedium.copy(
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                         fontSize = 11.5.sp
@@ -894,7 +898,7 @@ private fun UnifiedControlsCard(
                     }
 
                     // Custom Real-Time Clock Picker (When "Custom" chip is selected)
-                    if (selectedPreset == PausePreset.CUSTOM) {
+                    if (selectedOption?.id == "custom") {
                         Spacer(modifier = Modifier.height(10.dp))
 
                         LiquidClockPicker(
