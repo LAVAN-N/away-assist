@@ -5,13 +5,13 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
-// Light Palette (Calm Indigo & Fluid Frost)
-val BackgroundLight = Color(0xFFF2F3F7)
-val CardSurfaceLight = Color(0xCCFFFFFF) // Translucent for glassmorphism
-val CardBorderLight = Color(0x66FFFFFF)
-val TextPrimaryLight = Color(0xFF131316)
-val TextSecondaryLight = Color(0xFF686873)
-val DividerLight = Color(0x1F000000)
+// Light Palette (Warm Sunlit Champagne & Fluid Frost)
+val BackgroundLight = Color(0xFFF9F6F0)
+val CardSurfaceLight = Color(0xD6FFFFFF) // Translucent for glassmorphism
+val CardBorderLight = Color(0x65FFE8B2)
+val TextPrimaryLight = Color(0xFF1C1917)
+val TextSecondaryLight = Color(0xFF78716C)
+val DividerLight = Color(0x18423420)
 
 // Dark Palette (Midnight Glass)
 val BackgroundDark = Color(0xFF090A10)
