@@ -81,6 +81,7 @@ import com.awayassist.app.ui.components.AppleButtonStyle
 import com.awayassist.app.ui.components.AppleStyleButton
 import com.awayassist.app.ui.components.GroupedListCard
 import com.awayassist.app.ui.components.GroupedListRow
+import com.awayassist.app.ui.components.LiquidClockPicker
 import com.awayassist.app.ui.components.LiquidMeshBackground
 import com.awayassist.app.ui.components.LiquidModeSelector
 import com.awayassist.app.ui.components.LiquidPillBadge
@@ -849,70 +850,15 @@ private fun UnifiedControlsCard(
                         }
                     }
 
-                    // Custom Slider (When "Custom" chip is selected)
+                    // Custom Real-Time Clock Picker (When "Custom" chip is selected)
                     if (selectedPreset == PausePreset.CUSTOM) {
                         Spacer(modifier = Modifier.height(10.dp))
 
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .glassmorphic(shape = SquircleMedium, tintColor = colors.warning, isDark = isDark)
-                                .padding(10.dp)
-                        ) {
-                            Column {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "Custom Slider",
-                                        style = MaterialTheme.typography.bodySmall.copy(
-                                            fontWeight = FontWeight.Medium,
-                                            fontSize = 12.sp
-                                        ),
-                                        color = colors.textPrimary
-                                    )
-                                    Text(
-                                        text = if (customMinutes >= 60) {
-                                            val hrs = customMinutes / 60
-                                            val mins = customMinutes % 60
-                                            if (mins == 0) "${hrs}h" else "${hrs}h ${mins}m"
-                                        } else {
-                                            "${customMinutes}m"
-                                        },
-                                        style = MaterialTheme.typography.bodyMedium.copy(
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 13.sp,
-                                            color = colors.warning
-                                        )
-                                    )
-                                }
-
-                                Slider(
-                                    value = customMinutes.toFloat(),
-                                    onValueChange = {
-                                        customMinutes = (it.toInt() / 5) * 5
-                                        onPauseForDuration(customMinutes * 60_000L)
-                                    },
-                                    valueRange = 5f..480f,
-                                    steps = 94,
-                                    colors = SliderDefaults.colors(
-                                        thumbColor = colors.warning,
-                                        activeTrackColor = colors.warning,
-                                        inactiveTrackColor = if (isDark) Color(0x30FFFFFF) else Color(0x20000000)
-                                    )
-                                )
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text("5 min", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = colors.textSecondary)
-                                    Text("8 hrs", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = colors.textSecondary)
-                                }
-                            }
-                        }
+                        LiquidClockPicker(
+                            initialTargetTimestamp = appState.pauseUntilTimestamp,
+                            onDurationChanged = onPauseForDuration,
+                            isDark = isDark
+                        )
                     }
                 }
             }
