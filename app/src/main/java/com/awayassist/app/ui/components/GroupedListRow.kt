@@ -2,7 +2,6 @@ package com.awayassist.app.ui.components
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -13,7 +12,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -24,17 +22,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.awayassist.app.ui.theme.AwayAssistTheme
 import com.awayassist.app.ui.theme.SquircleLarge
 
 /**
- * iOS Settings-style Grouped Card Container.
+ * iOS Settings-style Liquid Glassmorphic Grouped Card Container.
  */
 @Composable
 fun GroupedListCard(
@@ -43,21 +39,22 @@ fun GroupedListCard(
     footer: String? = null,
     content: @Composable () -> Unit
 ) {
+    val isDark = AwayAssistTheme.colors.isDark
+
     Column(modifier = modifier.fillMaxWidth()) {
         if (header != null) {
             Text(
                 text = header.uppercase(),
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                 color = AwayAssistTheme.colors.textSecondary,
-                modifier = Modifier.padding(start = 16.dp, bottom = 6.dp)
+                modifier = Modifier.padding(start = 16.dp, bottom = 8.dp)
             )
         }
 
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(SquircleLarge)
-                .background(AwayAssistTheme.colors.cardSurface)
+                .glassmorphic(shape = SquircleLarge, isDark = isDark)
         ) {
             Column {
                 content()
@@ -76,7 +73,7 @@ fun GroupedListCard(
 }
 
 /**
- * iOS Settings-style List Row.
+ * iOS Settings-style Liquid Glass List Row.
  */
 @Composable
 fun GroupedListRow(
@@ -87,7 +84,7 @@ fun GroupedListRow(
     trailingContent: (@Composable () -> Unit)? = null,
     onClick: (() -> Unit)? = null,
     showDivider: Boolean = false,
-    dividerIndent: androidx.compose.ui.unit.Dp = 16.dp
+    dividerIndent: Dp = 16.dp
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -106,7 +103,7 @@ fun GroupedListRow(
                 if (onClick != null) {
                     Modifier.clickable(
                         interactionSource = interactionSource,
-                        indication = null, // No ripple, press opacity
+                        indication = null,
                         role = Role.Button,
                         onClick = onClick
                     )

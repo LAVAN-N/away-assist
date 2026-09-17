@@ -1,16 +1,13 @@
 package com.awayassist.app.ui
 
-import android.content.Intent
-import android.os.Build
-import android.provider.Settings
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,7 +25,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.PauseCircle
@@ -37,19 +33,20 @@ import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.awayassist.app.R
 import com.awayassist.app.data.AppState
 import com.awayassist.app.data.RingerState
 import com.awayassist.app.ui.components.AppleButtonStyle
@@ -57,6 +54,10 @@ import com.awayassist.app.ui.components.AppleStyleButton
 import com.awayassist.app.ui.components.AppleStyleSwitch
 import com.awayassist.app.ui.components.GroupedListCard
 import com.awayassist.app.ui.components.GroupedListRow
+import com.awayassist.app.ui.components.LiquidMeshBackground
+import com.awayassist.app.ui.components.LiquidPillBadge
+import com.awayassist.app.ui.components.LiquidPulsingHalo
+import com.awayassist.app.ui.components.glassmorphic
 import com.awayassist.app.ui.theme.AwayAssistTheme
 import com.awayassist.app.ui.theme.SquircleLarge
 import com.awayassist.app.ui.theme.SquircleMedium
@@ -74,32 +75,99 @@ fun MainScreen(
 ) {
     val scrollState = rememberScrollState()
     val colors = AwayAssistTheme.colors
+    val isDark = colors.isDark
 
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = colors.background
+    // Active ambient glow color corresponding to current ringer / app state
+    val targetAmbientColor = when {
+        !hasNotificationPolicyAccess -> colors.error
+        !appState.isEnabled -> colors.textSecondary
+        appState.isPaused -> colors.warning
+        appState.overrideMode != null -> colors.azureGlow
+        appState.currentMode == RingerState.RING -> colors.ringState
+        else -> colors.accentSilent
+    }
+
+    val animatedAmbientColor by animateColorAsState(
+        targetValue = targetAmbientColor,
+        animationSpec = spring(),
+        label = "ambientMeshColor"
+    )
+
+    LiquidMeshBackground(
+        activeColor = animatedAmbientColor,
+        isDark = isDark
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(scrollState)
-                .padding(horizontal = 20.dp, vertical = 24.dp)
+                .padding(horizontal = 20.dp, vertical = 20.dp)
         ) {
-            // Header
-            Text(
-                text = "Away-Assist",
-                style = MaterialTheme.typography.displayLarge,
-                color = colors.textPrimary,
-                modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)
-            )
-            Text(
-                text = "Smart lock-aware ringer switching",
-                style = MaterialTheme.typography.bodyLarge,
-                color = colors.textSecondary,
-                modifier = Modifier.padding(bottom = 20.dp)
-            )
+            // Header with Glassmorphic App Icon & Liquid Badge
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 28.dp, bottom = 22.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Glassmorphic App Icon Logo
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(SquircleMedium)
+                            .shadow(8.dp, SquircleMedium)
+                            .border(
+                                width = 1.dp,
+                                brush = Brush.linearGradient(
+                                    colors = listOf(Color(0x80FFFFFF), Color(0x20FFFFFF))
+                                ),
+                                shape = SquircleMedium
+                            )
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_app_logo),
+                            contentDescription = "Away-Assist App Icon",
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
 
-            // Permission Warning Banner if missing
+                    Spacer(modifier = Modifier.width(14.dp))
+
+                    Column {
+                        Text(
+                            text = "Away-Assist",
+                            style = MaterialTheme.typography.displayLarge.copy(
+                                fontSize = 28.sp,
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = colors.textPrimary
+                        )
+                        Text(
+                            text = "Liquid Lock-Aware Audio",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = colors.textSecondary
+                        )
+                    }
+                }
+
+                // Status Pill Badge
+                val badgeText = when {
+                    !hasNotificationPolicyAccess -> "Setup"
+                    !appState.isEnabled -> "Disabled"
+                    appState.isPaused -> "Paused"
+                    appState.overrideMode != null -> "Override"
+                    appState.currentMode == RingerState.RING -> "Ring"
+                    else -> "Vibrate"
+                }
+                LiquidPillBadge(
+                    text = badgeText,
+                    tintColor = animatedAmbientColor
+                )
+            }
+
+            // Permission Warning Card if missing
             AnimatedVisibility(
                 visible = !hasNotificationPolicyAccess,
                 enter = fadeIn(),
@@ -107,11 +175,12 @@ fun MainScreen(
             ) {
                 PermissionRequiredCard(
                     onRequestPolicyAccess = onRequestPolicyAccess,
+                    isDark = isDark,
                     modifier = Modifier.padding(bottom = 20.dp)
                 )
             }
 
-            // Live Status Card
+            // Hero Live Status Glassmorphic Card
             LiveStatusCard(
                 appState = appState,
                 hasPolicyAccess = hasNotificationPolicyAccess,
@@ -119,18 +188,35 @@ fun MainScreen(
                 onForceSilent = onForceSilent,
                 onPause1h = onPause1h,
                 onResumeAutomation = onResumeAutomation,
+                isDark = isDark,
                 modifier = Modifier.padding(bottom = 24.dp)
             )
 
-            // Master Toggle Grouped Card
+            // Master Automation Toggle Card
             GroupedListCard(
-                header = "Automation",
-                footer = "When enabled, Away-Assist switches your phone to Ring mode whenever the screen is locked, and back to Vibrate when unlocked.",
+                header = "Automation Engine",
+                footer = "Away-Assist continuously listens for hardware lock/unlock events with zero battery polling.",
                 modifier = Modifier.padding(bottom = 24.dp)
             ) {
                 GroupedListRow(
                     title = "Enable Automation",
                     subtitle = if (appState.isEnabled) "Service running in background" else "Automation paused",
+                    leadingIcon = {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(colors.accentSilent.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = if (appState.isEnabled) Icons.Default.Notifications else Icons.Default.NotificationsOff,
+                                contentDescription = null,
+                                tint = colors.accentSilent,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    },
                     trailingContent = {
                         AppleStyleSwitch(
                             checked = appState.isEnabled,
@@ -141,45 +227,93 @@ fun MainScreen(
                 )
             }
 
-            // Rules Card (Read-only Info)
+            // Automation Rules Glassmorphic Card
             GroupedListCard(
-                header = "Automation Rules",
-                footer = "Fixed configuration for v1. Ringer switches automatically on hardware screen lock / unlock events.",
+                header = "State Rules",
+                footer = "Deterministic switching: Screen locked triggers Normal audible mode; screen unlocked restores Vibrate mode.",
                 modifier = Modifier.padding(bottom = 24.dp)
             ) {
                 GroupedListRow(
-                    title = "On Screen Lock",
-                    subtitle = "When device is put away / locked",
+                    title = "Screen Locked",
+                    subtitle = "When phone is put away on desk or in pocket",
+                    leadingIcon = {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(colors.ringState.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Notifications,
+                                contentDescription = null,
+                                tint = colors.ringState,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    },
                     trailingContent = {
-                        Text(
-                            text = "Ring (Audible)",
-                            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
-                            color = colors.ringState
+                        LiquidPillBadge(
+                            text = "Ring (Normal)",
+                            tintColor = colors.ringState
                         )
                     },
                     showDivider = true
                 )
                 GroupedListRow(
-                    title = "On Screen Unlock",
-                    subtitle = "When device is actively in use",
+                    title = "Screen Unlocked",
+                    subtitle = "When phone is actively being handled",
+                    leadingIcon = {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(colors.accentSilent.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Vibration,
+                                contentDescription = null,
+                                tint = colors.accentSilent,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    },
                     trailingContent = {
-                        Text(
+                        LiquidPillBadge(
                             text = "Vibrate",
-                            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
-                            color = colors.accentSilent
+                            tintColor = colors.accentSilent
                         )
                     }
                 )
             }
 
-            // System & Permissions Card
+            // System & Permissions Status Card
             GroupedListCard(
-                header = "System Status",
-                modifier = Modifier.padding(bottom = 32.dp)
+                header = "System Integrity",
+                modifier = Modifier.padding(bottom = 36.dp)
             ) {
                 GroupedListRow(
-                    title = "Notification Policy Access",
-                    subtitle = if (hasNotificationPolicyAccess) "Required to change ringer mode" else "Tap to grant in Android Settings",
+                    title = "Do Not Disturb Access",
+                    subtitle = if (hasNotificationPolicyAccess) "Granted • Ringer switching authorized" else "Required • Tap to grant in Settings",
+                    leadingIcon = {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (hasNotificationPolicyAccess) colors.ringState.copy(alpha = 0.15f) else colors.error.copy(alpha = 0.15f)
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Shield,
+                                contentDescription = null,
+                                tint = if (hasNotificationPolicyAccess) colors.ringState else colors.error,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    },
                     trailingContent = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
@@ -200,8 +334,24 @@ fun MainScreen(
                     showDivider = true
                 )
                 GroupedListRow(
-                    title = "Foreground Service",
-                    subtitle = if (appState.isEnabled) "Active with low-priority notification" else "Stopped",
+                    title = "Background Foreground Service",
+                    subtitle = if (appState.isEnabled) "Active with low-priority notification" else "Service stopped",
+                    leadingIcon = {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(colors.azureGlow.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Notifications,
+                                contentDescription = null,
+                                tint = colors.azureGlow,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    },
                     trailingContent = {
                         Text(
                             text = if (appState.isEnabled) "Active" else "Stopped",
@@ -223,6 +373,7 @@ private fun LiveStatusCard(
     onForceSilent: () -> Unit,
     onPause1h: () -> Unit,
     onResumeAutomation: () -> Unit,
+    isDark: Boolean,
     modifier: Modifier = Modifier
 ) {
     val colors = AwayAssistTheme.colors
@@ -231,16 +382,16 @@ private fun LiveStatusCard(
         !hasPolicyAccess -> {
             Quad(
                 colors.error,
-                "Permission Missing",
-                "Grant Notification Policy Access to enable ringer changes",
+                "Permission Required",
+                "Grant Notification Policy Access so Away-Assist can switch ringer modes",
                 Icons.Default.Warning
             )
         }
         !appState.isEnabled -> {
             Quad(
                 colors.textSecondary,
-                "Automation Off",
-                "Enable the toggle below to activate smart switching",
+                "Automation Disabled",
+                "Enable the toggle below to activate automatic ringer switching",
                 Icons.Default.NotificationsOff
             )
         }
@@ -248,8 +399,8 @@ private fun LiveStatusCard(
             val remainingMins = ((appState.pauseUntilTimestamp - System.currentTimeMillis()) / 60000L).coerceAtLeast(1)
             Quad(
                 colors.warning,
-                "Paused",
-                "Automation paused for next ${remainingMins}m",
+                "Automation Paused",
+                "Paused for next ${remainingMins}m • Tap Resume to reactivate",
                 Icons.Default.PauseCircle
             )
         }
@@ -258,13 +409,13 @@ private fun LiveStatusCard(
                 RingerState.RING -> Quad(
                     colors.ringState,
                     "Force Ring Active",
-                    "Manual override • Will reset on next screen unlock",
+                    "Manual override • Resets on next screen unlock",
                     Icons.Default.Notifications
                 )
                 RingerState.VIBRATE, RingerState.SILENT -> Quad(
                     colors.accentSilent,
                     "Force Silent Active",
-                    "Manual override • Will reset on next screen lock",
+                    "Manual override • Resets on next screen lock",
                     Icons.Default.Vibration
                 )
                 else -> Quad(
@@ -278,15 +429,15 @@ private fun LiveStatusCard(
         appState.currentMode == RingerState.RING -> {
             Quad(
                 colors.ringState,
-                "Ring Mode",
-                "Screen locked • Calls and alerts are audible",
+                "Ring Mode Active",
+                "Screen locked • Incoming calls and alerts are audible",
                 Icons.Default.Notifications
             )
         }
         appState.currentMode == RingerState.VIBRATE -> {
             Quad(
                 colors.accentSilent,
-                "Vibrate Mode",
+                "Vibrate Mode Active",
                 "Screen unlocked • Silent vibration during active use",
                 Icons.Default.Vibration
             )
@@ -294,55 +445,76 @@ private fun LiveStatusCard(
         else -> {
             Quad(
                 colors.accentSilent,
-                "Ready",
-                "Listening for screen lock/unlock events",
+                "Monitoring Lock State",
+                "Ready to switch ringer mode on lock/unlock events",
                 Icons.Default.Notifications
             )
         }
     }
 
-    val animatedAccentColor = animateColorAsState(
+    val animatedStatusColor by animateColorAsState(
         targetValue = statusColor,
         animationSpec = spring(),
-        label = "statusCardColor"
+        label = "heroStatusColor"
     )
 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .clip(SquircleLarge)
-            .background(colors.cardSurface)
-            .padding(20.dp)
+            .glassmorphic(
+                shape = SquircleLarge,
+                tintColor = animatedStatusColor,
+                isDark = isDark
+            )
+            .padding(22.dp)
     ) {
         Column {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(46.dp)
-                        .clip(CircleShape)
-                        .background(animatedAccentColor.value.copy(alpha = 0.15f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = statusIcon,
-                        contentDescription = null,
-                        tint = animatedAccentColor.value,
-                        modifier = Modifier.size(24.dp)
-                    )
+                // Liquid Pulsing Halo around status icon
+                LiquidPulsingHalo(glowColor = animatedStatusColor) {
+                    Box(
+                        modifier = Modifier
+                            .size(54.dp)
+                            .clip(CircleShape)
+                            .background(
+                                Brush.radialGradient(
+                                    colors = listOf(
+                                        animatedStatusColor.copy(alpha = 0.35f),
+                                        animatedStatusColor.copy(alpha = 0.12f)
+                                    )
+                                )
+                            )
+                            .border(
+                                width = 1.dp,
+                                color = animatedStatusColor.copy(alpha = 0.5f),
+                                shape = CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = statusIcon,
+                            contentDescription = null,
+                            tint = animatedStatusColor,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
                 }
 
-                Spacer(modifier = Modifier.width(14.dp))
+                Spacer(modifier = Modifier.width(16.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = statusTitle,
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 20.sp
+                        ),
                         color = colors.textPrimary
                     )
-                    Spacer(modifier = Modifier.height(2.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = statusSubtitle,
                         style = MaterialTheme.typography.bodyMedium,
@@ -351,9 +523,9 @@ private fun LiveStatusCard(
                 }
             }
 
-            // Quick action buttons if automation is active
+            // Glassmorphic Quick Action Buttons
             if (hasPolicyAccess && appState.isEnabled) {
-                Spacer(modifier = Modifier.height(18.dp))
+                Spacer(modifier = Modifier.height(20.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -373,7 +545,7 @@ private fun LiveStatusCard(
                                 onClick = onForceSilent,
                                 style = AppleButtonStyle.PRIMARY,
                                 modifier = Modifier.weight(1f),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 11.dp)
                             )
                         } else {
                             AppleStyleButton(
@@ -381,16 +553,16 @@ private fun LiveStatusCard(
                                 onClick = onForceRing,
                                 style = AppleButtonStyle.ACCENT,
                                 modifier = Modifier.weight(1f),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 11.dp)
                             )
                         }
 
                         AppleStyleButton(
                             text = "Pause 1h",
                             onClick = onPause1h,
-                            style = AppleButtonStyle.SECONDARY,
+                            style = AppleButtonStyle.GLASS,
                             modifier = Modifier.weight(1f),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 11.dp)
                         )
                     }
                 }
@@ -402,6 +574,7 @@ private fun LiveStatusCard(
 @Composable
 private fun PermissionRequiredCard(
     onRequestPolicyAccess: () -> Unit,
+    isDark: Boolean,
     modifier: Modifier = Modifier
 ) {
     val colors = AwayAssistTheme.colors
@@ -409,35 +582,46 @@ private fun PermissionRequiredCard(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .clip(SquircleLarge)
-            .background(colors.error.copy(alpha = 0.10f))
-            .padding(18.dp)
+            .glassmorphic(
+                shape = SquircleLarge,
+                tintColor = colors.error,
+                isDark = isDark
+            )
+            .padding(20.dp)
     ) {
         Column {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.Shield,
-                    contentDescription = null,
-                    tint = colors.error,
-                    modifier = Modifier.size(24.dp)
-                )
-                Spacer(modifier = Modifier.width(10.dp))
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(colors.error.copy(alpha = 0.2f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Shield,
+                        contentDescription = null,
+                        tint = colors.error,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
                 Text(
                     text = "Permission Setup Required",
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = colors.error
                 )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             Text(
-                text = "Android requires Notification Policy Access (Do Not Disturb access) so Away-Assist can switch between Ring and Vibrate modes in the background.",
+                text = "Android requires Notification Policy Access (Do Not Disturb access) so Away-Assist can switch between Ring and Vibrate modes silently in the background.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = colors.textPrimary
             )
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             AppleStyleButton(
                 text = "Grant Permission in Settings",

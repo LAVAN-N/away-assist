@@ -16,13 +16,16 @@ import androidx.core.view.WindowCompat
 private val LightColors = AwayAssistColors(
     background = BackgroundLight,
     cardSurface = CardSurfaceLight,
+    cardBorder = CardBorderLight,
     textPrimary = TextPrimaryLight,
     textSecondary = TextSecondaryLight,
     divider = DividerLight,
     accentSilent = AccentSilent,
     ringState = RingState,
-    warning = WarningColor,
-    error = ErrorColor,
+    cyanGlow = CyanGlow,
+    azureGlow = AzureGlow,
+    warning = AmberGlow,
+    error = CoralGlow,
     switchOffTrack = SwitchOffTrackLight,
     isDark = false
 )
@@ -30,13 +33,16 @@ private val LightColors = AwayAssistColors(
 private val DarkColors = AwayAssistColors(
     background = BackgroundDark,
     cardSurface = CardSurfaceDark,
+    cardBorder = CardBorderDark,
     textPrimary = TextPrimaryDark,
     textSecondary = TextSecondaryDark,
     divider = DividerDark,
     accentSilent = AccentSilent,
     ringState = RingState,
-    warning = WarningColor,
-    error = ErrorColor,
+    cyanGlow = CyanGlow,
+    azureGlow = AzureGlow,
+    warning = AmberGlow,
+    error = CoralGlow,
     switchOffTrack = SwitchOffTrackDark,
     isDark = true
 )
