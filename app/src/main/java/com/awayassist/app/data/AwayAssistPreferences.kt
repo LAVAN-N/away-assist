@@ -24,12 +24,19 @@ enum class RingerState(val displayName: String) {
     UNKNOWN("Unknown")
 }
 
+enum class ThemeMode(val displayName: String) {
+    SYSTEM("System"),
+    LIGHT("Light"),
+    DARK("Dark")
+}
+
 data class AppState(
     val isEnabled: Boolean = true,
     val currentMode: RingerState = RingerState.UNKNOWN,
     val lastChangedTimestamp: Long = 0L,
     val pauseUntilTimestamp: Long = 0L,
-    val overrideMode: RingerState? = null
+    val overrideMode: RingerState? = null,
+    val themeMode: ThemeMode = ThemeMode.SYSTEM
 ) {
     val isPaused: Boolean
         get() = pauseUntilTimestamp > System.currentTimeMillis()
@@ -45,6 +52,7 @@ class AwayAssistPreferences(private val context: Context) {
         val KEY_LAST_CHANGED_TIMESTAMP = longPreferencesKey("last_changed_timestamp")
         val KEY_PAUSE_UNTIL_TIMESTAMP = longPreferencesKey("pause_until_timestamp")
         val KEY_OVERRIDE_MODE = stringPreferencesKey("override_mode")
+        val KEY_THEME_MODE = stringPreferencesKey("theme_mode")
 
         @Volatile
         private var INSTANCE: AwayAssistPreferences? = null
@@ -84,13 +92,20 @@ class AwayAssistPreferences(private val context: Context) {
                     null
                 }
             }
+            val themeModeStr = preferences[KEY_THEME_MODE] ?: ThemeMode.SYSTEM.name
+            val themeMode = try {
+                ThemeMode.valueOf(themeModeStr)
+            } catch (e: IllegalArgumentException) {
+                ThemeMode.SYSTEM
+            }
 
             AppState(
                 isEnabled = isEnabled,
                 currentMode = currentMode,
                 lastChangedTimestamp = lastChanged,
                 pauseUntilTimestamp = pauseUntil,
-                overrideMode = overrideMode
+                overrideMode = overrideMode,
+                themeMode = themeMode
             )
         }
 
@@ -99,6 +114,12 @@ class AwayAssistPreferences(private val context: Context) {
     suspend fun setEnabled(enabled: Boolean) {
         dataStore.edit { preferences ->
             preferences[KEY_IS_ENABLED] = enabled
+        }
+    }
+
+    suspend fun setThemeMode(mode: ThemeMode) {
+        dataStore.edit { preferences ->
+            preferences[KEY_THEME_MODE] = mode.name
         }
     }
 

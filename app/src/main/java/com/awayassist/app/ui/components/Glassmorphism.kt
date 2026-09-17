@@ -1,23 +1,39 @@
 package com.awayassist.app.ui.components
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BrightnessAuto
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -26,12 +42,16 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.awayassist.app.data.ThemeMode
 import com.awayassist.app.ui.theme.AwayAssistTheme
 import com.awayassist.app.ui.theme.SquircleLarge
+import com.awayassist.app.ui.theme.SquircleMedium
 import com.awayassist.app.ui.theme.SquirclePill
 
 /**
@@ -165,7 +185,6 @@ fun Modifier.glassmorphic(
         val w = size.width
         val h = size.height
 
-        // Translucent glass surface gradient
         val surfaceGradient = if (isDark) {
             Brush.linearGradient(
                 colors = listOf(
@@ -288,5 +307,109 @@ fun LiquidPillBadge(
             ),
             color = tintColor
         )
+    }
+}
+
+/**
+ * Liquid Segmented Theme Selector (System / Light / Dark).
+ */
+@Composable
+fun LiquidThemeSelector(
+    currentTheme: ThemeMode,
+    onThemeSelected: (ThemeMode) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val colors = AwayAssistTheme.colors
+    val isDark = colors.isDark
+
+    val options = listOf(
+        Triple(ThemeMode.SYSTEM, "System", Icons.Default.BrightnessAuto),
+        Triple(ThemeMode.LIGHT, "Light", Icons.Default.LightMode),
+        Triple(ThemeMode.DARK, "Dark", Icons.Default.DarkMode)
+    )
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(SquircleMedium)
+            .background(if (isDark) Color(0x20FFFFFF) else Color(0x14000000))
+            .border(
+                width = 0.8.dp,
+                brush = Brush.linearGradient(
+                    colors = if (isDark) listOf(Color(0x30FFFFFF), Color(0x0AFFFFFF)) else listOf(Color(0x60FFFFFF), Color(0x18000000))
+                ),
+                shape = SquircleMedium
+            )
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        options.forEach { (mode, label, icon) ->
+            val isSelected = currentTheme == mode
+            val interactionSource = remember { MutableInteractionSource() }
+
+            val itemBgColor by animateColorAsState(
+                targetValue = if (isSelected) {
+                    if (isDark) Color(0x40FFFFFF) else Color.White
+                } else {
+                    Color.Transparent
+                },
+                animationSpec = spring(),
+                label = "themeSegmentBg"
+            )
+
+            val itemTextColor by animateColorAsState(
+                targetValue = if (isSelected) {
+                    if (isDark) Color.White else colors.accentSilent
+                } else {
+                    colors.textSecondary
+                },
+                animationSpec = spring(),
+                label = "themeSegmentText"
+            )
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(36.dp)
+                    .clip(SquircleMedium)
+                    .background(itemBgColor)
+                    .then(
+                        if (isSelected) {
+                            Modifier.border(
+                                width = 0.8.dp,
+                                color = if (isDark) Color(0x60FFFFFF) else Color(0x30000000),
+                                shape = SquircleMedium
+                            )
+                        } else Modifier
+                    )
+                    .clickable(
+                        interactionSource = interactionSource,
+                        indication = null,
+                        role = Role.RadioButton,
+                        onClick = { onThemeSelected(mode) }
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = itemTextColor,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Box(modifier = Modifier.padding(start = 6.dp))
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                        ),
+                        color = itemTextColor
+                    )
+                }
+            }
+        }
     }
 }

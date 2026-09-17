@@ -27,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsOff
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PauseCircle
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Vibration
@@ -49,6 +50,7 @@ import androidx.compose.ui.unit.sp
 import com.awayassist.app.R
 import com.awayassist.app.data.AppState
 import com.awayassist.app.data.RingerState
+import com.awayassist.app.data.ThemeMode
 import com.awayassist.app.ui.components.AppleButtonStyle
 import com.awayassist.app.ui.components.AppleStyleButton
 import com.awayassist.app.ui.components.AppleStyleSwitch
@@ -57,6 +59,7 @@ import com.awayassist.app.ui.components.GroupedListRow
 import com.awayassist.app.ui.components.LiquidMeshBackground
 import com.awayassist.app.ui.components.LiquidPillBadge
 import com.awayassist.app.ui.components.LiquidPulsingHalo
+import com.awayassist.app.ui.components.LiquidThemeSelector
 import com.awayassist.app.ui.components.glassmorphic
 import com.awayassist.app.ui.theme.AwayAssistTheme
 import com.awayassist.app.ui.theme.SquircleLarge
@@ -71,7 +74,8 @@ fun MainScreen(
     onForceSilent: () -> Unit,
     onPause1h: () -> Unit,
     onResumeAutomation: () -> Unit,
-    onRequestPolicyAccess: () -> Unit
+    onRequestPolicyAccess: () -> Unit,
+    onSelectTheme: (ThemeMode) -> Unit
 ) {
     val scrollState = rememberScrollState()
     val colors = AwayAssistTheme.colors
@@ -128,7 +132,7 @@ fun MainScreen(
                     ) {
                         Image(
                             painter = painterResource(id = R.drawable.ic_app_logo),
-                            contentDescription = "Away-Assist App Icon",
+                            contentDescription = "Away Assist App Icon",
                             modifier = Modifier.fillMaxSize()
                         )
                     }
@@ -137,7 +141,7 @@ fun MainScreen(
 
                     Column {
                         Text(
-                            text = "Away-Assist",
+                            text = "Away Assist",
                             style = MaterialTheme.typography.displayLarge.copy(
                                 fontSize = 28.sp,
                                 fontWeight = FontWeight.Bold
@@ -195,7 +199,7 @@ fun MainScreen(
             // Master Automation Toggle Card
             GroupedListCard(
                 header = "Automation Engine",
-                footer = "Away-Assist continuously listens for hardware lock/unlock events with zero battery polling.",
+                footer = "Away Assist continuously listens for hardware lock/unlock events with zero battery polling.",
                 modifier = Modifier.padding(bottom = 24.dp)
             ) {
                 GroupedListRow(
@@ -225,6 +229,60 @@ fun MainScreen(
                         )
                     }
                 )
+            }
+
+            // Theme Appearance Card
+            GroupedListCard(
+                header = "Appearance",
+                footer = "Switch between dynamic liquid Light mode, Midnight Glass Dark mode, or follow your System setting.",
+                modifier = Modifier.padding(bottom = 24.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 14.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(colors.cyanGlow.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Palette,
+                                contentDescription = null,
+                                tint = colors.cyanGlow,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "Theme Mode",
+                                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+                                color = colors.textPrimary
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Current: ${appState.themeMode.displayName}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = colors.textSecondary
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    LiquidThemeSelector(
+                        currentTheme = appState.themeMode,
+                        onThemeSelected = onSelectTheme
+                    )
+                }
             }
 
             // Automation Rules Glassmorphic Card
@@ -334,7 +392,7 @@ fun MainScreen(
                     showDivider = true
                 )
                 GroupedListRow(
-                    title = "Background Foreground Service",
+                    title = "Background Service",
                     subtitle = if (appState.isEnabled) "Active with low-priority notification" else "Service stopped",
                     leadingIcon = {
                         Box(
@@ -383,7 +441,7 @@ private fun LiveStatusCard(
             Quad(
                 colors.error,
                 "Permission Required",
-                "Grant Notification Policy Access so Away-Assist can switch ringer modes",
+                "Grant Notification Policy Access so Away Assist can switch ringer modes",
                 Icons.Default.Warning
             )
         }
@@ -616,7 +674,7 @@ private fun PermissionRequiredCard(
             Spacer(modifier = Modifier.height(10.dp))
 
             Text(
-                text = "Android requires Notification Policy Access (Do Not Disturb access) so Away-Assist can switch between Ring and Vibrate modes silently in the background.",
+                text = "Android requires Notification Policy Access (Do Not Disturb access) so Away Assist can switch between Ring and Vibrate modes silently in the background.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = colors.textPrimary
             )

@@ -32,7 +32,7 @@ class NotificationHelper(private val context: Context) {
     fun createNotificationChannel() {
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "Away-Assist Service",
+            "Away Assist Service",
             NotificationManager.IMPORTANCE_LOW
         ).apply {
             description = "Shows current ringer mode and active automation status"
@@ -76,7 +76,7 @@ class NotificationHelper(private val context: Context) {
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("Away-Assist")
+            .setContentTitle("Away Assist")
             .setContentText(contentText)
             .setContentIntent(contentIntent)
             .setOngoing(true)

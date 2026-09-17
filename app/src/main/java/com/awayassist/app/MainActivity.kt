@@ -11,6 +11,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -24,6 +25,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.awayassist.app.data.AppState
 import com.awayassist.app.data.AwayAssistPreferences
+import com.awayassist.app.data.ThemeMode
 import com.awayassist.app.service.NotificationHelper
 import com.awayassist.app.service.RingerService
 import com.awayassist.app.ui.MainScreen
@@ -57,7 +59,15 @@ class MainActivity : ComponentActivity() {
         requestPostNotificationsPermissionIfNeeded()
 
         setContent {
-            AwayAssistTheme {
+            val appState by preferences.appStateFlow.collectAsState(initial = AppState())
+            val systemInDark = isSystemInDarkTheme()
+            val isDarkTheme = when (appState.themeMode) {
+                ThemeMode.SYSTEM -> systemInDark
+                ThemeMode.LIGHT -> false
+                ThemeMode.DARK -> true
+            }
+
+            AwayAssistTheme(darkTheme = isDarkTheme) {
                 val lifecycleOwner = LocalLifecycleOwner.current
                 var hasPolicyAccess by remember {
                     mutableStateOf(ringerController.isNotificationPolicyAccessGranted())
@@ -68,10 +78,6 @@ class MainActivity : ComponentActivity() {
                         if (event == Lifecycle.Event.ON_RESUME) {
                             val granted = ringerController.isNotificationPolicyAccessGranted()
                             hasPolicyAccess = granted
-                            if (granted) {
-                                // If enabled, make sure foreground service is running
-                                val state = preferences.appStateFlow
-                            }
                         }
                     }
                     lifecycleOwner.lifecycle.addObserver(observer)
@@ -80,7 +86,6 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                val appState by preferences.appStateFlow.collectAsState(initial = AppState())
                 val scope = rememberCoroutineScope()
 
                 MainScreen(
@@ -114,6 +119,11 @@ class MainActivity : ComponentActivity() {
                     },
                     onRequestPolicyAccess = {
                         openNotificationPolicyAccessSettings()
+                    },
+                    onSelectTheme = { mode ->
+                        scope.launch {
+                            preferences.setThemeMode(mode)
+                        }
                     }
                 )
             }
