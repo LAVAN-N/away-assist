@@ -37,9 +37,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -52,7 +58,8 @@ import com.awayassist.app.ui.theme.SquircleMedium
 import com.awayassist.app.ui.theme.SquirclePill
 
 /**
- * Renders a dynamic, animated liquid mesh background with floating fluid gradient orbs.
+ * Renders a dynamic, animated liquid mesh background with floating fluid Notification Bell silhouettes
+ * and radiating acoustic soundwaves reflecting the active ringer state.
  */
 @Composable
 fun LiquidMeshBackground(
@@ -63,54 +70,84 @@ fun LiquidMeshBackground(
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "liquidMeshAnimation")
 
-    val orb1OffsetX by infiniteTransition.animateFloat(
-        initialValue = -0.3f,
-        targetValue = 0.5f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 9000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "orb1X"
-    )
-
-    val orb1OffsetY by infiniteTransition.animateFloat(
+    val bell1OffsetX by infiniteTransition.animateFloat(
         initialValue = -0.2f,
-        targetValue = 0.3f,
+        targetValue = 0.35f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 11000, easing = FastOutSlowInEasing),
+            animation = tween(durationMillis = 9500, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "orb1Y"
+        label = "bell1X"
     )
 
-    val orb2OffsetX by infiniteTransition.animateFloat(
-        initialValue = 0.8f,
-        targetValue = 0.2f,
+    val bell1OffsetY by infiniteTransition.animateFloat(
+        initialValue = -0.15f,
+        targetValue = 0.25f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 13000, easing = FastOutSlowInEasing),
+            animation = tween(durationMillis = 11500, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "orb2X"
+        label = "bell1Y"
     )
 
-    val orb2OffsetY by infiniteTransition.animateFloat(
+    val bell1Sway by infiniteTransition.animateFloat(
+        initialValue = -8f,
+        targetValue = 8f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 7500, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "bell1Sway"
+    )
+
+    val bell2OffsetX by infiniteTransition.animateFloat(
         initialValue = 0.6f,
+        targetValue = 0.15f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 13500, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "bell2X"
+    )
+
+    val bell2OffsetY by infiniteTransition.animateFloat(
+        initialValue = 0.5f,
         targetValue = 0.1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 10000, easing = FastOutSlowInEasing),
+            animation = tween(durationMillis = 10500, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "orb2Y"
+        label = "bell2Y"
+    )
+
+    val bell2Sway by infiniteTransition.animateFloat(
+        initialValue = 6f,
+        targetValue = -6f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 8800, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "bell2Sway"
     )
 
     val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 0.85f,
-        targetValue = 1.15f,
+        initialValue = 0.88f,
+        targetValue = 1.14f,
         animationSpec = infiniteRepeatable(
             animation = tween(durationMillis = 7000, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "pulseScale"
+    )
+
+    val soundwavePulse by infiniteTransition.animateFloat(
+        initialValue = 0.80f,
+        targetValue = 1.35f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 4500, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "soundwavePulse"
     )
 
     val baseBg = AwayAssistTheme.colors.background
@@ -125,43 +162,259 @@ fun LiquidMeshBackground(
                 val w = size.width
                 val h = size.height
 
+                // 1. Primary Active Notification Bell (Upper Ambient Region)
+                val primaryCenter = Offset(
+                    w * (0.32f + bell1OffsetX * 0.4f),
+                    h * (0.22f + bell1OffsetY * 0.3f)
+                )
+                val primarySize = Size(
+                    w * 0.75f * pulseScale,
+                    w * 0.85f * pulseScale
+                )
+
+                // Ambient Radial Glow under Primary Bell
                 drawCircle(
                     brush = Brush.radialGradient(
                         colors = listOf(
-                            activeColor.copy(alpha = if (isDark) 0.35f else 0.18f),
-                            activeColor.copy(alpha = if (isDark) 0.12f else 0.06f),
+                            activeColor.copy(alpha = if (isDark) 0.32f else 0.16f),
+                            activeColor.copy(alpha = if (isDark) 0.10f else 0.05f),
                             Color.Transparent
                         ),
-                        center = Offset(w * (0.3f + orb1OffsetX * 0.4f), h * (0.2f + orb1OffsetY * 0.3f)),
-                        radius = (w * 0.8f) * pulseScale
+                        center = primaryCenter,
+                        radius = (w * 0.65f) * pulseScale
                     )
                 )
 
-                drawCircle(
-                    brush = Brush.radialGradient(
+                // Primary Fluid Notification Bell Silhouette
+                drawFluidNotificationBell(
+                    center = primaryCenter,
+                    size = primarySize,
+                    rotationDegrees = bell1Sway,
+                    fillBrush = Brush.radialGradient(
                         colors = listOf(
-                            cyan.copy(alpha = if (isDark) 0.22f else 0.14f),
-                            azure.copy(alpha = if (isDark) 0.08f else 0.04f),
+                            activeColor.copy(alpha = if (isDark) 0.30f else 0.15f),
+                            activeColor.copy(alpha = if (isDark) 0.12f else 0.05f),
                             Color.Transparent
                         ),
-                        center = Offset(w * (0.7f + orb2OffsetX * 0.3f), h * (0.45f + orb2OffsetY * 0.3f)),
-                        radius = (w * 0.75f) * pulseScale
-                    )
+                        center = primaryCenter,
+                        radius = primarySize.width * 0.6f
+                    ),
+                    strokeBrush = Brush.linearGradient(
+                        colors = listOf(
+                            activeColor.copy(alpha = if (isDark) 0.35f else 0.22f),
+                            Color.Transparent,
+                            activeColor.copy(alpha = if (isDark) 0.18f else 0.08f)
+                        ),
+                        start = Offset(primaryCenter.x - primarySize.width * 0.5f, primaryCenter.y - primarySize.height * 0.5f),
+                        end = Offset(primaryCenter.x + primarySize.width * 0.5f, primaryCenter.y + primarySize.height * 0.5f)
+                    ),
+                    strokeWidth = 1.8.dp.toPx()
                 )
 
+                // Radiating Acoustic Chime Soundwave Arcs from Primary Bell
+                drawAcousticSoundwaves(
+                    center = primaryCenter,
+                    bellWidth = primarySize.width,
+                    bellHeight = primarySize.height,
+                    scale = soundwavePulse,
+                    color = activeColor.copy(alpha = if (isDark) 0.20f else 0.10f),
+                    rotationDegrees = bell1Sway
+                )
+
+                // 2. Secondary Floating Notification Bell (Mid-Right Region)
+                val secondaryCenter = Offset(
+                    w * (0.68f + bell2OffsetX * 0.3f),
+                    h * (0.48f + bell2OffsetY * 0.25f)
+                )
+                val secondarySize = Size(
+                    w * 0.60f * pulseScale,
+                    w * 0.68f * pulseScale
+                )
+
+                drawFluidNotificationBell(
+                    center = secondaryCenter,
+                    size = secondarySize,
+                    rotationDegrees = bell2Sway,
+                    fillBrush = Brush.radialGradient(
+                        colors = listOf(
+                            cyan.copy(alpha = if (isDark) 0.22f else 0.12f),
+                            azure.copy(alpha = if (isDark) 0.07f else 0.03f),
+                            Color.Transparent
+                        ),
+                        center = secondaryCenter,
+                        radius = secondarySize.width * 0.55f
+                    ),
+                    strokeBrush = Brush.linearGradient(
+                        colors = listOf(
+                            cyan.copy(alpha = if (isDark) 0.28f else 0.16f),
+                            Color.Transparent,
+                            azure.copy(alpha = if (isDark) 0.12f else 0.05f)
+                        )
+                    ),
+                    strokeWidth = 1.4.dp.toPx()
+                )
+
+                // 3. Lower Ambient Floating Soundwave Glow
                 drawCircle(
                     brush = Brush.radialGradient(
                         colors = listOf(
-                            azure.copy(alpha = if (isDark) 0.18f else 0.08f),
+                            azure.copy(alpha = if (isDark) 0.16f else 0.08f),
                             Color.Transparent
                         ),
-                        center = Offset(w * 0.2f, h * 0.85f),
-                        radius = w * 0.7f
+                        center = Offset(w * 0.22f, h * 0.82f),
+                        radius = w * 0.65f
                     )
                 )
             }
     ) {
         content()
+    }
+}
+
+/**
+ * Draws a fluid, organic Notification Bell silhouette with dome, flaring body, and clapper.
+ */
+private fun DrawScope.drawFluidNotificationBell(
+    center: Offset,
+    size: Size,
+    rotationDegrees: Float,
+    fillBrush: Brush,
+    strokeBrush: Brush? = null,
+    strokeWidth: Float = 0f
+) {
+    rotate(degrees = rotationDegrees, pivot = center) {
+        val cx = center.x
+        val cy = center.y
+        val w = size.width
+        val h = size.height
+
+        val bellPath = Path().apply {
+            val topLoopRadius = w * 0.075f
+            val topY = cy - h * 0.44f
+            val domeTopY = cy - h * 0.36f
+            val waistY = cy + h * 0.05f
+            val flareY = cy + h * 0.30f
+            val lipBottomY = cy + h * 0.34f
+
+            // Top hanger loop
+            moveTo(cx, topY)
+            cubicTo(
+                cx + topLoopRadius * 1.3f, topY,
+                cx + topLoopRadius * 1.3f, domeTopY,
+                cx, domeTopY
+            )
+            cubicTo(
+                cx - topLoopRadius * 1.3f, domeTopY,
+                cx - topLoopRadius * 1.3f, topY,
+                cx, topY
+            )
+
+            // Dome top and right shoulder
+            moveTo(cx, domeTopY)
+            cubicTo(
+                cx + w * 0.26f, domeTopY + h * 0.03f,
+                cx + w * 0.22f, waistY,
+                cx + w * 0.42f, flareY
+            )
+            // Right flare lip
+            cubicTo(
+                cx + w * 0.44f, lipBottomY,
+                cx + w * 0.34f, lipBottomY,
+                cx + w * 0.18f, lipBottomY
+            )
+            // Bottom clapper dome
+            val clapperRadius = w * 0.09f
+            cubicTo(
+                cx + clapperRadius, lipBottomY,
+                cx + clapperRadius, lipBottomY + h * 0.09f,
+                cx, lipBottomY + h * 0.09f
+            )
+            cubicTo(
+                cx - clapperRadius, lipBottomY + h * 0.09f,
+                cx - clapperRadius, lipBottomY,
+                cx - w * 0.18f, lipBottomY
+            )
+            // Left flare lip
+            cubicTo(
+                cx - w * 0.34f, lipBottomY,
+                cx - w * 0.44f, lipBottomY,
+                cx - w * 0.42f, flareY
+            )
+            // Left waist and shoulder
+            cubicTo(
+                cx - w * 0.22f, waistY,
+                cx - w * 0.26f, domeTopY + h * 0.03f,
+                cx, domeTopY
+            )
+            close()
+        }
+
+        drawPath(path = bellPath, brush = fillBrush)
+        if (strokeBrush != null && strokeWidth > 0f) {
+            drawPath(path = bellPath, brush = strokeBrush, style = Stroke(width = strokeWidth))
+        }
+    }
+}
+
+/**
+ * Draws concentric radiating soundwave / chime wave arcs around the notification bell.
+ */
+private fun DrawScope.drawAcousticSoundwaves(
+    center: Offset,
+    bellWidth: Float,
+    bellHeight: Float,
+    scale: Float,
+    color: Color,
+    rotationDegrees: Float
+) {
+    rotate(degrees = rotationDegrees, pivot = center) {
+        val cx = center.x
+        val cy = center.y
+
+        // Left Chime Wave Arc
+        val leftArcRadius = (bellWidth * 0.52f) * scale
+        drawArc(
+            color = color,
+            startAngle = 135f,
+            sweepAngle = 90f,
+            useCenter = false,
+            topLeft = Offset(cx - leftArcRadius - bellWidth * 0.15f, cy - leftArcRadius * 0.7f),
+            size = Size(leftArcRadius * 2f, leftArcRadius * 1.4f),
+            style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
+        )
+
+        // Right Chime Wave Arc
+        val rightArcRadius = (bellWidth * 0.52f) * scale
+        drawArc(
+            color = color,
+            startAngle = -45f,
+            sweepAngle = 90f,
+            useCenter = false,
+            topLeft = Offset(cx - rightArcRadius + bellWidth * 0.15f, cy - rightArcRadius * 0.7f),
+            size = Size(rightArcRadius * 2f, rightArcRadius * 1.4f),
+            style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
+        )
+
+        // Outer Secondary Wave Pulse
+        val outerRadius = (bellWidth * 0.70f) * scale
+        drawArc(
+            color = color.copy(alpha = color.alpha * 0.5f),
+            startAngle = 145f,
+            sweepAngle = 70f,
+            useCenter = false,
+            topLeft = Offset(cx - outerRadius - bellWidth * 0.22f, cy - outerRadius * 0.7f),
+            size = Size(outerRadius * 2f, outerRadius * 1.4f),
+            style = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round)
+        )
+        drawArc(
+            color = color.copy(alpha = color.alpha * 0.5f),
+            startAngle = -35f,
+            sweepAngle = 70f,
+            useCenter = false,
+            topLeft = Offset(cx - outerRadius + bellWidth * 0.22f, cy - outerRadius * 0.7f),
+            size = Size(outerRadius * 2f, outerRadius * 1.4f),
+            style = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round)
+        )
     }
 }
 
