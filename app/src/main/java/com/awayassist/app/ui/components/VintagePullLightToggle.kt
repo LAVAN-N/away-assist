@@ -1,5 +1,10 @@
 package com.awayassist.app.ui.components
 
+import android.content.Context
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -7,6 +12,7 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
@@ -39,7 +45,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -59,6 +67,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
@@ -75,11 +84,13 @@ import kotlin.math.hypot
 import kotlin.math.roundToInt
 
 /**
- * Realistic Vintage Pull-Cord Light Switch with Interactable Tip & Independent Fixture.
+ * Realistic Vintage Pull-Cord Light Switch with Gyroscope/Accelerometer Gravity Sway.
  *
- * - The string hangs independently beside the bulb from its own ceiling mount with NO horizontal attachment to the bulb.
- * - The cord exhibits realistic catenary rope physics.
- * - ONLY the tip (brass acorn handle) is interactable/draggable in all directions.
+ * - Real-time device tilt & gravity dynamics: tilting the phone makes the beaded cord sway
+ *   naturally like a real hanging metal chain.
+ * - String hangs independently beside the bulb from its own ceiling rosette (no attachment to bulb).
+ * - Catenary rope curvature & damped 2D harmonic spring physics.
+ * - Only the bottom acorn tip is interactable for grabbing, dragging, and pulling in any direction.
  */
 @Composable
 fun VintagePullLightToggle(
@@ -90,6 +101,7 @@ fun VintagePullLightToggle(
 ) {
     val colors = AwayAssistTheme.colors
     val density = LocalDensity.current
+    val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
     val isCurrentlyLit = !isDark
@@ -102,10 +114,66 @@ fun VintagePullLightToggle(
     val thresholdDistPx = with(density) { 34.dp.toPx() }
     val restLengthPx = with(density) { 72.dp.toPx() }
 
-    // 2D Rope Physics Animatable Offsets
+    // 2D Rope Physics Animatable Drag Offsets
     val offsetX = remember { Animatable(0f) }
     val offsetY = remember { Animatable(0f) }
     var isDragging by remember { mutableStateOf(false) }
+
+    // Gyroscope / Accelerometer Gravity Tilt State
+    var rawTiltXPx by remember { mutableFloatStateOf(0f) }
+    var rawTiltYPx by remember { mutableFloatStateOf(0f) }
+
+    DisposableEffect(context) {
+        val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
+        val sensor = sensorManager?.getDefaultSensor(Sensor.TYPE_GRAVITY)
+            ?: sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+
+        val maxSwayXPx = with(density) { 22.dp.toPx() }
+        val maxSwayYPx = with(density) { 8.dp.toPx() }
+
+        val listener = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent?) {
+                if (event == null) return
+                // event.values[0]: X axis gravity (-9.8 to +9.8 m/s²)
+                // event.values[1]: Y axis gravity
+                val gx = event.values[0]
+                val gy = event.values[1]
+                // Tilting phone right (gx negative) sways cord to the right (+X screen)
+                val targetSwayX = (-gx / 9.81f).coerceIn(-1.0f, 1.0f) * maxSwayXPx
+                val targetSwayY = ((9.81f - gy) / 9.81f).coerceIn(-0.3f, 0.6f) * maxSwayYPx
+                rawTiltXPx = targetSwayX
+                rawTiltYPx = targetSwayY
+            }
+
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+        }
+
+        sensor?.let {
+            sensorManager?.registerListener(listener, it, SensorManager.SENSOR_DELAY_GAME)
+        }
+
+        onDispose {
+            sensorManager?.unregisterListener(listener)
+        }
+    }
+
+    // Smooth Spring-damped Gyro Pendulum Response
+    val animatedTiltX by animateFloatAsState(
+        targetValue = rawTiltXPx,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "gyroTiltX"
+    )
+    val animatedTiltY by animateFloatAsState(
+        targetValue = rawTiltYPx,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "gyroTiltY"
+    )
 
     // Filament breathing transition
     val infiniteTransition = rememberInfiniteTransition(label = "filamentWarmth")
@@ -237,7 +305,7 @@ fun VintagePullLightToggle(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Interactive Stage with Independent Lamp and Separate Pull Cord
+            // Interactive Stage with Independent Lamp, Gyro Pendulum Physics, and Catenary Rope
             BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -253,10 +321,14 @@ fun VintagePullLightToggle(
                 val curX = offsetX.value
                 val curY = offsetY.value
 
+                // Combine Gyro Tilt with Interactive Drag
+                val liveTiltX = if (isDragging) animatedTiltX * 0.25f else animatedTiltX
+                val liveTiltY = if (isDragging) animatedTiltY * 0.25f else animatedTiltY
+
                 // Acorn Tip Position
                 val acornPoint = Offset(
-                    x = anchorXPx + curX,
-                    y = anchorYPx + restLengthPx + curY
+                    x = anchorXPx + liveTiltX + curX,
+                    y = anchorYPx + restLengthPx + liveTiltY + curY
                 )
 
                 // 1. Background Ambient Radial Glow
@@ -278,7 +350,7 @@ fun VintagePullLightToggle(
                     }
                 }
 
-                // 2. Coordinated Visual Canvas: Lamp + Separate Cord Mount + Catenary Rope
+                // 2. Coordinated Visual Canvas: Lamp + Separate Cord Mount + Gyro Catenary Rope
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     // Draw Edison Bulb (Completely Independent, No Horizontal Pipe)
                     drawVintageEdisonBulb(
@@ -306,8 +378,8 @@ fun VintagePullLightToggle(
                         2.dp.toPx() / tautRatio
                     }
 
-                    val lateralSag = if (abs(curX) > 8f) {
-                        -curX * 0.12f
+                    val lateralSag = if (abs(curX + liveTiltX) > 6f) {
+                        -(curX + liveTiltX) * 0.12f
                     } else 0f
 
                     val controlPoint = Offset(
@@ -376,9 +448,6 @@ fun VintagePullLightToggle(
                 }
 
                 // 3. ONLY THE TIP IS INTERACTABLE (Acorn Handle Hit Target)
-                val acornXDp = with(density) { acornPoint.x.toDp() }
-                val acornYDp = with(density) { acornPoint.y.toDp() }
-
                 Box(
                     modifier = Modifier
                         .offset {
