@@ -170,7 +170,6 @@ fun MainScreen(
             // Editorial Glass Header
             EditorialHeader(
                 currentMode = currentOperationMode,
-                countdownText = countdownText,
                 hasPolicyAccess = hasNotificationPolicyAccess,
                 statusColor = animatedAmbientColor,
                 isDark = isDark,
@@ -210,7 +209,6 @@ fun MainScreen(
             UnifiedControlsCard(
                 appState = appState,
                 currentMode = currentOperationMode,
-                countdownText = countdownText,
                 onSelectMode = onSelectMode,
                 onPauseForDuration = onPauseForDuration,
                 onSelectTheme = onSelectTheme,
@@ -288,7 +286,6 @@ fun MainScreen(
 @Composable
 private fun EditorialHeader(
     currentMode: OperationMode,
-    countdownText: String,
     hasPolicyAccess: Boolean,
     statusColor: Color,
     isDark: Boolean,
@@ -355,7 +352,7 @@ private fun EditorialHeader(
         val badgeText = when {
             !hasPolicyAccess -> "Setup"
             currentMode == OperationMode.FORCE_RING -> "Ring"
-            currentMode == OperationMode.PAUSE -> countdownText
+            currentMode == OperationMode.PAUSE -> "Paused"
             else -> "Auto"
         }
 
@@ -393,8 +390,7 @@ private fun EditorialHeader(
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontWeight = FontWeight.Bold,
                         fontSize = 10.sp,
-                        letterSpacing = 0.7.sp,
-                        fontFamily = if (currentMode == OperationMode.PAUSE) FontFamily.Monospace else FontFamily.Default
+                        letterSpacing = 0.7.sp
                     ),
                     color = statusColor
                 )
@@ -683,7 +679,6 @@ enum class PausePreset(val label: String, val minutes: Int) {
 private fun UnifiedControlsCard(
     appState: AppState,
     currentMode: OperationMode,
-    countdownText: String,
     onSelectMode: (OperationMode) -> Unit,
     onPauseForDuration: (Long) -> Unit,
     onSelectTheme: (ThemeMode) -> Unit,
@@ -720,12 +715,11 @@ private fun UnifiedControlsCard(
                     text = when (currentMode) {
                         OperationMode.AUTO -> "Dynamic Lock/Unlock"
                         OperationMode.FORCE_RING -> "Always Ring"
-                        OperationMode.PAUSE -> "Paused ($countdownText)"
+                        OperationMode.PAUSE -> "Paused"
                     },
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontWeight = FontWeight.Medium,
-                        fontSize = 11.5.sp,
-                        fontFamily = if (currentMode == OperationMode.PAUSE) FontFamily.Monospace else FontFamily.Default
+                        fontSize = 11.5.sp
                     ),
                     color = when (currentMode) {
                         OperationMode.AUTO -> colors.accentSilent
@@ -803,11 +797,10 @@ private fun UnifiedControlsCard(
                         }
                         if (expiryTime.isNotEmpty()) {
                             Text(
-                                text = "$countdownText (Resumes $expiryTime)",
+                                text = "Resumes at $expiryTime",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontWeight = FontWeight.SemiBold,
-                                    fontSize = 11.sp,
-                                    fontFamily = FontFamily.Monospace
+                                    fontSize = 11.sp
                                 ),
                                 color = colors.warning
                             )
