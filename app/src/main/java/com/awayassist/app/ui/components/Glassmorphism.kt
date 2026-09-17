@@ -2,9 +2,7 @@ package com.awayassist.app.ui.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -42,7 +40,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -128,7 +125,6 @@ fun LiquidMeshBackground(
                 val w = size.width
                 val h = size.height
 
-                // Fluid Orb 1 (Active Color Glow - top area)
                 drawCircle(
                     brush = Brush.radialGradient(
                         colors = listOf(
@@ -141,7 +137,6 @@ fun LiquidMeshBackground(
                     )
                 )
 
-                // Fluid Orb 2 (Cyan / Indigo fluid blend - middle right)
                 drawCircle(
                     brush = Brush.radialGradient(
                         colors = listOf(
@@ -154,7 +149,6 @@ fun LiquidMeshBackground(
                     )
                 )
 
-                // Fluid Orb 3 (Bottom ambient glow)
                 drawCircle(
                     brush = Brush.radialGradient(
                         colors = listOf(
@@ -188,8 +182,8 @@ fun Modifier.glassmorphic(
         val surfaceGradient = if (isDark) {
             Brush.linearGradient(
                 colors = listOf(
-                    tintColor?.copy(alpha = 0.22f) ?: Color(0x33202235),
-                    tintColor?.copy(alpha = 0.10f) ?: Color(0x1F141524)
+                    tintColor?.copy(alpha = 0.20f) ?: Color(0x33202235),
+                    tintColor?.copy(alpha = 0.08f) ?: Color(0x1F141524)
                 ),
                 start = Offset(0f, 0f),
                 end = Offset(w, h)
@@ -197,8 +191,8 @@ fun Modifier.glassmorphic(
         } else {
             Brush.linearGradient(
                 colors = listOf(
-                    tintColor?.copy(alpha = 0.14f) ?: Color(0xEBFFFFFF),
-                    tintColor?.copy(alpha = 0.06f) ?: Color(0xC7F5F6FC)
+                    tintColor?.copy(alpha = 0.12f) ?: Color(0xEBFFFFFF),
+                    tintColor?.copy(alpha = 0.05f) ?: Color(0xC7F5F6FC)
                 ),
                 start = Offset(0f, 0f),
                 end = Offset(w, h)
@@ -242,7 +236,7 @@ fun LiquidPulsingHalo(
     val infiniteTransition = rememberInfiniteTransition(label = "pulseTransition")
     val haloScale by infiniteTransition.animateFloat(
         initialValue = 1.0f,
-        targetValue = 1.35f,
+        targetValue = 1.30f,
         animationSpec = infiniteRepeatable(
             animation = tween(2200, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
@@ -250,8 +244,8 @@ fun LiquidPulsingHalo(
         label = "haloScale"
     )
     val haloAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.45f,
-        targetValue = 0.08f,
+        initialValue = 0.40f,
+        targetValue = 0.06f,
         animationSpec = infiniteRepeatable(
             animation = tween(2200, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
@@ -285,25 +279,26 @@ fun LiquidPillBadge(
     Box(
         modifier = modifier
             .clip(SquirclePill)
-            .background(tintColor.copy(alpha = 0.15f))
+            .background(tintColor.copy(alpha = 0.12f))
             .border(
                 width = 0.8.dp,
                 brush = Brush.horizontalGradient(
                     colors = listOf(
-                        tintColor.copy(alpha = 0.6f),
-                        tintColor.copy(alpha = 0.2f)
+                        tintColor.copy(alpha = 0.55f),
+                        tintColor.copy(alpha = 0.20f)
                     )
                 ),
                 shape = SquirclePill
             )
-            .padding(horizontal = 10.dp, vertical = 4.dp),
+            .padding(horizontal = 9.dp, vertical = 3.5.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = text.uppercase(),
             style = MaterialTheme.typography.labelSmall.copy(
                 fontWeight = FontWeight.Bold,
-                letterSpacing = 0.8.sp
+                fontSize = 10.sp,
+                letterSpacing = 0.6.sp
             ),
             color = tintColor
         )
@@ -332,7 +327,7 @@ fun LiquidThemeSelector(
         modifier = modifier
             .fillMaxWidth()
             .clip(SquircleMedium)
-            .background(if (isDark) Color(0x20FFFFFF) else Color(0x14000000))
+            .background(if (isDark) Color(0x1CFFFFFF) else Color(0x10000000))
             .border(
                 width = 0.8.dp,
                 brush = Brush.linearGradient(
@@ -340,8 +335,8 @@ fun LiquidThemeSelector(
                 ),
                 shape = SquircleMedium
             )
-            .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
+            .padding(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(3.dp)
     ) {
         options.forEach { (mode, label, icon) ->
             val isSelected = currentTheme == mode
@@ -370,14 +365,14 @@ fun LiquidThemeSelector(
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .height(36.dp)
+                    .height(32.dp)
                     .clip(SquircleMedium)
                     .background(itemBgColor)
                     .then(
                         if (isSelected) {
                             Modifier.border(
                                 width = 0.8.dp,
-                                color = if (isDark) Color(0x60FFFFFF) else Color(0x30000000),
+                                color = if (isDark) Color(0x55FFFFFF) else Color(0x28000000),
                                 shape = SquircleMedium
                             )
                         } else Modifier
@@ -398,13 +393,14 @@ fun LiquidThemeSelector(
                         imageVector = icon,
                         contentDescription = null,
                         tint = itemTextColor,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(14.dp)
                     )
-                    Box(modifier = Modifier.padding(start = 6.dp))
+                    Box(modifier = Modifier.padding(start = 5.dp))
                     Text(
                         text = label,
                         style = MaterialTheme.typography.labelMedium.copy(
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            fontSize = 11.5.sp
                         ),
                         color = itemTextColor
                     )
