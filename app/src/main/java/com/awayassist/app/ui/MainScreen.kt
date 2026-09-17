@@ -9,8 +9,10 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -33,19 +35,19 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PauseCircle
-import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.Info
@@ -100,8 +102,8 @@ fun MainScreen(
     appState: AppState,
     hasNotificationPolicyAccess: Boolean,
     onToggleEnabled: (Boolean) -> Unit,
-    onForceRing: () -> Unit,
-    onForceSilent: () -> Unit,
+    onToggleForceRing: (Boolean) -> Unit,
+    onTogglePause: (Boolean, Long) -> Unit,
     onPauseForDuration: (Long) -> Unit,
     onResumeAutomation: () -> Unit,
     onRequestPolicyAccess: () -> Unit,
@@ -112,7 +114,6 @@ fun MainScreen(
     val isDark = colors.isDark
 
     var showInfoSheet by remember { mutableStateOf(false) }
-    var showPauseSheet by remember { mutableStateOf(false) }
 
     val targetAmbientColor = when {
         !hasNotificationPolicyAccess -> colors.error
@@ -165,10 +166,6 @@ fun MainScreen(
             CompactStatusCard(
                 appState = appState,
                 hasPolicyAccess = hasNotificationPolicyAccess,
-                onForceRing = onForceRing,
-                onForceSilent = onForceSilent,
-                onDefaultPause = { onPauseForDuration(3600_000L) },
-                onOpenPauseSheet = { showPauseSheet = true },
                 onResumeAutomation = onResumeAutomation,
                 isDark = isDark,
                 modifier = Modifier.padding(bottom = 12.dp)
@@ -179,84 +176,20 @@ fun MainScreen(
                 modifier = Modifier.padding(bottom = 12.dp)
             )
 
-            // Combined Controls Card (Automation Toggle + Appearance Segment)
-            GroupedListCard(
+            // Controls Card with Toggles & Inline Expandable Custom Pause
+            ControlsCard(
+                appState = appState,
+                hasPolicyAccess = hasNotificationPolicyAccess,
+                onToggleEnabled = onToggleEnabled,
+                onToggleForceRing = onToggleForceRing,
+                onTogglePause = onTogglePause,
+                onPauseForDuration = onPauseForDuration,
+                onSelectTheme = onSelectTheme,
+                isDark = isDark,
                 modifier = Modifier.padding(bottom = 12.dp)
-            ) {
-                GroupedListRow(
-                    title = "Automation",
-                    subtitle = if (appState.isEnabled) "Automating on lock / unlock" else "Paused",
-                    leadingIcon = {
-                        Box(
-                            modifier = Modifier
-                                .size(28.dp)
-                                .clip(CircleShape)
-                                .background(colors.accentSilent.copy(alpha = 0.15f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = if (appState.isEnabled) Icons.Default.Notifications else Icons.Default.NotificationsOff,
-                                contentDescription = null,
-                                tint = colors.accentSilent,
-                                modifier = Modifier.size(15.dp)
-                            )
-                        }
-                    },
-                    trailingContent = {
-                        AppleStyleSwitch(
-                            checked = appState.isEnabled,
-                            onCheckedChange = onToggleEnabled,
-                            activeColor = colors.ringState
-                        )
-                    },
-                    showDivider = true
-                )
+            )
 
-                // Theme Mode Segment Row
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 10.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(28.dp)
-                                .clip(CircleShape)
-                                .background(colors.cyanGlow.copy(alpha = 0.15f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Palette,
-                                contentDescription = null,
-                                tint = colors.cyanGlow,
-                                modifier = Modifier.size(15.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = "Appearance",
-                            style = MaterialTheme.typography.bodyLarge.copy(
-                                fontWeight = FontWeight.Medium,
-                                fontSize = 15.sp
-                            ),
-                            color = colors.textPrimary
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    LiquidThemeSelector(
-                        currentTheme = appState.themeMode,
-                        onThemeSelected = onSelectTheme
-                    )
-                }
-            }
-
-            // System Status Card
+            // System Status Card (DND Permission)
             GroupedListCard(
                 modifier = Modifier.padding(bottom = 20.dp)
             ) {
@@ -315,25 +248,6 @@ fun MainScreen(
                 dragHandle = null
             ) {
                 InfoBottomSheetContent(onClose = { showInfoSheet = false })
-            }
-        }
-
-        // Custom Pause Modal Bottom Sheet
-        if (showPauseSheet) {
-            ModalBottomSheet(
-                onDismissRequest = { showPauseSheet = false },
-                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-                containerColor = if (isDark) Color(0xFF141520) else Color(0xFFFAFAFC),
-                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-                dragHandle = null
-            ) {
-                CustomPauseBottomSheetContent(
-                    onConfirm = { durationMs ->
-                        onPauseForDuration(durationMs)
-                        showPauseSheet = false
-                    },
-                    onClose = { showPauseSheet = false }
-                )
             }
         }
     }
@@ -481,16 +395,12 @@ private fun EditorialHeader(
 }
 
 /**
- * Compact Glanceable Hero Status Card
+ * Compact Hero Status Card
  */
 @Composable
 private fun CompactStatusCard(
     appState: AppState,
     hasPolicyAccess: Boolean,
-    onForceRing: () -> Unit,
-    onForceSilent: () -> Unit,
-    onDefaultPause: () -> Unit,
-    onOpenPauseSheet: () -> Unit,
     onResumeAutomation: () -> Unit,
     isDark: Boolean,
     modifier: Modifier = Modifier
@@ -511,13 +421,13 @@ private fun CompactStatusCard(
                 RingerState.RING -> Quad(
                     colors.ringState,
                     "Force Ring Active",
-                    "Automation disabled • Tap Resume to reactivate",
-                    Icons.Default.Notifications
+                    "Continuous audible ring • Tap Resume or turn off toggle",
+                    Icons.Default.NotificationsActive
                 )
                 RingerState.VIBRATE, RingerState.SILENT -> Quad(
                     colors.accentSilent,
                     "Force Silent Active",
-                    "Automation disabled • Tap Resume to reactivate",
+                    "Continuous silent vibration • Tap Resume to reactivate",
                     Icons.Default.Vibration
                 )
                 else -> Quad(
@@ -533,7 +443,7 @@ private fun CompactStatusCard(
             Quad(
                 colors.warning,
                 "Paused (${remainingMins}m remaining)",
-                "Automation paused • Resumes automatically",
+                "Automation suspended • Resumes automatically",
                 Icons.Default.PauseCircle
             )
         }
@@ -641,70 +551,16 @@ private fun CompactStatusCard(
                 }
             }
 
-            // Compact Quick Actions with Default Preset and Separate Custom Option
-            if (hasPolicyAccess) {
-                if (appState.isPaused || appState.overrideMode != null) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    AppleStyleButton(
-                        text = "Resume Automation",
-                        onClick = onResumeAutomation,
-                        style = AppleButtonStyle.PRIMARY,
-                        modifier = Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 9.dp)
-                    )
-                } else if (appState.isEnabled) {
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        // Action 1: Force mode toggle
-                        if (appState.currentMode == RingerState.RING) {
-                            AppleStyleButton(
-                                text = "Force Silent",
-                                onClick = onForceSilent,
-                                style = AppleButtonStyle.PRIMARY,
-                                modifier = Modifier.weight(1.15f),
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.5.dp)
-                            )
-                        } else {
-                            AppleStyleButton(
-                                text = "Force Ring",
-                                onClick = onForceRing,
-                                style = AppleButtonStyle.ACCENT,
-                                modifier = Modifier.weight(1.15f),
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.5.dp)
-                            )
-                        }
-
-                        // Action 2: Single Default Preset (1h)
-                        AppleStyleButton(
-                            text = "Pause 1h",
-                            onClick = onDefaultPause,
-                            style = AppleButtonStyle.GLASS,
-                            modifier = Modifier.weight(1.0f),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.5.dp)
-                        )
-
-                        // Action 3: Separate Custom Option
-                        AppleStyleButton(
-                            text = "Custom",
-                            onClick = onOpenPauseSheet,
-                            style = AppleButtonStyle.GLASS,
-                            modifier = Modifier.weight(0.95f),
-                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.5.dp),
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Default.Schedule,
-                                    contentDescription = null,
-                                    tint = colors.textPrimary,
-                                    modifier = Modifier.size(12.dp)
-                                )
-                            }
-                        )
-                    }
-                }
+            // Quick Resume Button when Override or Pause is active
+            if (hasPolicyAccess && (appState.isPaused || appState.overrideMode != null)) {
+                Spacer(modifier = Modifier.height(12.dp))
+                AppleStyleButton(
+                    text = "Resume Automation",
+                    onClick = onResumeAutomation,
+                    style = AppleButtonStyle.PRIMARY,
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.5.dp)
+                )
             }
         }
     }
@@ -800,6 +656,376 @@ private fun CompactRulesGrid(modifier: Modifier = Modifier) {
     }
 }
 
+enum class PausePreset(val label: String, val minutes: Int) {
+    M10("10m", 10),
+    M30("30m", 30),
+    H1("1h", 60),
+    CUSTOM("Custom", -1)
+}
+
+/**
+ * Controls Card containing:
+ * 1. Automation Toggle
+ * 2. Force Ring Toggle
+ * 3. Pause Automation Toggle + Collapsible Inline Custom Duration Picker
+ * 4. Appearance Selector
+ */
+@Composable
+private fun ControlsCard(
+    appState: AppState,
+    hasPolicyAccess: Boolean,
+    onToggleEnabled: (Boolean) -> Unit,
+    onToggleForceRing: (Boolean) -> Unit,
+    onTogglePause: (Boolean, Long) -> Unit,
+    onPauseForDuration: (Long) -> Unit,
+    onSelectTheme: (ThemeMode) -> Unit,
+    isDark: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val colors = AwayAssistTheme.colors
+
+    var selectedPreset by remember { mutableStateOf(PausePreset.H1) }
+    var customMinutes by remember { mutableIntStateOf(45) }
+
+    val activeMinutes = if (selectedPreset == PausePreset.CUSTOM) customMinutes else selectedPreset.minutes
+    val currentDurationMs = activeMinutes * 60_000L
+
+    val isForceRingActive = appState.overrideMode == RingerState.RING
+
+    GroupedListCard(modifier = modifier) {
+        // Row 1: Automation Toggle
+        GroupedListRow(
+            title = "Automation",
+            subtitle = if (appState.isEnabled) "Automating on lock / unlock" else "Off",
+            leadingIcon = {
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(colors.accentSilent.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (appState.isEnabled) Icons.Default.Notifications else Icons.Default.NotificationsOff,
+                        contentDescription = null,
+                        tint = colors.accentSilent,
+                        modifier = Modifier.size(15.dp)
+                    )
+                }
+            },
+            trailingContent = {
+                AppleStyleSwitch(
+                    checked = appState.isEnabled,
+                    onCheckedChange = onToggleEnabled,
+                    activeColor = colors.ringState
+                )
+            },
+            showDivider = true
+        )
+
+        // Row 2: Force Ring Toggle
+        GroupedListRow(
+            title = "Force Ring",
+            subtitle = if (isForceRingActive) "Always audible • Lock automation suspended" else "Keep ringer audible always",
+            leadingIcon = {
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(if (isForceRingActive) colors.ringState.copy(alpha = 0.15f) else colors.textSecondary.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.NotificationsActive,
+                        contentDescription = null,
+                        tint = if (isForceRingActive) colors.ringState else colors.textSecondary,
+                        modifier = Modifier.size(15.dp)
+                    )
+                }
+            },
+            trailingContent = {
+                AppleStyleSwitch(
+                    checked = isForceRingActive,
+                    onCheckedChange = onToggleForceRing,
+                    activeColor = colors.ringState
+                )
+            },
+            showDivider = true
+        )
+
+        // Row 3: Pause Automation Toggle
+        val remainingMins = if (appState.isPaused) {
+            ((appState.pauseUntilTimestamp - System.currentTimeMillis()) / 60000L).coerceAtLeast(1)
+        } else 0L
+
+        GroupedListRow(
+            title = "Pause",
+            subtitle = if (appState.isPaused) "Suspended for ${remainingMins}m" else "Temporarily pause automation",
+            leadingIcon = {
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(if (appState.isPaused) colors.warning.copy(alpha = 0.18f) else colors.textSecondary.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Schedule,
+                        contentDescription = null,
+                        tint = if (appState.isPaused) colors.warning else colors.textSecondary,
+                        modifier = Modifier.size(15.dp)
+                    )
+                }
+            },
+            trailingContent = {
+                AppleStyleSwitch(
+                    checked = appState.isPaused,
+                    onCheckedChange = { checked ->
+                        onTogglePause(checked, currentDurationMs)
+                    },
+                    activeColor = colors.warning
+                )
+            },
+            showDivider = !appState.isPaused
+        )
+
+        // Animated Inline Custom Duration Section (Appears ONLY on Pause)
+        AnimatedVisibility(
+            visible = appState.isPaused,
+            enter = fadeIn(spring()) + expandVertically(spring()),
+            exit = fadeOut(spring()) + shrinkVertically(spring())
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(colors.warning.copy(alpha = if (isDark) 0.08f else 0.05f))
+                    .padding(horizontal = 14.dp, vertical = 12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Tune,
+                            contentDescription = null,
+                            tint = colors.warning,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Pause Duration",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.5.sp
+                            ),
+                            color = colors.warning
+                        )
+                    }
+
+                    val expiryTime = remember(appState.pauseUntilTimestamp) {
+                        if (appState.pauseUntilTimestamp > 0L) {
+                            SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(appState.pauseUntilTimestamp))
+                        } else ""
+                    }
+                    if (expiryTime.isNotEmpty()) {
+                        Text(
+                            text = "Resumes at $expiryTime",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 11.sp
+                            ),
+                            color = colors.textSecondary
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Preset Chips Row (10m, 30m, 1h, Custom)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(SquircleMedium)
+                        .background(if (isDark) Color(0x22FFFFFF) else Color(0x14000000))
+                        .padding(3.dp),
+                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                ) {
+                    PausePreset.values().forEach { preset ->
+                        val isSelected = selectedPreset == preset
+                        val itemBg by animateColorAsState(
+                            targetValue = if (isSelected) {
+                                if (isDark) Color(0x50FFFFFF) else Color.White
+                            } else Color.Transparent,
+                            animationSpec = spring(),
+                            label = "pauseChipBg"
+                        )
+                        val itemText by animateColorAsState(
+                            targetValue = if (isSelected) {
+                                if (isDark) Color.White else colors.warning
+                            } else colors.textSecondary,
+                            animationSpec = spring(),
+                            label = "pauseChipText"
+                        )
+
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(30.dp)
+                                .clip(SquircleMedium)
+                                .background(itemBg)
+                                .then(
+                                    if (isSelected) {
+                                        Modifier.border(
+                                            width = 0.8.dp,
+                                            color = if (isDark) Color(0x60FFFFFF) else Color(0x25000000),
+                                            shape = SquircleMedium
+                                        )
+                                    } else Modifier
+                                )
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                    onClick = {
+                                        selectedPreset = preset
+                                        val newDuration = if (preset == PausePreset.CUSTOM) {
+                                            customMinutes * 60_000L
+                                        } else {
+                                            preset.minutes * 60_000L
+                                        }
+                                        onPauseForDuration(newDuration)
+                                    }
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = preset.label,
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    fontSize = 11.5.sp
+                                ),
+                                color = itemText
+                            )
+                        }
+                    }
+                }
+
+                // Custom Duration Slider (When "Custom" chip is selected)
+                if (selectedPreset == PausePreset.CUSTOM) {
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .glassmorphic(shape = SquircleMedium, tintColor = colors.warning, isDark = isDark)
+                            .padding(10.dp)
+                    ) {
+                        Column {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Custom Slider",
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        fontWeight = FontWeight.Medium,
+                                        fontSize = 12.sp
+                                    ),
+                                    color = colors.textPrimary
+                                )
+                                Text(
+                                    text = if (customMinutes >= 60) {
+                                        val hrs = customMinutes / 60
+                                        val mins = customMinutes % 60
+                                        if (mins == 0) "${hrs}h" else "${hrs}h ${mins}m"
+                                    } else {
+                                        "${customMinutes}m"
+                                    },
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        color = colors.warning
+                                    )
+                                )
+                            }
+
+                            Slider(
+                                value = customMinutes.toFloat(),
+                                onValueChange = {
+                                    customMinutes = (it.toInt() / 5) * 5
+                                    onPauseForDuration(customMinutes * 60_000L)
+                                },
+                                valueRange = 5f..480f,
+                                steps = 94,
+                                colors = SliderDefaults.colors(
+                                    thumbColor = colors.warning,
+                                    activeTrackColor = colors.warning,
+                                    inactiveTrackColor = if (isDark) Color(0x30FFFFFF) else Color(0x20000000)
+                                )
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("5 min", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = colors.textSecondary)
+                                Text("8 hrs", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = colors.textSecondary)
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+        }
+
+        // Row 4: Theme Mode Segment Row
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(colors.cyanGlow.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Palette,
+                        contentDescription = null,
+                        tint = colors.cyanGlow,
+                        modifier = Modifier.size(15.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = "Appearance",
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 15.sp
+                    ),
+                    color = colors.textPrimary
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            LiquidThemeSelector(
+                currentTheme = appState.themeMode,
+                onThemeSelected = onSelectTheme
+            )
+        }
+    }
+}
+
 /**
  * Compact Missing Permission Banner
  */
@@ -848,253 +1074,6 @@ private fun CompactPermissionCard(
                 onClick = onRequestPolicyAccess,
                 style = AppleButtonStyle.DESTRUCTIVE,
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-            )
-        }
-    }
-}
-
-enum class PausePreset(val label: String, val minutes: Int) {
-    M10("10m", 10),
-    M30("30m", 30),
-    H1("1h", 60),
-    CUSTOM("Custom", -1)
-}
-
-/**
- * Custom Pause Bottom Sheet supporting 10min, 30min, 1hr and Custom options
- */
-@Composable
-private fun CustomPauseBottomSheetContent(
-    onConfirm: (Long) -> Unit,
-    onClose: () -> Unit
-) {
-    val colors = AwayAssistTheme.colors
-    val isDark = colors.isDark
-
-    var selectedPreset by remember { mutableStateOf(PausePreset.H1) }
-    var customMinutes by remember { mutableIntStateOf(45) }
-
-    val activeMinutes = if (selectedPreset == PausePreset.CUSTOM) customMinutes else selectedPreset.minutes
-    val durationMs = activeMinutes * 60_000L
-
-    val expiryTime = remember(activeMinutes) {
-        val target = System.currentTimeMillis() + durationMs
-        SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(target))
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 20.dp)
-    ) {
-        // Drag Handle
-        Box(
-            modifier = Modifier
-                .align(Alignment.CenterHorizontally)
-                .size(width = 36.dp, height = 4.dp)
-                .clip(CircleShape)
-                .background(if (isDark) Color(0x40FFFFFF) else Color(0x30000000))
-        )
-
-        Spacer(modifier = Modifier.height(18.dp))
-
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Icon(
-                imageVector = Icons.Default.Schedule,
-                contentDescription = null,
-                tint = colors.warning,
-                modifier = Modifier.size(22.dp)
-            )
-            Spacer(modifier = Modifier.width(10.dp))
-            Text(
-                text = "Pause Automation",
-                style = MaterialTheme.typography.titleLarge.copy(
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 19.sp
-                ),
-                color = colors.textPrimary
-            )
-        }
-
-        Spacer(modifier = Modifier.height(6.dp))
-
-        Text(
-            text = "Temporarily suspend automatic ringer switching. Resumes automatically after time expires.",
-            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp),
-            color = colors.textSecondary
-        )
-
-        Spacer(modifier = Modifier.height(18.dp))
-
-        // Preset Chips Row (10m, 30m, 1h, Custom)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(SquircleMedium)
-                .background(if (isDark) Color(0x1CFFFFFF) else Color(0x10000000))
-                .padding(4.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            PausePreset.values().forEach { preset ->
-                val isSelected = selectedPreset == preset
-                val itemBg by animateColorAsState(
-                    targetValue = if (isSelected) {
-                        if (isDark) Color(0x45FFFFFF) else Color.White
-                    } else Color.Transparent,
-                    animationSpec = spring(),
-                    label = "pauseChipBg"
-                )
-                val itemText by animateColorAsState(
-                    targetValue = if (isSelected) {
-                        if (isDark) Color.White else colors.warning
-                    } else colors.textSecondary,
-                    animationSpec = spring(),
-                    label = "pauseChipText"
-                )
-
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(34.dp)
-                        .clip(SquircleMedium)
-                        .background(itemBg)
-                        .then(
-                            if (isSelected) {
-                                Modifier.border(
-                                    width = 0.8.dp,
-                                    color = if (isDark) Color(0x55FFFFFF) else Color(0x28000000),
-                                    shape = SquircleMedium
-                                )
-                            } else Modifier
-                        )
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            onClick = { selectedPreset = preset }
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = preset.label,
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            fontSize = 12.sp
-                        ),
-                        color = itemText
-                    )
-                }
-            }
-        }
-
-        // Custom Slider if "Custom" is selected
-        if (selectedPreset == PausePreset.CUSTOM) {
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .glassmorphic(shape = SquircleMedium, tintColor = colors.warning, isDark = isDark)
-                    .padding(14.dp)
-            ) {
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Custom Duration",
-                            style = MaterialTheme.typography.bodyLarge.copy(
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 14.sp
-                            ),
-                            color = colors.textPrimary
-                        )
-                        Text(
-                            text = if (customMinutes >= 60) {
-                                val hrs = customMinutes / 60
-                                val mins = customMinutes % 60
-                                if (mins == 0) "${hrs}h" else "${hrs}h ${mins}m"
-                            } else {
-                                "${customMinutes}m"
-                            },
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = colors.warning
-                            )
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Slider(
-                        value = customMinutes.toFloat(),
-                        onValueChange = { customMinutes = (it.toInt() / 5) * 5 },
-                        valueRange = 5f..480f,
-                        steps = 94,
-                        colors = SliderDefaults.colors(
-                            thumbColor = colors.warning,
-                            activeTrackColor = colors.warning,
-                            inactiveTrackColor = if (isDark) Color(0x30FFFFFF) else Color(0x20000000)
-                        )
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("5 min", style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
-                        Text("8 hrs", style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Expiry Summary Pill
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(SquircleMedium)
-                .background(colors.warning.copy(alpha = 0.12f))
-                .border(width = 0.8.dp, color = colors.warning.copy(alpha = 0.35f), shape = SquircleMedium)
-                .padding(vertical = 10.dp, horizontal = 14.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "Automation will resume at $expiryTime",
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 13.sp
-                ),
-                color = colors.warning
-            )
-        }
-
-        Spacer(modifier = Modifier.height(18.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            AppleStyleButton(
-                text = "Cancel",
-                onClick = onClose,
-                style = AppleButtonStyle.GLASS,
-                modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(vertical = 12.dp)
-            )
-
-            AppleStyleButton(
-                text = "Pause (${activeMinutes}m)",
-                onClick = { onConfirm(durationMs) },
-                style = AppleButtonStyle.PRIMARY,
-                modifier = Modifier.weight(1.5f),
-                contentPadding = PaddingValues(vertical = 12.dp)
             )
         }
     }

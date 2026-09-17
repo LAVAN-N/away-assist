@@ -105,11 +105,19 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     },
-                    onForceRing = {
-                        sendServiceAction(NotificationHelper.ACTION_FORCE_RING)
+                    onToggleForceRing = { enabled ->
+                        if (enabled) {
+                            sendServiceAction(NotificationHelper.ACTION_FORCE_RING)
+                        } else {
+                            sendServiceAction(NotificationHelper.ACTION_RESUME)
+                        }
                     },
-                    onForceSilent = {
-                        sendServiceAction(NotificationHelper.ACTION_FORCE_SILENT)
+                    onTogglePause = { enabled, durationMs ->
+                        if (enabled) {
+                            RingerService.pauseService(this@MainActivity, durationMs)
+                        } else {
+                            sendServiceAction(NotificationHelper.ACTION_RESUME)
+                        }
                     },
                     onPauseForDuration = { durationMs ->
                         RingerService.pauseService(this@MainActivity, durationMs)
