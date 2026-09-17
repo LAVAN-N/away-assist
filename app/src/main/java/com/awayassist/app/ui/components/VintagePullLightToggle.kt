@@ -43,6 +43,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -91,7 +92,9 @@ fun VintagePullLightToggle(
     val density = LocalDensity.current
     val coroutineScope = rememberCoroutineScope()
 
-    val isCurrentlyLit = currentTheme == ThemeMode.LIGHT
+    val isCurrentlyLit = !isDark
+    val currentIsLit by rememberUpdatedState(isCurrentlyLit)
+    val currentOnThemeSelected by rememberUpdatedState(onThemeSelected)
 
     // Physical measurements in px
     val maxPullXPx = with(density) { 80.dp.toPx() }
@@ -386,7 +389,7 @@ fun VintagePullLightToggle(
                         }
                         .size(52.dp)
                         .clip(CircleShape)
-                        .pointerInput(Unit) {
+                        .pointerInput(currentIsLit) {
                             detectDragGestures(
                                 onDragStart = {
                                     isDragging = true
@@ -398,8 +401,8 @@ fun VintagePullLightToggle(
 
                                     coroutineScope.launch {
                                         if (isTriggered) {
-                                            val nextMode = if (isCurrentlyLit) ThemeMode.DARK else ThemeMode.LIGHT
-                                            onThemeSelected(nextMode)
+                                            val nextMode = if (currentIsLit) ThemeMode.DARK else ThemeMode.LIGHT
+                                            currentOnThemeSelected(nextMode)
                                         }
 
                                         // 2D Spring physics recoil with damped harmonic pendulum wave
@@ -457,8 +460,8 @@ fun VintagePullLightToggle(
                                     }
                                     launch {
                                         offsetY.animateTo(thresholdDistPx * 1.2f, tween(110, easing = FastOutSlowInEasing))
-                                        val nextMode = if (isCurrentlyLit) ThemeMode.DARK else ThemeMode.LIGHT
-                                        onThemeSelected(nextMode)
+                                        val nextMode = if (currentIsLit) ThemeMode.DARK else ThemeMode.LIGHT
+                                        currentOnThemeSelected(nextMode)
                                         offsetY.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = 250f))
                                     }
                                 }
