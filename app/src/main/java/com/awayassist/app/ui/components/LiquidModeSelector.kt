@@ -61,14 +61,14 @@ fun LiquidModeSelector(
         modifier = modifier
             .fillMaxWidth()
             .clip(SquircleMedium)
-            .background(if (isDark) Color(0x1EFFFFFF) else Color(0x12000000))
+            .background(if (isDark) Color(0x1EFFFFFF) else Color(0x14000000))
             .border(
                 width = 0.8.dp,
                 brush = Brush.linearGradient(
                     colors = if (isDark) {
                         listOf(Color(0x35FFFFFF), Color(0x0CFFFFFF))
                     } else {
-                        listOf(Color(0x65FFFFFF), Color(0x15000000))
+                        listOf(Color(0x80FFFFFF), Color(0x25FFFFFF))
                     }
                 ),
                 shape = SquircleMedium
@@ -76,7 +76,7 @@ fun LiquidModeSelector(
             .padding(4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        OperationMode.values().forEach { mode ->
+        OperationMode.entries.forEach { mode ->
             val isSelected = selectedMode == mode
             val interactionSource = remember { MutableInteractionSource() }
 
@@ -88,7 +88,7 @@ fun LiquidModeSelector(
 
             val itemBgColor by animateColorAsState(
                 targetValue = if (isSelected) {
-                    if (isDark) Color(0x45FFFFFF) else Color.White
+                    if (isDark) Color(0x45FFFFFF) else Color(0xC8FFFFFF)
                 } else {
                     Color.Transparent
                 },
@@ -126,7 +126,7 @@ fun LiquidModeSelector(
                         if (isSelected) {
                             Modifier.border(
                                 width = 0.9.dp,
-                                color = if (isDark) Color(0x60FFFFFF) else Color(0x28000000),
+                                color = if (isDark) Color(0x60FFFFFF) else Color(0x95FFFFFF),
                                 shape = SquircleMedium
                             )
                         } else Modifier

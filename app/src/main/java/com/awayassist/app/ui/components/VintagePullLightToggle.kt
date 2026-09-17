@@ -76,6 +76,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.awayassist.app.data.ThemeMode
 import com.awayassist.app.ui.theme.AwayAssistTheme
+import com.awayassist.app.ui.theme.SquircleLarge
 import com.awayassist.app.ui.theme.SquircleMedium
 import com.awayassist.app.ui.theme.SquirclePill
 import kotlinx.coroutines.launch
@@ -212,20 +213,10 @@ fun VintagePullLightToggle(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .clip(SquircleMedium)
-            .background(
-                if (isDark) {
-                    Brush.verticalGradient(listOf(Color(0xFF18181F), Color(0xFF131318)))
-                } else {
-                    Brush.verticalGradient(listOf(Color(0xFFFFFFFF), Color(0xFFF4F4F8)))
-                }
-            )
-            .border(
-                width = 0.8.dp,
-                brush = Brush.verticalGradient(
-                    colors = if (isDark) listOf(Color(0x30FFFFFF), Color(0x10FFFFFF)) else listOf(Color(0x70FFFFFF), Color(0x15000000))
-                ),
-                shape = SquircleMedium
+            .glassmorphic(
+                shape = SquircleLarge,
+                tintColor = if (isCurrentlyLit) Color(0xFFFFB300) else null,
+                isDark = isDark
             )
             .padding(horizontal = 16.dp, vertical = 14.dp)
     ) {

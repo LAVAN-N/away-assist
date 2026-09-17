@@ -838,7 +838,7 @@ private fun UnifiedControlsCard(
                             val isSelected = selectedOption == option
                             val itemBg by animateColorAsState(
                                 targetValue = if (isSelected) {
-                                    if (isDark) Color(0x50FFFFFF) else Color.White
+                                    if (isDark) Color(0x50FFFFFF) else Color(0xC8FFFFFF)
                                 } else Color.Transparent,
                                 animationSpec = spring(),
                                 label = "pauseChipBg"
@@ -861,7 +861,7 @@ private fun UnifiedControlsCard(
                                         if (isSelected) {
                                             Modifier.border(
                                                 width = 0.8.dp,
-                                                color = if (isDark) Color(0x60FFFFFF) else Color(0x25000000),
+                                                color = if (isDark) Color(0x60FFFFFF) else Color(0x90FFFFFF),
                                                 shape = SquircleMedium
                                             )
                                         } else Modifier

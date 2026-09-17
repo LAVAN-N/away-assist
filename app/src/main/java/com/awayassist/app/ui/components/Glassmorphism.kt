@@ -191,8 +191,8 @@ fun Modifier.glassmorphic(
         } else {
             Brush.linearGradient(
                 colors = listOf(
-                    tintColor?.copy(alpha = 0.12f) ?: Color(0xEBFFFFFF),
-                    tintColor?.copy(alpha = 0.05f) ?: Color(0xC7F5F6FC)
+                    tintColor?.copy(alpha = 0.16f) ?: Color(0x90FFFFFF),
+                    tintColor?.copy(alpha = 0.06f) ?: Color(0x55FFFFFF)
                 ),
                 start = Offset(0f, 0f),
                 end = Offset(w, h)
@@ -212,10 +212,10 @@ fun Modifier.glassmorphic(
                 )
             } else {
                 listOf(
-                    Color(0x99FFFFFF),
-                    Color(0x40FFFFFF),
-                    Color(0x20FFFFFF),
-                    Color(0x60FFFFFF)
+                    Color(0xDDFFFFFF),
+                    Color(0x75FFFFFF),
+                    Color(0x35FFFFFF),
+                    Color(0x90FFFFFF)
                 )
             },
             start = Offset(0f, 0f),
