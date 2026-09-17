@@ -15,25 +15,31 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import kotlin.math.hypot
 
 enum class ThemeTransitionType {
-    EMIT_LIGHT,     // Expanding photon wavefront from bulb across entire screen
-    ABSORB_LIGHT    // Seamless atmospheric contraction of light pulled back into bulb
+    EMIT_LIGHT,     // Synchronous radial illumination revealing light mode outward from bulb
+    ABSORB_LIGHT    // Synchronous radial contraction absorbing daylight back into bulb
 }
 
 // Silky, slow, cinematic easing curves for realistic fluid optical physics
-private val SoftEmitEasing = CubicBezierEasing(0.18f, 0.88f, 0.28f, 1.0f)
+private val SoftEmitEasing = CubicBezierEasing(0.20f, 0.90f, 0.30f, 1.0f)
 private val SoftAbsorbEasing = CubicBezierEasing(0.38f, 0.05f, 0.22f, 1.0f)
 
 /**
- * Full-screen optical theme transition effect with slow, graceful easing and pure gradient blending:
- * - Switching to Light Mode: A warm, expansive daylight illumination emits smoothly from the bulb center,
- *   gliding across the entire screen and illuminating cards, backgrounds, and headers with warm daylight.
- * - Switching to Dark Mode: Pure atmospheric blend—the light across the screen is drawn inward and absorbed
- *   seamlessly into the bulb without hard geometric circles, melting gracefully into the dark atmosphere.
+ * Full-screen synchronous optical theme transition overlay:
+ *
+ * - Dark -> Light Mode:
+ *   Prevents the screen from immediately snapping to white. Instead, the dark atmosphere
+ *   is held across the screen and smoothly, continuously pulled back in a radial aperture
+ *   expanding outward from the bulb, seamlessly revealing the light theme in sync with
+ *   the warm golden dawn emission wave.
+ *
+ * - Light -> Dark Mode:
+ *   Maintains a daylight atmospheric veil that smoothly contracts inward from the screen
+ *   edges and corners toward the bulb, revealing the dark theme in its wake and absorbing
+ *   the light gracefully into the bulb filament.
  */
 @Composable
 fun FullScreenThemeWaveOverlay(
@@ -68,103 +74,122 @@ fun FullScreenThemeWaveOverlay(
         val origin = bulbScreenPosition ?: Offset(size.width * 0.44f, size.height * 0.48f)
         val progress = animProgress.value
         val maxRadius = hypot(size.width, size.height) * 1.35f
+        val feather = (200.dp.toPx()).coerceAtLeast(100f)
 
         when (currentTransition) {
             ThemeTransitionType.EMIT_LIGHT -> {
-                // Expanding photon wavefront radiating slowly and smoothly from bulb
-                val currentRadius = maxRadius * progress
-                val fade = (1f - progress * 0.80f).coerceIn(0f, 1f)
+                // Expanding photon wave revealing light theme outward from bulb
+                val revealRadius = maxRadius * progress
+                val gradientRadius = (revealRadius + feather).coerceAtLeast(10f)
 
-                // 1. Soft Ambient Daylight Wash over Full Viewport
-                drawRect(
-                    color = Color(0xFFFFFAEB).copy(alpha = 0.16f * (1f - progress * 0.9f))
-                )
+                val stopTransparent = (revealRadius / gradientRadius).coerceIn(0f, 0.95f)
+                val stopMid = ((revealRadius + feather * 0.45f) / gradientRadius).coerceIn(stopTransparent, 0.98f)
 
-                // 2. Expanding Golden Dawn Aura Pool (Deep Radial Layering)
-                if (currentRadius > 0f) {
-                    drawCircle(
+                // 1. Dark Atmospheric Veil: Masks light theme and expands radially from bulb
+                if (progress < 0.999f) {
+                    drawRect(
                         brush = Brush.radialGradient(
-                            colors = listOf(
-                                Color(0xFFFFF9C4).copy(alpha = 0.65f * fade),
-                                Color(0xFFFFE082).copy(alpha = 0.48f * fade),
-                                Color(0x80FFB300).copy(alpha = 0.32f * fade),
-                                Color(0x25FF8F00).copy(alpha = 0.14f * fade),
-                                Color.Transparent
+                            colorStops = arrayOf(
+                                0.0f to Color.Transparent,
+                                stopTransparent to Color.Transparent,
+                                stopMid to Color(0xD8090A10),
+                                1.0f to Color(0xFF090A10)
                             ),
                             center = origin,
-                            radius = currentRadius.coerceAtLeast(10f)
-                        ),
-                        center = origin,
-                        radius = currentRadius
+                            radius = gradientRadius
+                        )
                     )
                 }
 
-                // 3. Soft Diffuse Leading Wavefront
+                // 2. Warm Photonic Sunrise Aura at the opening aperture
+                val auraRadius = (revealRadius + feather * 0.5f).coerceAtLeast(10f)
+                val fade = (1f - progress * 0.70f).coerceIn(0f, 1f)
                 drawCircle(
                     brush = Brush.radialGradient(
                         colors = listOf(
-                            Color.Transparent,
-                            Color(0x60FFF59D).copy(alpha = 0.50f * (1f - progress)),
-                            Color(0x25FFE082).copy(alpha = 0.25f * (1f - progress)),
+                            Color(0x95FFF9C4).copy(alpha = 0.60f * fade),
+                            Color(0x65FFE082).copy(alpha = 0.42f * fade),
+                            Color(0x35FFB300).copy(alpha = 0.24f * fade),
+                            Color(0x12FF8F00).copy(alpha = 0.09f * fade),
                             Color.Transparent
                         ),
                         center = origin,
-                        radius = currentRadius.coerceAtLeast(10f)
+                        radius = auraRadius
                     ),
                     center = origin,
-                    radius = currentRadius
+                    radius = auraRadius
                 )
+
+                // 3. Diffuse Ambient Wavefront leading edge
+                if (revealRadius > 0f) {
+                    val waveInnerStop = (revealRadius * 0.85f / gradientRadius).coerceIn(0f, 0.9f)
+                    val wavePeakStop = (revealRadius / gradientRadius).coerceIn(waveInnerStop, 0.95f)
+                    val waveOuterStop = ((revealRadius + feather * 0.35f) / gradientRadius).coerceIn(wavePeakStop, 1.0f)
+
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colorStops = arrayOf(
+                                0.0f to Color.Transparent,
+                                waveInnerStop to Color.Transparent,
+                                wavePeakStop to Color(0x65FFF59D).copy(alpha = 0.50f * (1f - progress)),
+                                waveOuterStop to Color.Transparent,
+                                1.0f to Color.Transparent
+                            ),
+                            center = origin,
+                            radius = gradientRadius
+                        ),
+                        center = origin,
+                        radius = gradientRadius
+                    )
+                }
             }
 
             ThemeTransitionType.ABSORB_LIGHT -> {
-                // Pure atmospheric blend: Light across entire screen is gently sucked/absorbed back into bulb
-                // Zero literal circle outlines/strokes — completely organic soft gradient falloff
-                val currentRadius = maxRadius * (1f - progress)
-                val concentration = (1f + progress * 1.3f).coerceIn(1f, 2.3f)
-                val globalFade = (1f - progress * 0.5f).coerceIn(0f, 1f)
+                // Contracting daylight pool absorbed smoothly back into bulb
+                val activeRadius = maxRadius * (1f - progress)
+                val gradientRadius = (activeRadius + feather).coerceAtLeast(10f)
 
-                // 1. Soft full-screen atmospheric warmth wash that fades as light is drawn into bulb
-                drawRect(
-                    color = Color(0x28FFE082).copy(alpha = 0.18f * (1f - progress))
-                )
+                val stopInner = ((activeRadius * 0.65f) / gradientRadius).coerceIn(0f, 0.9f)
+                val stopEdge = (activeRadius / gradientRadius).coerceIn(stopInner, 0.95f)
+                val globalFade = (1f - progress * 0.40f).coerceIn(0f, 1f)
 
-                // 2. Outer Atmospheric Twilight Blend Gradient (seamless diffuse falloff)
-                val outerRadius = (maxRadius * (1f - progress * 0.70f)).coerceAtLeast(20f)
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            Color(0x356366F1).copy(alpha = 0.22f * (1f - progress)),
-                            Color(0x184F46E5).copy(alpha = 0.12f * (1f - progress)),
-                            Color.Transparent
-                        ),
-                        center = origin,
-                        radius = outerRadius
-                    ),
-                    center = origin,
-                    radius = outerRadius
-                )
-
-                // 3. Contracting Warm Daylight Pool (Multi-stop gaussian-smooth radial blend)
-                if (currentRadius > 0f) {
-                    drawCircle(
+                // 1. Daylight Atmosphere Veil contracting smoothly inward toward the bulb
+                if (progress > 0.001f && progress < 0.999f) {
+                    drawRect(
                         brush = Brush.radialGradient(
-                            colors = listOf(
-                                Color(0xFFFFF9C4).copy(alpha = (0.75f * concentration).coerceAtMost(0.95f) * globalFade),
-                                Color(0xFFFFD54F).copy(alpha = 0.55f * globalFade),
-                                Color(0x90FF8F00).copy(alpha = 0.35f * globalFade),
-                                Color(0x406366F1).copy(alpha = 0.18f * (1f - progress)),
-                                Color.Transparent
+                            colorStops = arrayOf(
+                                0.0f to Color(0xFFF2F3F7).copy(alpha = 0.92f * (1f - progress * 0.25f)),
+                                stopInner to Color(0xFFF2F3F7).copy(alpha = 0.82f * (1f - progress * 0.35f)),
+                                stopEdge to Color(0x75F2F3F7).copy(alpha = 0.45f * (1f - progress * 0.6f)),
+                                1.0f to Color.Transparent
                             ),
                             center = origin,
-                            radius = currentRadius.coerceAtLeast(15f)
-                        ),
-                        center = origin,
-                        radius = currentRadius
+                            radius = gradientRadius
+                        )
                     )
                 }
 
-                // 4. Concentrated Inner Core Warmth (pulling inward toward bulb center)
-                val innerCoreRadius = (currentRadius * 0.45f).coerceAtLeast(0f)
+                // 2. Contracting Warm Daylight Pool (Multi-stop gaussian-smooth radial blend)
+                if (activeRadius > 0f) {
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                Color(0xFFFFF9C4).copy(alpha = 0.70f * globalFade),
+                                Color(0xFFFFD54F).copy(alpha = 0.52f * globalFade),
+                                Color(0x90FF8F00).copy(alpha = 0.32f * globalFade),
+                                Color(0x356366F1).copy(alpha = 0.15f * (1f - progress)),
+                                Color.Transparent
+                            ),
+                            center = origin,
+                            radius = activeRadius.coerceAtLeast(15f)
+                        ),
+                        center = origin,
+                        radius = activeRadius
+                    )
+                }
+
+                // 3. Concentrated Inner Core Warmth (pulling inward toward bulb center)
+                val innerCoreRadius = (activeRadius * 0.45f).coerceAtLeast(0f)
                 if (innerCoreRadius > 0f) {
                     drawCircle(
                         brush = Brush.radialGradient(
@@ -182,7 +207,7 @@ fun FullScreenThemeWaveOverlay(
                     )
                 }
 
-                // 5. Final Delicate Filament Dissipation at Bulb (progress > 0.70f)
+                // 4. Final Delicate Filament Dissipation at Bulb (progress > 0.70f)
                 if (progress > 0.70f) {
                     val filamentProgress = ((progress - 0.70f) / 0.30f).coerceIn(0f, 1f)
                     val sparkRadius = (28.dp.toPx() * (1f - filamentProgress)).coerceAtLeast(0f)
