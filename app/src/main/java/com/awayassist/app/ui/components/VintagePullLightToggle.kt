@@ -15,13 +15,14 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -33,7 +34,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
-import androidx.compose.material.icons.filled.WbIncandescent
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -46,8 +46,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -56,8 +54,8 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -69,15 +67,17 @@ import com.awayassist.app.ui.theme.AwayAssistTheme
 import com.awayassist.app.ui.theme.SquircleMedium
 import com.awayassist.app.ui.theme.SquirclePill
 import kotlinx.coroutines.launch
+import kotlin.math.abs
+import kotlin.math.atan2
+import kotlin.math.hypot
 import kotlin.math.roundToInt
-import kotlin.math.sin
 
 /**
- * Realistic Vintage Pull-Chain Light Switch Toggle.
+ * Realistic Vintage Pull-Chain Light Switch Toggle with Omnidirectional 2D Physics.
  *
- * Simulates a classic Edison lamp fixture with a brass beaded pull-chain.
- * Features realistic drag physics, spring tension, harmonic oscillation bounce-back,
- * and responsive illumination effects for Light and Dark modes.
+ * The chain is anchored directly to the top brass fixture of the Edison bulb.
+ * Supports natural pulling in any direction (down, left, right, diagonally) with
+ * non-linear 2D spring tension, dynamic angle alignment, and harmonic pendulum recoil.
  */
 @Composable
 fun VintagePullLightToggle(
@@ -93,15 +93,17 @@ fun VintagePullLightToggle(
     val isCurrentlyLit = currentTheme == ThemeMode.LIGHT
 
     // Physical measurements in px
-    val maxPullPx = with(density) { 68.dp.toPx() }
-    val thresholdPx = with(density) { 38.dp.toPx() }
+    val maxPullXPx = with(density) { 75.dp.toPx() }
+    val maxPullYPx = with(density) { 70.dp.toPx() }
+    val thresholdDistPx = with(density) { 36.dp.toPx() }
+    val restLengthPx = with(density) { 68.dp.toPx() }
 
-    // Spring physics animatables
-    val pullOffsetPx = remember { Animatable(0f) }
-    val swingAngleDeg = remember { Animatable(0f) }
+    // 2D Omnidirectional spring physics
+    val offsetX = remember { Animatable(0f) }
+    val offsetY = remember { Animatable(0f) }
     var isDragging by remember { mutableStateOf(false) }
 
-    // Glow filament breathing transition
+    // Filament breathing transition
     val infiniteTransition = rememberInfiniteTransition(label = "filamentWarmth")
     val filamentFlicker by infiniteTransition.animateFloat(
         initialValue = 0.95f,
@@ -231,19 +233,17 @@ fun VintagePullLightToggle(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Interactive Vintage Pull-Lamp Stage
+            // Interactive Vintage Pull-Lamp Stage (Omnidirectional 2D Physics)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(150.dp)
+                    .height(162.dp)
                     .clip(SquircleMedium)
-                    .background(if (isCurrentlyLit) Color(0x20FFD54F) else if (isDark) Color(0x22000000) else Color(0x0A000000)),
-                contentAlignment = Alignment.TopCenter
+                    .background(if (isCurrentlyLit) Color(0x20FFD54F) else if (isDark) Color(0x22000000) else Color(0x0A000000))
             ) {
-                // Background Light Cone / Radial Illumination
-                Canvas(modifier = Modifier.matchParentSize()) {
+                // Background Light Glow Cone
+                Canvas(modifier = Modifier.fillMaxSize()) {
                     if (isCurrentlyLit) {
-                        // Wide ambient flare
                         drawCircle(
                             brush = Brush.radialGradient(
                                 colors = listOf(
@@ -251,134 +251,194 @@ fun VintagePullLightToggle(
                                     Color(0x25FFCA28),
                                     Color(0x00FFB300)
                                 ),
-                                center = Offset(size.width / 2f, 38.dp.toPx()),
+                                center = Offset(size.width / 2f, 40.dp.toPx()),
                                 radius = size.width * 0.65f
                             ),
                             radius = size.width * 0.65f,
-                            center = Offset(size.width / 2f, 38.dp.toPx())
+                            center = Offset(size.width / 2f, 40.dp.toPx())
                         )
                     }
                 }
 
-                // Vintage Edison Lamp & Brass Socket Visualizer (Centered Top)
-                VintageEdisonBulbCanvas(
-                    isLit = isCurrentlyLit,
-                    flickerScale = if (isCurrentlyLit) filamentFlicker else 1.0f,
-                    modifier = Modifier
-                        .size(width = 84.dp, height = 76.dp)
-                        .align(Alignment.TopCenter)
-                )
+                // Full Coordinated Canvas: Bulb, Filament, Top-Anchored Omnidirectional Beaded Chain, Acorn Finial
+                val curX = offsetX.value
+                val curY = offsetY.value
 
-                // Interactive Physics Pull Chain & Brass Acorn Pendant
-                val currentPull = pullOffsetPx.value
-                val pullProgress = (currentPull / thresholdPx).coerceIn(0f, 1.5f)
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val cx = size.width / 2f
+
+                    // 1. Draw Vintage Edison Bulb with Top Brass Socket Canopy
+                    drawVintageEdisonBulb(
+                        cx = cx,
+                        isLit = isCurrentlyLit,
+                        flickerScale = if (isCurrentlyLit) filamentFlicker else 1.0f
+                    )
+
+                    // 2. Chain Anchor at the TOP OF THE BULB FIXTURE
+                    val anchorPoint = Offset(cx + 14.dp.toPx(), 9.dp.toPx())
+
+                    // 3. Current Acorn Finial Position
+                    val acornPoint = Offset(
+                        x = anchorPoint.x + curX,
+                        y = anchorPoint.y + restLengthPx + curY
+                    )
+
+                    // 4. Vector from Anchor to Acorn
+                    val deltaX = acornPoint.x - anchorPoint.x
+                    val deltaY = acornPoint.y - anchorPoint.y
+                    val chainDistance = hypot(deltaX, deltaY)
+
+                    // Pull Angle in Radians (0 = straight down)
+                    val pullAngleRad = atan2(deltaX, deltaY)
+                    val pullAngleDeg = (pullAngleRad * 180.0 / Math.PI).toFloat()
+
+                    // 5. Draw Beaded Metallic Brass Chain along the 2D Vector
+                    val beadSpacing = 5.2.dp.toPx()
+                    val totalBeads = (chainDistance / beadSpacing).toInt().coerceAtLeast(2)
+                    val beadRadius = 2.0.dp.toPx()
+
+                    val beadBrush = Brush.radialGradient(
+                        colors = listOf(
+                            Color(0xFFFFF59D),
+                            Color(0xFFD4AF37),
+                            Color(0xFF8D6E3F),
+                            Color(0xFF422C10)
+                        ),
+                        center = Offset(-0.6.dp.toPx(), -0.6.dp.toPx()),
+                        radius = beadRadius * 1.5f
+                    )
+
+                    // Underlying chain link wire
+                    drawLine(
+                        color = Color(0xFF8D6E3F),
+                        start = anchorPoint,
+                        end = acornPoint,
+                        strokeWidth = 0.9.dp.toPx(),
+                        cap = StrokeCap.Round
+                    )
+
+                    // Spherical Brass Beads along Vector
+                    for (i in 0..totalBeads) {
+                        val fraction = i.toFloat() / totalBeads.toFloat()
+                        val bx = anchorPoint.x + deltaX * fraction
+                        val by = anchorPoint.y + deltaY * fraction
+
+                        drawCircle(
+                            brush = beadBrush,
+                            radius = beadRadius,
+                            center = Offset(bx, by)
+                        )
+                        // Specular highlight glint
+                        drawCircle(
+                            color = Color.White.copy(alpha = 0.75f),
+                            radius = 0.6.dp.toPx(),
+                            center = Offset(bx - 0.7.dp.toPx(), by - 0.7.dp.toPx())
+                        )
+                    }
+
+                    // 6. Draw Antique Brass Acorn Pendant rotated along Pull Angle
+                    drawBrassAcornPendant(
+                        center = acornPoint,
+                        angleDegrees = -pullAngleDeg,
+                        isLit = isCurrentlyLit
+                    )
+                }
+
+                // Interactive 2D Drag & Tap Hit Target overlay on the Acorn
+                val anchorXDp = with(density) { 14.dp }
+                val anchorYDp = with(density) { 9.dp }
+                val restLengthDp = with(density) { restLengthPx.toDp() }
 
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
-                        .offset { IntOffset(x = 18.dp.roundToPx(), y = 46.dp.roundToPx()) }
-                        .rotate(swingAngleDeg.value)
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier
-                            .pointerInput(Unit) {
-                                detectVerticalDragGestures(
-                                    onDragStart = {
-                                        isDragging = true
-                                    },
-                                    onDragEnd = {
-                                        isDragging = false
-                                        val reachedThreshold = pullOffsetPx.value >= thresholdPx
-                                        coroutineScope.launch {
-                                            if (reachedThreshold) {
-                                                // Toggle theme
-                                                val nextMode = if (isCurrentlyLit) ThemeMode.DARK else ThemeMode.LIGHT
-                                                onThemeSelected(nextMode)
-                                                // Trigger slight pendulum swing
-                                                swingAngleDeg.animateTo(
-                                                    targetValue = 6f,
-                                                    animationSpec = tween(70, easing = FastOutSlowInEasing)
-                                                )
-                                                swingAngleDeg.animateTo(
-                                                    targetValue = -4f,
-                                                    animationSpec = tween(90, easing = FastOutSlowInEasing)
-                                                )
-                                                swingAngleDeg.animateTo(
-                                                    targetValue = 0f,
-                                                    animationSpec = spring(
-                                                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                                                        stiffness = Spring.StiffnessLow
-                                                    )
-                                                )
-                                            }
-                                            // Spring recoil back to origin
-                                            pullOffsetPx.animateTo(
+                        .offset {
+                            IntOffset(
+                                x = (anchorXDp.roundToPx() + curX).roundToInt() - 24.dp.roundToPx(),
+                                y = (anchorYDp.roundToPx() + restLengthDp.roundToPx() + curY).roundToInt() - 24.dp.roundToPx()
+                            )
+                        }
+                        .size(52.dp)
+                        .pointerInput(Unit) {
+                            detectDragGestures(
+                                onDragStart = {
+                                    isDragging = true
+                                },
+                                onDragEnd = {
+                                    isDragging = false
+                                    val dist = hypot(offsetX.value, offsetY.value)
+                                    // Trigger if pulled far enough with downward or lateral displacement
+                                    val isTriggered = dist >= thresholdDistPx && (offsetY.value > 12f || abs(offsetX.value) > 22f)
+
+                                    coroutineScope.launch {
+                                        if (isTriggered) {
+                                            val nextMode = if (isCurrentlyLit) ThemeMode.DARK else ThemeMode.LIGHT
+                                            onThemeSelected(nextMode)
+                                        }
+
+                                        // 2D Harmonic spring recoil & pendulum swing back
+                                        launch {
+                                            offsetX.animateTo(
                                                 targetValue = 0f,
                                                 animationSpec = spring(
                                                     dampingRatio = Spring.DampingRatioMediumBouncy,
-                                                    stiffness = 260f
+                                                    stiffness = Spring.StiffnessLow
                                                 )
                                             )
                                         }
-                                    },
-                                    onDragCancel = {
-                                        isDragging = false
-                                        coroutineScope.launch {
-                                            pullOffsetPx.animateTo(0f, spring())
-                                        }
-                                    },
-                                    onVerticalDrag = { change, dragAmount ->
-                                        change.consume()
-                                        val cur = pullOffsetPx.value
-                                        // Dynamic spring resistance tension
-                                        val resistance = 1f / (1f + (cur / maxPullPx) * 1.6f)
-                                        val nextVal = (cur + dragAmount * resistance).coerceIn(0f, maxPullPx)
-                                        coroutineScope.launch {
-                                            pullOffsetPx.snapTo(nextVal)
+                                        launch {
+                                            offsetY.animateTo(
+                                                targetValue = 0f,
+                                                animationSpec = spring(
+                                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                                    stiffness = 240f
+                                                )
+                                            )
                                         }
                                     }
-                                )
-                            }
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                onClick = {
-                                    // Programmatic realistic snap-pull on tap
+                                },
+                                onDragCancel = {
+                                    isDragging = false
                                     coroutineScope.launch {
-                                        pullOffsetPx.animateTo(
-                                            targetValue = thresholdPx * 1.15f,
-                                            animationSpec = tween(120, easing = FastOutSlowInEasing)
-                                        )
-                                        val nextMode = if (isCurrentlyLit) ThemeMode.DARK else ThemeMode.LIGHT
-                                        onThemeSelected(nextMode)
-                                        swingAngleDeg.animateTo(4f, tween(60))
-                                        swingAngleDeg.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy))
-                                        pullOffsetPx.animateTo(
-                                            targetValue = 0f,
-                                            animationSpec = spring(
-                                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                                stiffness = 240f
-                                            )
-                                        )
+                                        launch { offsetX.animateTo(0f, spring()) }
+                                        launch { offsetY.animateTo(0f, spring()) }
+                                    }
+                                },
+                                onDrag = { change, dragAmount ->
+                                    change.consume()
+                                    val curDist = hypot(offsetX.value, offsetY.value)
+                                    val damping = 1f / (1f + (curDist / maxPullYPx) * 1.5f)
+
+                                    val nextX = (offsetX.value + dragAmount.x * damping).coerceIn(-maxPullXPx, maxPullXPx)
+                                    val nextY = (offsetY.value + dragAmount.y * damping).coerceIn(-20f, maxPullYPx)
+
+                                    coroutineScope.launch {
+                                        offsetX.snapTo(nextX)
+                                        offsetY.snapTo(nextY)
                                     }
                                 }
                             )
-                    ) {
-                        // Beaded Metallic Pull Chain Canvas
-                        val chainLengthDp = 30.dp + (currentPull / density.density).dp
-                        BrassBeadedChainCanvas(
-                            heightDp = chainLengthDp,
-                            modifier = Modifier.width(10.dp)
+                        }
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = {
+                                // Tap triggers a natural 2D pull-snap and pendulum oscillation
+                                coroutineScope.launch {
+                                    launch {
+                                        offsetX.animateTo(14f, tween(110, easing = FastOutSlowInEasing))
+                                        offsetX.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow))
+                                    }
+                                    launch {
+                                        offsetY.animateTo(thresholdDistPx * 1.18f, tween(110, easing = FastOutSlowInEasing))
+                                        val nextMode = if (isCurrentlyLit) ThemeMode.DARK else ThemeMode.LIGHT
+                                        onThemeSelected(nextMode)
+                                        offsetY.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = 240f))
+                                    }
+                                }
+                            }
                         )
-
-                        // Brass Acorn / Pendant Finial Grip
-                        VintageBrassAcornPendant(
-                            isPulled = pullProgress >= 1.0f,
-                            isLit = isCurrentlyLit
-                        )
-                    }
-                }
+                )
 
                 // Interactive Hint Label (Bottom of the Stage)
                 Box(
@@ -391,7 +451,7 @@ fun VintagePullLightToggle(
                         .padding(horizontal = 10.dp, vertical = 3.dp)
                 ) {
                     Text(
-                        text = if (isCurrentlyLit) "PULL CORD TO TURN OFF" else "PULL CORD TO TURN ON",
+                        text = if (isCurrentlyLit) "PULL STRING IN ANY DIRECTION TO TURN OFF" else "PULL STRING IN ANY DIRECTION TO TURN ON",
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontWeight = FontWeight.Bold,
                             fontSize = 9.5.sp,
@@ -406,284 +466,220 @@ fun VintagePullLightToggle(
 }
 
 /**
- * Realistic Edison Lamp Canvas with Brass Socket, Glass Bulb, and Filament.
+ * Draw Vintage Edison Lamp with Top Brass Socket Canopy and Filament.
  */
-@Composable
-private fun VintageEdisonBulbCanvas(
+private fun DrawScope.drawVintageEdisonBulb(
+    cx: Float,
     isLit: Boolean,
-    flickerScale: Float,
-    modifier: Modifier = Modifier
+    flickerScale: Float
 ) {
-    Canvas(modifier = modifier) {
-        val cx = size.width / 2f
+    // 1. Top Brass Socket Canopy Mount (Origin of String)
+    val brassGradient = Brush.horizontalGradient(
+        colors = listOf(
+            Color(0xFF8D6E3F),
+            Color(0xFFD4AF37),
+            Color(0xFFFFDF79),
+            Color(0xFFB8860B),
+            Color(0xFF5C4018)
+        )
+    )
 
-        // 1. Top Brass Socket Canopy Mount
-        val brassGradient = Brush.horizontalGradient(
+    // Mounting Bracket Base
+    drawRoundRect(
+        brush = brassGradient,
+        topLeft = Offset(cx - 16.dp.toPx(), 0f),
+        size = Size(32.dp.toPx(), 6.dp.toPx()),
+        cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx(), 2.dp.toPx())
+    )
+
+    // Socket Collar with Knurled Rings
+    drawRect(
+        brush = brassGradient,
+        topLeft = Offset(cx - 11.dp.toPx(), 6.dp.toPx()),
+        size = Size(22.dp.toPx(), 10.dp.toPx())
+    )
+
+    // Brass Grommet / Eyelet on top right where string is anchored
+    drawCircle(
+        brush = brassGradient,
+        radius = 3.2.dp.toPx(),
+        center = Offset(cx + 14.dp.toPx(), 9.dp.toPx())
+    )
+    drawCircle(
+        color = Color(0xFF2B1D0E),
+        radius = 1.4.dp.toPx(),
+        center = Offset(cx + 14.dp.toPx(), 9.dp.toPx())
+    )
+
+    // 2. Glass Teardrop Edison Bulb Envelope
+    val bulbTopY = 16.dp.toPx()
+    val bulbRadius = 18.dp.toPx()
+    val bulbCenter = Offset(cx, bulbTopY + bulbRadius)
+
+    val bulbPath = Path().apply {
+        moveTo(cx - 9.dp.toPx(), bulbTopY)
+        lineTo(cx + 9.dp.toPx(), bulbTopY)
+        cubicTo(
+            cx + 22.dp.toPx(), bulbTopY + 8.dp.toPx(),
+            cx + 20.dp.toPx(), bulbTopY + 36.dp.toPx(),
+            cx, bulbTopY + 44.dp.toPx()
+        )
+        cubicTo(
+            cx - 20.dp.toPx(), bulbTopY + 36.dp.toPx(),
+            cx - 22.dp.toPx(), bulbTopY + 8.dp.toPx(),
+            cx - 9.dp.toPx(), bulbTopY
+        )
+        close()
+    }
+
+    // Glass Tint Fill
+    if (isLit) {
+        drawPath(
+            path = bulbPath,
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    Color(0xFFFFF176).copy(alpha = 0.55f * flickerScale),
+                    Color(0xFFFFB300).copy(alpha = 0.35f),
+                    Color(0xFFFF8F00).copy(alpha = 0.15f)
+                ),
+                center = bulbCenter,
+                radius = bulbRadius * 1.4f
+            )
+        )
+    } else {
+        drawPath(
+            path = bulbPath,
+            color = Color(0x18FFFFFF)
+        )
+    }
+
+    // Glass Specular Rim
+    drawPath(
+        path = bulbPath,
+        color = if (isLit) Color(0x60FFFFFF) else Color(0x35FFFFFF),
+        style = Stroke(width = 1.2.dp.toPx())
+    )
+
+    // Glass Curved Reflection Arc
+    drawArc(
+        color = Color.White.copy(alpha = if (isLit) 0.5f else 0.25f),
+        startAngle = 140f,
+        sweepAngle = 70f,
+        useCenter = false,
+        topLeft = Offset(cx - 16.dp.toPx(), bulbTopY + 4.dp.toPx()),
+        size = Size(32.dp.toPx(), 34.dp.toPx()),
+        style = Stroke(width = 1.4.dp.toPx(), cap = StrokeCap.Round)
+    )
+
+    // 3. Vintage Squirrel-Cage Filament Wire
+    val filamentPath = Path().apply {
+        val startY = bulbTopY + 7.dp.toPx()
+        moveTo(cx - 3.dp.toPx(), startY)
+        lineTo(cx - 4.dp.toPx(), startY + 16.dp.toPx())
+        lineTo(cx - 1.dp.toPx(), startY + 8.dp.toPx())
+        lineTo(cx + 2.dp.toPx(), startY + 18.dp.toPx())
+        lineTo(cx + 4.dp.toPx(), startY + 6.dp.toPx())
+        lineTo(cx + 3.dp.toPx(), startY)
+    }
+
+    if (isLit) {
+        drawPath(
+            path = filamentPath,
+            color = Color(0xFFFF9100).copy(alpha = 0.9f),
+            style = Stroke(width = 2.4.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+        )
+        drawPath(
+            path = filamentPath,
+            color = Color(0xFFFFFDE7),
+            style = Stroke(width = 1.2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+        )
+    } else {
+        drawPath(
+            path = filamentPath,
+            color = Color(0xFF6B5848),
+            style = Stroke(width = 1.1.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+        )
+    }
+}
+
+/**
+ * Draw Lathed Antique Brass Acorn Pendant rotated along Pull Vector.
+ */
+private fun DrawScope.drawBrassAcornPendant(
+    center: Offset,
+    angleDegrees: Float,
+    isLit: Boolean
+) {
+    rotate(degrees = angleDegrees, pivot = center) {
+        val brassGold = Color(0xFFD4AF37)
+        val highlight = if (isLit) Color(0xFFFFE082) else Color(0xFFFFF9C4)
+
+        val pendantBrush = Brush.horizontalGradient(
             colors = listOf(
-                Color(0xFF8D6E3F),
-                Color(0xFFD4AF37),
-                Color(0xFFFFDF79),
-                Color(0xFFB8860B),
-                Color(0xFF5C4018)
-            )
+                Color(0xFF7A5C28),
+                brassGold,
+                highlight,
+                Color(0xFFA67C1E),
+                Color(0xFF3E280C)
+            ),
+            startX = center.x - 8.dp.toPx(),
+            endX = center.x + 8.dp.toPx()
         )
 
-        // Mounting Bracket Base
+        val px = center.x
+        val py = center.y
+
+        // Top Collar Cap
         drawRoundRect(
-            brush = brassGradient,
-            topLeft = Offset(cx - 16.dp.toPx(), 0f),
-            size = Size(32.dp.toPx(), 6.dp.toPx()),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx(), 2.dp.toPx())
+            brush = pendantBrush,
+            topLeft = Offset(px - 3.5.dp.toPx(), py - 12.dp.toPx()),
+            size = Size(7.dp.toPx(), 3.5.dp.toPx()),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(1.dp.toPx(), 1.dp.toPx())
         )
 
-        // Socket Collar with Knurled Rings
+        // Lathed Ridge Ring
         drawRect(
-            brush = brassGradient,
-            topLeft = Offset(cx - 11.dp.toPx(), 6.dp.toPx()),
-            size = Size(22.dp.toPx(), 10.dp.toPx())
+            brush = pendantBrush,
+            topLeft = Offset(px - 5.5.dp.toPx(), py - 8.5.dp.toPx()),
+            size = Size(11.dp.toPx(), 2.5.dp.toPx())
         )
 
-        // Grommet / Chain Exit Bushing on Right Side
-        drawCircle(
-            brush = brassGradient,
-            radius = 3.dp.toPx(),
-            center = Offset(cx + 18.dp.toPx(), 9.dp.toPx())
-        )
-        drawCircle(
-            color = Color(0xFF2B1D0E),
-            radius = 1.4.dp.toPx(),
-            center = Offset(cx + 18.dp.toPx(), 9.dp.toPx())
-        )
-
-        // 2. Glass Teardrop Edison Bulb Envelope
-        val bulbTopY = 16.dp.toPx()
-        val bulbRadius = 18.dp.toPx()
-        val bulbCenter = Offset(cx, bulbTopY + bulbRadius)
-
-        val bulbPath = Path().apply {
-            moveTo(cx - 9.dp.toPx(), bulbTopY)
-            lineTo(cx + 9.dp.toPx(), bulbTopY)
-            // Curved glass body expanding out and rounding at bottom
+        // Acorn / Bell Shaped Body
+        val acornPath = Path().apply {
+            moveTo(px - 5.5.dp.toPx(), py - 6.dp.toPx())
+            lineTo(px + 5.5.dp.toPx(), py - 6.dp.toPx())
             cubicTo(
-                cx + 22.dp.toPx(), bulbTopY + 8.dp.toPx(),
-                cx + 20.dp.toPx(), bulbTopY + 36.dp.toPx(),
-                cx, bulbTopY + 44.dp.toPx()
+                px + 7.5.dp.toPx(), py - 1.dp.toPx(),
+                px + 5.5.dp.toPx(), py + 6.dp.toPx(),
+                px, py + 10.dp.toPx()
             )
             cubicTo(
-                cx - 20.dp.toPx(), bulbTopY + 36.dp.toPx(),
-                cx - 22.dp.toPx(), bulbTopY + 8.dp.toPx(),
-                cx - 9.dp.toPx(), bulbTopY
+                px - 5.5.dp.toPx(), py + 6.dp.toPx(),
+                px - 7.5.dp.toPx(), py - 1.dp.toPx(),
+                px - 5.5.dp.toPx(), py - 6.dp.toPx()
             )
             close()
         }
 
-        // Glass Tint Fill
-        if (isLit) {
-            drawPath(
-                path = bulbPath,
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        Color(0xFFFFF176).copy(alpha = 0.55f * flickerScale),
-                        Color(0xFFFFB300).copy(alpha = 0.35f),
-                        Color(0xFFFF8F00).copy(alpha = 0.15f)
-                    ),
-                    center = bulbCenter,
-                    radius = bulbRadius * 1.4f
-                )
-            )
-        } else {
-            drawPath(
-                path = bulbPath,
-                color = Color(0x18FFFFFF)
-            )
-        }
-
-        // Glass Specular Rim Highlight
         drawPath(
-            path = bulbPath,
-            color = if (isLit) Color(0x60FFFFFF) else Color(0x35FFFFFF),
-            style = Stroke(width = 1.2.dp.toPx())
+            path = acornPath,
+            brush = pendantBrush
         )
 
-        // Glass Curved Reflection Arc
-        drawArc(
-            color = Color.White.copy(alpha = if (isLit) 0.5f else 0.25f),
-            startAngle = 140f,
-            sweepAngle = 70f,
-            useCenter = false,
-            topLeft = Offset(cx - 16.dp.toPx(), bulbTopY + 4.dp.toPx()),
-            size = Size(32.dp.toPx(), 34.dp.toPx()),
-            style = Stroke(width = 1.4.dp.toPx(), cap = StrokeCap.Round)
+        // Bottom Teardrop Finial Tip
+        drawCircle(
+            brush = pendantBrush,
+            radius = 1.6.dp.toPx(),
+            center = Offset(px, py + 10.5.dp.toPx())
         )
 
-        // 3. Vintage Squirrel-Cage Filament Wire
-        val filamentPath = Path().apply {
-            val startY = bulbTopY + 7.dp.toPx()
-            moveTo(cx - 3.dp.toPx(), startY)
-            lineTo(cx - 4.dp.toPx(), startY + 16.dp.toPx())
-            lineTo(cx - 1.dp.toPx(), startY + 8.dp.toPx())
-            lineTo(cx + 2.dp.toPx(), startY + 18.dp.toPx())
-            lineTo(cx + 4.dp.toPx(), startY + 6.dp.toPx())
-            lineTo(cx + 3.dp.toPx(), startY)
-        }
-
-        if (isLit) {
-            // Intense Glowing Core
-            drawPath(
-                path = filamentPath,
-                color = Color(0xFFFF9100).copy(alpha = 0.9f),
-                style = Stroke(width = 2.4.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
-            )
-            drawPath(
-                path = filamentPath,
-                color = Color(0xFFFFFDE7),
-                style = Stroke(width = 1.2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
-            )
-        } else {
-            // Cold graphite/tungsten filament wire
-            drawPath(
-                path = filamentPath,
-                color = Color(0xFF6B5848),
-                style = Stroke(width = 1.1.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
-            )
-        }
-    }
-}
-
-/**
- * High-detail Beaded Metallic Ball Chain Canvas.
- */
-@Composable
-private fun BrassBeadedChainCanvas(
-    heightDp: androidx.compose.ui.unit.Dp,
-    modifier: Modifier = Modifier
-) {
-    Canvas(modifier = modifier.height(heightDp)) {
-        val cx = size.width / 2f
-        val beadRadius = 2.0.dp.toPx()
-        val spacing = 5.2.dp.toPx()
-        val totalBeads = (size.height / spacing).toInt().coerceAtLeast(1)
-
-        val beadBrush = Brush.radialGradient(
-            colors = listOf(
-                Color(0xFFFFF59D),
-                Color(0xFFD4AF37),
-                Color(0xFF8D6E3F),
-                Color(0xFF422C10)
-            ),
-            center = Offset(cx - 0.7.dp.toPx(), 0f),
-            radius = beadRadius * 1.5f
-        )
-
-        // Connecting metal wire
+        // Specular Glint Reflection Line
         drawLine(
-            color = Color(0xFF8D6E3F),
-            start = Offset(cx, 0f),
-            end = Offset(cx, size.height),
-            strokeWidth = 0.9.dp.toPx(),
+            color = Color.White.copy(alpha = 0.65f),
+            start = Offset(px - 1.5.dp.toPx(), py - 5.dp.toPx()),
+            end = Offset(px - 1.dp.toPx(), py + 6.dp.toPx()),
+            strokeWidth = 1.0.dp.toPx(),
             cap = StrokeCap.Round
         )
-
-        // Spherical metallic beads
-        for (i in 0..totalBeads) {
-            val cy = (i * spacing).coerceAtMost(size.height)
-            drawCircle(
-                brush = beadBrush,
-                radius = beadRadius,
-                center = Offset(cx, cy)
-            )
-            // Tiny white specular glint
-            drawCircle(
-                color = Color.White.copy(alpha = 0.75f),
-                radius = 0.6.dp.toPx(),
-                center = Offset(cx - 0.7.dp.toPx(), cy - 0.7.dp.toPx())
-            )
-        }
-    }
-}
-
-/**
- * Vintage Lathed Brass Acorn / Pendant Pull Knob.
- */
-@Composable
-private fun VintageBrassAcornPendant(
-    isPulled: Boolean,
-    isLit: Boolean,
-    modifier: Modifier = Modifier
-) {
-    val brassGold = Color(0xFFD4AF37)
-    val highlight = if (isLit) Color(0xFFFFE082) else Color(0xFFFFF9C4)
-
-    Box(
-        modifier = modifier
-            .size(width = 16.dp, height = 24.dp)
-            .shadow(elevation = if (isPulled) 4.dp else 2.dp, shape = CircleShape)
-    ) {
-        Canvas(modifier = Modifier.matchParentSize()) {
-            val cx = size.width / 2f
-
-            val pendantBrush = Brush.horizontalGradient(
-                colors = listOf(
-                    Color(0xFF7A5C28),
-                    brassGold,
-                    highlight,
-                    Color(0xFFA67C1E),
-                    Color(0xFF3E280C)
-                )
-            )
-
-            // Top Collar Cap
-            drawRoundRect(
-                brush = pendantBrush,
-                topLeft = Offset(cx - 3.5.dp.toPx(), 0f),
-                size = Size(7.dp.toPx(), 3.5.dp.toPx()),
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(1.dp.toPx(), 1.dp.toPx())
-            )
-
-            // Lathed Ring
-            drawRect(
-                brush = pendantBrush,
-                topLeft = Offset(cx - 5.5.dp.toPx(), 3.5.dp.toPx()),
-                size = Size(11.dp.toPx(), 2.5.dp.toPx())
-            )
-
-            // Acorn / Bell Shaped Body
-            val acornPath = Path().apply {
-                moveTo(cx - 5.5.dp.toPx(), 6.dp.toPx())
-                lineTo(cx + 5.5.dp.toPx(), 6.dp.toPx())
-                cubicTo(
-                    cx + 7.5.dp.toPx(), 11.dp.toPx(),
-                    cx + 5.5.dp.toPx(), 18.dp.toPx(),
-                    cx, 22.dp.toPx()
-                )
-                cubicTo(
-                    cx - 5.5.dp.toPx(), 18.dp.toPx(),
-                    cx - 7.5.dp.toPx(), 11.dp.toPx(),
-                    cx - 5.5.dp.toPx(), 6.dp.toPx()
-                )
-                close()
-            }
-
-            drawPath(
-                path = acornPath,
-                brush = pendantBrush
-            )
-
-            // Bottom Teardrop Finial Tip
-            drawCircle(
-                brush = pendantBrush,
-                radius = 1.6.dp.toPx(),
-                center = Offset(cx, 22.5.dp.toPx())
-            )
-
-            // Specular Glint Reflection Line
-            drawLine(
-                color = Color.White.copy(alpha = 0.65f),
-                start = Offset(cx - 1.5.dp.toPx(), 7.dp.toPx()),
-                end = Offset(cx - 1.dp.toPx(), 18.dp.toPx()),
-                strokeWidth = 1.0.dp.toPx(),
-                cap = StrokeCap.Round
-            )
-        }
     }
 }
