@@ -151,8 +151,8 @@ fun LiquidMeshBackground(
     )
 
     val baseBg = AwayAssistTheme.colors.background
-    val cyan = if (isDark) AwayAssistTheme.colors.cyanGlow else Color(0xFFFFB74D) // Warm golden apricot in light mode
-    val azure = if (isDark) AwayAssistTheme.colors.azureGlow else Color(0xFFFFD54F) // Warm champagne gold in light mode
+    val cyan = if (isDark) AwayAssistTheme.colors.cyanGlow else Color(0xFFFFB300) // Warm amber gold in light mode
+    val azure = if (isDark) AwayAssistTheme.colors.azureGlow else Color(0xFFFFA000) // Warm honey amber in light mode
 
     Box(
         modifier = modifier
@@ -162,16 +162,30 @@ fun LiquidMeshBackground(
                 val w = size.width
                 val h = size.height
 
-                // 0. Warm Sunlight Ambient Field for Light Mode (Whole Screen Warmth)
+                // 0. Warm Incandescent Lamp-Lit Room Atmosphere for Light Mode
                 if (!isDark) {
+                    // Primary Lamp Light Dome (Overhead warm tungsten 2700K pool)
                     drawCircle(
                         brush = Brush.radialGradient(
                             colors = listOf(
-                                Color(0x38FFE082),
-                                Color(0x18FFB300),
+                                Color(0x50FFE082),
+                                Color(0x28FFB300),
+                                Color(0x10FF8F00),
                                 Color.Transparent
                             ),
-                            center = Offset(w * 0.45f, h * 0.12f),
+                            center = Offset(w * 0.45f, h * 0.15f),
+                            radius = w * 1.05f
+                        )
+                    )
+                    // Secondary Ambient Room Bounce (Lower ambient warmth)
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                Color(0x35FFD54F),
+                                Color(0x15FFA000),
+                                Color.Transparent
+                            ),
+                            center = Offset(w * 0.55f, h * 0.85f),
                             radius = w * 0.90f
                         )
                     )
@@ -191,8 +205,8 @@ fun LiquidMeshBackground(
                 drawCircle(
                     brush = Brush.radialGradient(
                         colors = listOf(
-                            activeColor.copy(alpha = if (isDark) 0.32f else 0.20f),
-                            activeColor.copy(alpha = if (isDark) 0.10f else 0.08f),
+                            activeColor.copy(alpha = if (isDark) 0.32f else 0.22f),
+                            activeColor.copy(alpha = if (isDark) 0.10f else 0.09f),
                             Color.Transparent
                         ),
                         center = primaryCenter,
@@ -207,8 +221,8 @@ fun LiquidMeshBackground(
                     rotationDegrees = bell1Sway,
                     fillBrush = Brush.radialGradient(
                         colors = listOf(
-                            activeColor.copy(alpha = if (isDark) 0.30f else 0.18f),
-                            activeColor.copy(alpha = if (isDark) 0.12f else 0.07f),
+                            activeColor.copy(alpha = if (isDark) 0.30f else 0.20f),
+                            activeColor.copy(alpha = if (isDark) 0.12f else 0.08f),
                             Color.Transparent
                         ),
                         center = primaryCenter,
@@ -216,9 +230,9 @@ fun LiquidMeshBackground(
                     ),
                     strokeBrush = Brush.linearGradient(
                         colors = listOf(
-                            activeColor.copy(alpha = if (isDark) 0.35f else 0.26f),
+                            activeColor.copy(alpha = if (isDark) 0.35f else 0.28f),
                             Color.Transparent,
-                            activeColor.copy(alpha = if (isDark) 0.18f else 0.10f)
+                            activeColor.copy(alpha = if (isDark) 0.18f else 0.12f)
                         ),
                         start = Offset(primaryCenter.x - primarySize.width * 0.5f, primaryCenter.y - primarySize.height * 0.5f),
                         end = Offset(primaryCenter.x + primarySize.width * 0.5f, primaryCenter.y + primarySize.height * 0.5f)
@@ -232,7 +246,7 @@ fun LiquidMeshBackground(
                     bellWidth = primarySize.width,
                     bellHeight = primarySize.height,
                     scale = soundwavePulse,
-                    color = activeColor.copy(alpha = if (isDark) 0.20f else 0.14f),
+                    color = activeColor.copy(alpha = if (isDark) 0.20f else 0.16f),
                     rotationDegrees = bell1Sway
                 )
 
@@ -252,8 +266,8 @@ fun LiquidMeshBackground(
                     rotationDegrees = bell2Sway,
                     fillBrush = Brush.radialGradient(
                         colors = listOf(
-                            cyan.copy(alpha = if (isDark) 0.22f else 0.16f),
-                            azure.copy(alpha = if (isDark) 0.07f else 0.06f),
+                            cyan.copy(alpha = if (isDark) 0.22f else 0.18f),
+                            azure.copy(alpha = if (isDark) 0.07f else 0.08f),
                             Color.Transparent
                         ),
                         center = secondaryCenter,
@@ -261,9 +275,9 @@ fun LiquidMeshBackground(
                     ),
                     strokeBrush = Brush.linearGradient(
                         colors = listOf(
-                            cyan.copy(alpha = if (isDark) 0.28f else 0.20f),
+                            cyan.copy(alpha = if (isDark) 0.28f else 0.22f),
                             Color.Transparent,
-                            azure.copy(alpha = if (isDark) 0.12f else 0.08f)
+                            azure.copy(alpha = if (isDark) 0.12f else 0.10f)
                         )
                     ),
                     strokeWidth = 1.4.dp.toPx()
@@ -273,7 +287,7 @@ fun LiquidMeshBackground(
                 drawCircle(
                     brush = Brush.radialGradient(
                         colors = listOf(
-                            azure.copy(alpha = if (isDark) 0.16f else 0.12f),
+                            azure.copy(alpha = if (isDark) 0.16f else 0.15f),
                             Color.Transparent
                         ),
                         center = Offset(w * 0.22f, h * 0.82f),
@@ -459,8 +473,8 @@ fun Modifier.glassmorphic(
         } else {
             Brush.linearGradient(
                 colors = listOf(
-                    tintColor?.copy(alpha = 0.18f) ?: Color(0xEEFFFFFF),
-                    tintColor?.copy(alpha = 0.08f) ?: Color(0xD8FFFBF5)
+                    tintColor?.copy(alpha = 0.20f) ?: Color(0xEBFFFDF8),
+                    tintColor?.copy(alpha = 0.09f) ?: Color(0xD6FAF2E4)
                 ),
                 start = Offset(0f, 0f),
                 end = Offset(w, h)
@@ -481,9 +495,9 @@ fun Modifier.glassmorphic(
             } else {
                 listOf(
                     Color(0xFFFFFFFF),
-                    Color(0xB0FFF8E7),
-                    Color(0x55FFE8B2),
-                    Color(0xB5FFFFFF)
+                    Color(0xD0FFF1D0),
+                    Color(0x75FFD580),
+                    Color(0xC5FFFFFF)
                 )
             },
             start = Offset(0f, 0f),

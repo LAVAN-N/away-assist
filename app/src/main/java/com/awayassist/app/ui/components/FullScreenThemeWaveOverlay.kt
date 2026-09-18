@@ -158,9 +158,9 @@ fun FullScreenThemeWaveOverlay(
                     drawRect(
                         brush = Brush.radialGradient(
                             colorStops = arrayOf(
-                                0.0f to Color(0xFFF2F3F7).copy(alpha = 0.92f * (1f - progress * 0.25f)),
-                                stopInner to Color(0xFFF2F3F7).copy(alpha = 0.82f * (1f - progress * 0.35f)),
-                                stopEdge to Color(0x75F2F3F7).copy(alpha = 0.45f * (1f - progress * 0.6f)),
+                                0.0f to Color(0xFFF6EADB).copy(alpha = 0.94f * (1f - progress * 0.25f)),
+                                stopInner to Color(0xFFF6EADB).copy(alpha = 0.85f * (1f - progress * 0.35f)),
+                                stopEdge to Color(0x80F6EADB).copy(alpha = 0.50f * (1f - progress * 0.6f)),
                                 1.0f to Color.Transparent
                             ),
                             center = origin,
