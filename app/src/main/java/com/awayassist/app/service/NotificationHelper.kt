@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import com.awayassist.app.MainActivity
@@ -65,36 +66,75 @@ class NotificationHelper(private val context: Context) {
         )
 
         // Pending Intents for Widget Buttons
-        val resumeIntent = PendingIntent.getService(
-            context,
-            101,
-            Intent(context, RingerService::class.java).apply { action = ACTION_RESUME },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+        val resumeIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            PendingIntent.getForegroundService(
+                context,
+                101,
+                Intent(context, RingerService::class.java).apply { action = ACTION_RESUME },
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        } else {
+            PendingIntent.getService(
+                context,
+                101,
+                Intent(context, RingerService::class.java).apply { action = ACTION_RESUME },
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        }
 
-        val forceSilentIntent = PendingIntent.getService(
-            context,
-            102,
-            Intent(context, RingerService::class.java).apply { action = ACTION_FORCE_SILENT },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+        val forceSilentIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            PendingIntent.getForegroundService(
+                context,
+                102,
+                Intent(context, RingerService::class.java).apply { action = ACTION_FORCE_SILENT },
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        } else {
+            PendingIntent.getService(
+                context,
+                102,
+                Intent(context, RingerService::class.java).apply { action = ACTION_FORCE_SILENT },
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        }
 
-        val forceRingIntent = PendingIntent.getService(
-            context,
-            103,
-            Intent(context, RingerService::class.java).apply { action = ACTION_FORCE_RING },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+        val forceRingIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            PendingIntent.getForegroundService(
+                context,
+                103,
+                Intent(context, RingerService::class.java).apply { action = ACTION_FORCE_RING },
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        } else {
+            PendingIntent.getService(
+                context,
+                103,
+                Intent(context, RingerService::class.java).apply { action = ACTION_FORCE_RING },
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        }
 
-        val pause10mIntent = PendingIntent.getService(
-            context,
-            104,
-            Intent(context, RingerService::class.java).apply {
-                action = ACTION_PAUSE_10M
-                putExtra(EXTRA_PAUSE_DURATION_MS, DEFAULT_PAUSE_DURATION_MS)
-            },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+        val pause10mIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            PendingIntent.getForegroundService(
+                context,
+                104,
+                Intent(context, RingerService::class.java).apply {
+                    action = ACTION_PAUSE_10M
+                    putExtra(EXTRA_PAUSE_DURATION_MS, DEFAULT_PAUSE_DURATION_MS)
+                },
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        } else {
+            PendingIntent.getService(
+                context,
+                104,
+                Intent(context, RingerService::class.java).apply {
+                    action = ACTION_PAUSE_10M
+                    putExtra(EXTRA_PAUSE_DURATION_MS, DEFAULT_PAUSE_DURATION_MS)
+                },
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        }
 
         val isPaused = appState.isPaused
         val isAutoMode = appState.isEnabled && !isPaused && appState.overrideMode == null

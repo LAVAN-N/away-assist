@@ -6,6 +6,7 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.widget.RemoteViews
 import com.awayassist.app.MainActivity
 import com.awayassist.app.R
@@ -58,24 +59,42 @@ class AwayAssistAppWidgetProvider : AppWidgetProvider() {
             val autoIntent = Intent(context, RingerService::class.java).apply {
                 action = NotificationHelper.ACTION_RESUME
             }
-            val autoPendingIntent = PendingIntent.getService(
-                context,
-                201,
-                autoIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
+            val autoPendingIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                PendingIntent.getForegroundService(
+                    context,
+                    201,
+                    autoIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            } else {
+                PendingIntent.getService(
+                    context,
+                    201,
+                    autoIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            }
             views.setOnClickPendingIntent(R.id.appwidget_btn_auto, autoPendingIntent)
 
             // Button 2: Force Ring
             val ringIntent = Intent(context, RingerService::class.java).apply {
                 action = NotificationHelper.ACTION_FORCE_RING
             }
-            val ringPendingIntent = PendingIntent.getService(
-                context,
-                202,
-                ringIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
+            val ringPendingIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                PendingIntent.getForegroundService(
+                    context,
+                    202,
+                    ringIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            } else {
+                PendingIntent.getService(
+                    context,
+                    202,
+                    ringIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            }
             views.setOnClickPendingIntent(R.id.appwidget_btn_ring, ringPendingIntent)
 
             // Button 3: Pause 10m
@@ -83,12 +102,21 @@ class AwayAssistAppWidgetProvider : AppWidgetProvider() {
                 action = NotificationHelper.ACTION_PAUSE_10M
                 putExtra(NotificationHelper.EXTRA_PAUSE_DURATION_MS, NotificationHelper.DEFAULT_PAUSE_DURATION_MS)
             }
-            val pausePendingIntent = PendingIntent.getService(
-                context,
-                203,
-                pauseIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
+            val pausePendingIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                PendingIntent.getForegroundService(
+                    context,
+                    203,
+                    pauseIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            } else {
+                PendingIntent.getService(
+                    context,
+                    203,
+                    pauseIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            }
             views.setOnClickPendingIntent(R.id.appwidget_btn_pause, pausePendingIntent)
 
             // State Population
