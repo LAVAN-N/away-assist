@@ -3,16 +3,16 @@
     android:id="@+id/notification_root"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:minHeight="52dp"
+    android:minHeight="48dp"
     android:orientation="horizontal"
-    android:background="@drawable/bg_glass_notification"
-    android:paddingStart="12dp"
-    android:paddingEnd="12dp"
-    android:paddingTop="10dp"
-    android:paddingBottom="10dp"
+    android:background="@android:color/transparent"
+    android:paddingStart="4dp"
+    android:paddingEnd="4dp"
+    android:paddingTop="6dp"
+    android:paddingBottom="6dp"
     android:gravity="center_vertical">
 
-    <!-- Left Status Section: Icon + Mode Title + State Badge -->
+    <!-- Left Status Section: Icon + Title & Subtitle Info -->
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
@@ -23,42 +23,43 @@
 
         <ImageView
             android:id="@+id/notification_status_icon"
-            android:layout_width="16dp"
-            android:layout_height="16dp"
+            android:layout_width="18dp"
+            android:layout_height="18dp"
             android:layout_gravity="center_vertical"
             android:src="@drawable/ic_widget_ring"
             android:contentDescription="Status Icon" />
 
-        <TextView
-            android:id="@+id/notification_status_text"
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
             android:layout_gravity="center_vertical"
-            android:layout_marginStart="6dp"
-            android:text="Ring"
-            android:textColor="#FFFFFFFF"
-            android:textSize="12.5sp"
-            android:textStyle="bold"
-            android:includeFontPadding="false"
-            android:maxLines="1"
-            android:ellipsize="end" />
+            android:orientation="vertical">
 
-        <TextView
-            android:id="@+id/notification_mode_badge"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center_vertical"
-            android:layout_marginStart="5dp"
-            android:background="@drawable/bg_glass_status_pill"
-            android:paddingStart="5dp"
-            android:paddingEnd="5dp"
-            android:paddingTop="1.5dp"
-            android:paddingBottom="1.5dp"
-            android:text="LOCKED"
-            android:textColor="#E6FFFFFF"
-            android:textSize="8.5sp"
-            android:textStyle="bold"
-            android:includeFontPadding="false" />
+            <TextView
+                android:id="@+id/notification_status_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Ring Mode"
+                android:textColor="#DEFFFFFF"
+                android:textSize="12.5sp"
+                android:textStyle="bold"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:ellipsize="end" />
+
+            <TextView
+                android:id="@+id/notification_subtitle_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:text="Screen Locked"
+                android:textColor="#99FFFFFF"
+                android:textSize="10.5sp"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:ellipsize="end" />
+        </LinearLayout>
     </LinearLayout>
 
     <!-- Right Controls Section: 3 Direct Compact Widget Action Buttons -->
@@ -76,8 +77,8 @@
             android:layout_height="28dp"
             android:layout_gravity="center_vertical"
             android:background="@drawable/bg_glass_widget_button"
-            android:paddingStart="7dp"
-            android:paddingEnd="7dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
             android:gravity="center"
             android:orientation="horizontal"
             android:layout_marginEnd="4dp">
@@ -95,9 +96,9 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_vertical"
-                android:layout_marginStart="3.5dp"
+                android:layout_marginStart="4dp"
                 android:text="Silent"
-                android:textColor="#FFFFFFFF"
+                android:textColor="#DEFFFFFF"
                 android:textSize="10.5sp"
                 android:textStyle="bold"
                 android:includeFontPadding="false"
@@ -111,8 +112,8 @@
             android:layout_height="28dp"
             android:layout_gravity="center_vertical"
             android:background="@drawable/bg_glass_widget_button"
-            android:paddingStart="7dp"
-            android:paddingEnd="7dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
             android:gravity="center"
             android:orientation="horizontal"
             android:layout_marginEnd="4dp">
@@ -130,7 +131,7 @@
                 android:layout_gravity="center_vertical"
                 android:layout_marginStart="3dp"
                 android:text="1h"
-                android:textColor="#FFFFFFFF"
+                android:textColor="#DEFFFFFF"
                 android:textSize="10.5sp"
                 android:textStyle="bold"
                 android:includeFontPadding="false"
@@ -144,13 +145,12 @@
             android:layout_height="28dp"
             android:layout_gravity="center_vertical"
             android:background="@drawable/bg_glass_widget_button"
-            android:paddingStart="7dp"
-            android:paddingEnd="7dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
             android:gravity="center"
             android:orientation="horizontal">
 
             <ImageView
-                android:id="@+id/widget_auto_icon"
                 android:layout_width="10dp"
                 android:layout_height="10dp"
                 android:layout_gravity="center_vertical"
@@ -164,7 +164,7 @@
                 android:layout_gravity="center_vertical"
                 android:layout_marginStart="3dp"
                 android:text="Auto"
-                android:textColor="#FFFFFFFF"
+                android:textColor="#DEFFFFFF"
                 android:textSize="10.5sp"
                 android:textStyle="bold"
                 android:includeFontPadding="false"

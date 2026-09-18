@@ -102,31 +102,31 @@ class NotificationHelper(private val context: Context) {
             String.format(Locale.getDefault(), "%02d:%02d", mins, secs)
         } else ""
 
-        val (statusText, statusIconRes, badgeText) = when {
+        val (titleText, subtitleText, statusIconRes) = when {
             !appState.isEnabled && appState.overrideMode == null -> {
-                Triple("Disabled", R.drawable.ic_widget_silent, "OFF")
+                Triple("Disabled", "Automation off", R.drawable.ic_widget_silent)
             }
             isPaused -> {
-                Triple("Paused $countdownText", R.drawable.ic_widget_pause, "PAUSE")
+                Triple("Paused", "Resumes in $countdownText", R.drawable.ic_widget_pause)
             }
             isForceRing -> {
-                Triple("Ring (Forced)", R.drawable.ic_widget_ring, "RING")
+                Triple("Force Ring", "Continuous audible", R.drawable.ic_widget_ring)
             }
             isForceSilent -> {
-                Triple("Silent (Forced)", R.drawable.ic_widget_silent, "SILENT")
+                Triple("Force Silent", "Continuous vibration", R.drawable.ic_widget_silent)
             }
             isRingMode -> {
-                Triple("Ring", R.drawable.ic_widget_ring, "LOCKED")
+                Triple("Ring Mode", "Screen Locked", R.drawable.ic_widget_ring)
             }
             else -> {
-                Triple("Silent", R.drawable.ic_widget_silent, "IN USE")
+                Triple("Silent Mode", "Screen Unlocked", R.drawable.ic_widget_silent)
             }
         }
 
-        // Build Ultra-Compact Single-Row RemoteViews
+        // Build Ultra-Compact Single-Row RemoteViews (Transparent background to blend seamlessly)
         val compactViews = RemoteViews(context.packageName, R.layout.notification_glass_collapsed).apply {
-            setTextViewText(R.id.notification_status_text, statusText)
-            setTextViewText(R.id.notification_mode_badge, badgeText)
+            setTextViewText(R.id.notification_status_text, titleText)
+            setTextViewText(R.id.notification_subtitle_text, subtitleText)
             setImageViewResource(R.id.notification_status_icon, statusIconRes)
 
             // Button 1: Force Silent / Force Ring Toggle
@@ -149,8 +149,8 @@ class NotificationHelper(private val context: Context) {
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("Away Assist")
-            .setContentText(statusText)
+            .setContentTitle(titleText)
+            .setContentText(subtitleText)
             .setContentIntent(contentIntent)
             .setCustomContentView(compactViews)
             .setOngoing(true)
