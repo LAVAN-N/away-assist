@@ -1,7 +1,9 @@
 *.iml
 .gradle
 /local.properties
+local.properties
 /.idea
+.idea/
 .DS_Store
 /build
 build/
@@ -9,4 +11,16 @@ app/build/
 /captures
 .externalNativeBuild
 .cxx
-local.properties
+
+# Release signing & credentials
+*.keystore
+*.jks
+keystore.properties
+
+# Scratch & Temporary
+scratch/
+scratch
+shared image.jpeg
+*.apk
+*.aab
+

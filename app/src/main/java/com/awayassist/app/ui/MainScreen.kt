@@ -1413,7 +1413,7 @@ private fun DeveloperStoryFooter(
             )
 
             Text(
-                text = "v1.0 • LAVAN-N",
+                text = "v${com.awayassist.app.BuildConfig.VERSION_NAME} • LAVAN-N",
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontWeight = FontWeight.Light,
                     fontSize = 10.sp,
