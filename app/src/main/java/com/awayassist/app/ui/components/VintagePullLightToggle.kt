@@ -203,7 +203,7 @@ fun VintagePullLightToggle(
                 lightBurstProgress.snapTo(0f)
                 lightBurstProgress.animateTo(
                     targetValue = 1f,
-                    animationSpec = tween(durationMillis = 1600, easing = FastOutSlowInEasing)
+                    animationSpec = tween(durationMillis = 2800, easing = FastOutSlowInEasing)
                 )
             } finally {
                 if (lightBurstProgress.value != 1f) {
@@ -599,13 +599,13 @@ fun VintagePullLightToggle(
                                                 currentOnThemeSelected(nextMode)
                                             }
 
-                                            // 2D Spring physics recoil with damped harmonic pendulum wave
+                                            // Soft, weighted beaded cord recoil physics: smooth ease-out and gentle natural settle
                                             launch {
                                                 offsetX.animateTo(
                                                     targetValue = 0f,
                                                     animationSpec = spring(
-                                                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                                                        stiffness = Spring.StiffnessLow
+                                                        dampingRatio = 0.72f,
+                                                        stiffness = 50f
                                                     )
                                                 )
                                             }
@@ -613,8 +613,8 @@ fun VintagePullLightToggle(
                                                 offsetY.animateTo(
                                                     targetValue = 0f,
                                                     animationSpec = spring(
-                                                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                                                        stiffness = 250f
+                                                        dampingRatio = 0.76f,
+                                                        stiffness = 55f
                                                     )
                                                 )
                                             }
@@ -631,8 +631,18 @@ fun VintagePullLightToggle(
                                     pullJob?.cancel()
                                     pullJob = coroutineScope.launch {
                                         try {
-                                            launch { offsetX.animateTo(0f, spring()) }
-                                            launch { offsetY.animateTo(0f, spring()) }
+                                            launch {
+                                                offsetX.animateTo(
+                                                    targetValue = 0f,
+                                                    animationSpec = spring(dampingRatio = 0.72f, stiffness = 50f)
+                                                )
+                                            }
+                                            launch {
+                                                offsetY.animateTo(
+                                                    targetValue = 0f,
+                                                    animationSpec = spring(dampingRatio = 0.76f, stiffness = 55f)
+                                                )
+                                            }
                                         } finally {
                                             if (!isDragging) {
                                                 if (offsetX.value != 0f) offsetX.snapTo(0f)
@@ -667,13 +677,13 @@ fun VintagePullLightToggle(
                                         currentOnThemeSelected(nextMode)
                                         launch {
                                             offsetX.snapTo(0f)
-                                            offsetX.animateTo(12f, tween(90, easing = FastOutSlowInEasing))
-                                            offsetX.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow))
+                                            offsetX.animateTo(10f, tween(160, easing = FastOutSlowInEasing))
+                                            offsetX.animateTo(0f, spring(dampingRatio = 0.72f, stiffness = 50f))
                                         }
                                         launch {
                                             offsetY.snapTo(0f)
-                                            offsetY.animateTo(thresholdDistPx * 1.15f, tween(90, easing = FastOutSlowInEasing))
-                                            offsetY.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = 250f))
+                                            offsetY.animateTo(thresholdDistPx * 1.1f, tween(160, easing = FastOutSlowInEasing))
+                                            offsetY.animateTo(0f, spring(dampingRatio = 0.76f, stiffness = 55f))
                                         }
                                     } finally {
                                         if (!isDragging) {

@@ -60,7 +60,7 @@ fun FullScreenThemeWaveOverlay(
                 animProgress.animateTo(
                     targetValue = 1f,
                     animationSpec = tween(
-                        durationMillis = 1600,
+                        durationMillis = 2800,
                         easing = if (isEnteringLight) SoftEmitEasing else SoftAbsorbEasing
                     )
                 )
