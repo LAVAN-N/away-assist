@@ -5,10 +5,8 @@
     android:targetCellWidth="4"
     android:targetCellHeight="1"
     android:minResizeWidth="180dp"
-    android:minResizeHeight="50dp"
-    android:maxResizeHeight="160dp"
     android:updatePeriodMillis="0"
     android:initialLayout="@layout/widget_glassmorphic"
-    android:resizeMode="horizontal|vertical"
+    android:resizeMode="horizontal"
     android:widgetCategory="home_screen"
     android:description="@string/app_name" />
