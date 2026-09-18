@@ -119,6 +119,7 @@ class RingerService : Service() {
             val filter = IntentFilter().apply {
                 addAction(Intent.ACTION_SCREEN_OFF)
                 addAction(Intent.ACTION_USER_PRESENT)
+                addAction(Intent.ACTION_SCREEN_ON)
             }
             registerReceiver(screenStateReceiver, filter)
             Log.d(TAG, "Registered ScreenStateReceiver dynamically")

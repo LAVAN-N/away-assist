@@ -81,6 +81,7 @@ import com.awayassist.app.ui.theme.AwayAssistTheme
 import com.awayassist.app.ui.theme.SquircleLarge
 import com.awayassist.app.ui.theme.SquircleMedium
 import com.awayassist.app.ui.theme.SquirclePill
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -198,11 +199,17 @@ fun VintagePullLightToggle(
     LaunchedEffect(isCurrentlyLit) {
         if (isCurrentlyLit != previousLitState) {
             previousLitState = isCurrentlyLit
-            lightBurstProgress.snapTo(0f)
-            lightBurstProgress.animateTo(
-                targetValue = 1f,
-                animationSpec = tween(durationMillis = 1600, easing = FastOutSlowInEasing)
-            )
+            try {
+                lightBurstProgress.snapTo(0f)
+                lightBurstProgress.animateTo(
+                    targetValue = 1f,
+                    animationSpec = tween(durationMillis = 1600, easing = FastOutSlowInEasing)
+                )
+            } finally {
+                if (lightBurstProgress.value != 1f) {
+                    lightBurstProgress.snapTo(1f)
+                }
+            }
         }
     }
 
@@ -560,6 +567,8 @@ fun VintagePullLightToggle(
                     )
                 }
 
+                var pullJob by remember { mutableStateOf<Job?>(null) }
+
                 // 3. ONLY THE TIP IS INTERACTABLE (Acorn Handle Hit Target)
                 Box(
                     modifier = Modifier
@@ -571,9 +580,10 @@ fun VintagePullLightToggle(
                         }
                         .size(52.dp)
                         .clip(CircleShape)
-                        .pointerInput(currentIsLit) {
+                        .pointerInput(Unit) {
                             detectDragGestures(
                                 onDragStart = {
+                                    pullJob?.cancel()
                                     isDragging = true
                                 },
                                 onDragEnd = {
@@ -581,38 +591,54 @@ fun VintagePullLightToggle(
                                     val dist = hypot(offsetX.value, offsetY.value)
                                     val isTriggered = dist >= thresholdDistPx && (offsetY.value > 10f || abs(offsetX.value) > 18f)
 
-                                    coroutineScope.launch {
-                                        if (isTriggered) {
-                                            val nextMode = if (currentIsLit) ThemeMode.DARK else ThemeMode.LIGHT
-                                            currentOnThemeSelected(nextMode)
-                                        }
+                                    pullJob?.cancel()
+                                    pullJob = coroutineScope.launch {
+                                        try {
+                                            if (isTriggered) {
+                                                val nextMode = if (currentIsLit) ThemeMode.DARK else ThemeMode.LIGHT
+                                                currentOnThemeSelected(nextMode)
+                                            }
 
-                                        // 2D Spring physics recoil with damped harmonic pendulum wave
-                                        launch {
-                                            offsetX.animateTo(
-                                                targetValue = 0f,
-                                                animationSpec = spring(
-                                                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                                                    stiffness = Spring.StiffnessLow
+                                            // 2D Spring physics recoil with damped harmonic pendulum wave
+                                            launch {
+                                                offsetX.animateTo(
+                                                    targetValue = 0f,
+                                                    animationSpec = spring(
+                                                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                                                        stiffness = Spring.StiffnessLow
+                                                    )
                                                 )
-                                            )
-                                        }
-                                        launch {
-                                            offsetY.animateTo(
-                                                targetValue = 0f,
-                                                animationSpec = spring(
-                                                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                                                    stiffness = 250f
+                                            }
+                                            launch {
+                                                offsetY.animateTo(
+                                                    targetValue = 0f,
+                                                    animationSpec = spring(
+                                                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                                                        stiffness = 250f
+                                                    )
                                                 )
-                                            )
+                                            }
+                                        } finally {
+                                            if (!isDragging) {
+                                                if (offsetX.value != 0f) offsetX.snapTo(0f)
+                                                if (offsetY.value != 0f) offsetY.snapTo(0f)
+                                            }
                                         }
                                     }
                                 },
                                 onDragCancel = {
                                     isDragging = false
-                                    coroutineScope.launch {
-                                        launch { offsetX.animateTo(0f, spring()) }
-                                        launch { offsetY.animateTo(0f, spring()) }
+                                    pullJob?.cancel()
+                                    pullJob = coroutineScope.launch {
+                                        try {
+                                            launch { offsetX.animateTo(0f, spring()) }
+                                            launch { offsetY.animateTo(0f, spring()) }
+                                        } finally {
+                                            if (!isDragging) {
+                                                if (offsetX.value != 0f) offsetX.snapTo(0f)
+                                                if (offsetY.value != 0f) offsetY.snapTo(0f)
+                                            }
+                                        }
                                     }
                                 },
                                 onDrag = { change, dragAmount ->
@@ -634,16 +660,26 @@ fun VintagePullLightToggle(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
                             onClick = {
-                                coroutineScope.launch {
-                                    launch {
-                                        offsetX.animateTo(12f, tween(110, easing = FastOutSlowInEasing))
-                                        offsetX.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow))
-                                    }
-                                    launch {
-                                        offsetY.animateTo(thresholdDistPx * 1.2f, tween(110, easing = FastOutSlowInEasing))
+                                pullJob?.cancel()
+                                pullJob = coroutineScope.launch {
+                                    try {
                                         val nextMode = if (currentIsLit) ThemeMode.DARK else ThemeMode.LIGHT
                                         currentOnThemeSelected(nextMode)
-                                        offsetY.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = 250f))
+                                        launch {
+                                            offsetX.snapTo(0f)
+                                            offsetX.animateTo(12f, tween(90, easing = FastOutSlowInEasing))
+                                            offsetX.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow))
+                                        }
+                                        launch {
+                                            offsetY.snapTo(0f)
+                                            offsetY.animateTo(thresholdDistPx * 1.15f, tween(90, easing = FastOutSlowInEasing))
+                                            offsetY.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = 250f))
+                                        }
+                                    } finally {
+                                        if (!isDragging) {
+                                            if (offsetX.value != 0f) offsetX.snapTo(0f)
+                                            if (offsetY.value != 0f) offsetY.snapTo(0f)
+                                        }
                                     }
                                 }
                             }

@@ -1,8 +1,10 @@
 package com.awayassist.app.service
 
+import android.app.KeyguardManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.PowerManager
 import android.util.Log
 import com.awayassist.app.data.AwayAssistPreferences
 import com.awayassist.app.data.RingerState
@@ -11,11 +13,14 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class ScreenStateReceiver : BroadcastReceiver() {
 
     companion object {
         private const val TAG = "ScreenStateReceiver"
+        private val processingMutex = Mutex()
     }
 
     private val receiverScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -29,47 +34,63 @@ class ScreenStateReceiver : BroadcastReceiver() {
         val notificationHelper = NotificationHelper(context)
 
         receiverScope.launch {
-            val state = preferences.getAppState()
+            // Guarantee strictly sequential, race-free processing for rapid lock/unlock events
+            processingMutex.withLock {
+                val state = preferences.getAppState()
 
-            if (!state.isEnabled) {
-                Log.d(TAG, "Automation is disabled in preferences; ignoring $action")
-                return@launch
-            }
+                if (!state.isEnabled) {
+                    Log.d(TAG, "Automation is disabled in preferences; ignoring $action")
+                    return@withLock
+                }
 
-            if (state.isPaused) {
-                Log.d(TAG, "Automation is currently paused until ${state.pauseUntilTimestamp}; ignoring $action")
-                return@launch
-            }
+                if (state.isPaused) {
+                    Log.d(TAG, "Automation is currently paused until ${state.pauseUntilTimestamp}; ignoring $action")
+                    return@withLock
+                }
 
-            when (action) {
-                Intent.ACTION_SCREEN_OFF -> {
-                    Log.d(TAG, "Screen locked -> setting ringer to RING (Normal)")
-                    val success = ringerController.setRingMode()
+                if (state.overrideMode != null) {
+                    Log.d(TAG, "Manual override active (${state.overrideMode}); ignoring $action")
+                    return@withLock
+                }
+
+                val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+                val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+
+                val isInteractive = powerManager?.isInteractive ?: true
+                val isKeyguardLocked = keyguardManager?.isKeyguardLocked ?: false
+
+                // Determine target ringer mode based on verified hardware state:
+                // - If screen is turned off or not interactive: device is locked -> set RING
+                // - If user is present or screen is interactive and unlocked: device is unlocked -> set VIBRATE
+                val targetMode: RingerState? = when {
+                    action == Intent.ACTION_SCREEN_OFF || !isInteractive -> {
+                        RingerState.RING
+                    }
+                    action == Intent.ACTION_USER_PRESENT || (action == Intent.ACTION_SCREEN_ON && !isKeyguardLocked) -> {
+                        RingerState.VIBRATE
+                    }
+                    else -> null
+                }
+
+                if (targetMode != null) {
+                    Log.d(
+                        TAG,
+                        "Setting target mode $targetMode (action=$action, interactive=$isInteractive, keyguardLocked=$isKeyguardLocked)"
+                    )
+                    val success = when (targetMode) {
+                        RingerState.RING -> ringerController.setRingMode()
+                        RingerState.VIBRATE -> ringerController.setVibrateMode()
+                        else -> false
+                    }
                     if (success) {
                         preferences.updateRingerState(
-                            mode = RingerState.RING,
+                            mode = targetMode,
                             overrideMode = null
                         )
                         notificationHelper.updateNotification(
                             preferences.getAppState()
                         )
                     }
-                }
-                Intent.ACTION_USER_PRESENT -> {
-                    Log.d(TAG, "Screen unlocked (User present) -> setting ringer to VIBRATE")
-                    val success = ringerController.setVibrateMode()
-                    if (success) {
-                        preferences.updateRingerState(
-                            mode = RingerState.VIBRATE,
-                            overrideMode = null
-                        )
-                        notificationHelper.updateNotification(
-                            preferences.getAppState()
-                        )
-                    }
-                }
-                else -> {
-                    Log.d(TAG, "Unhandled action: $action")
                 }
             }
         }

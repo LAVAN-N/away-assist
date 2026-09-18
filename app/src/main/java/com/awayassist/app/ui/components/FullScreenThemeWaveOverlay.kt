@@ -55,15 +55,18 @@ fun FullScreenThemeWaveOverlay(
         if (previousDarkState != null && previousDarkState != isDark) {
             val isEnteringLight = !isDark
             activeTransition = if (isEnteringLight) ThemeTransitionType.EMIT_LIGHT else ThemeTransitionType.ABSORB_LIGHT
-            animProgress.snapTo(0f)
-            animProgress.animateTo(
-                targetValue = 1f,
-                animationSpec = tween(
-                    durationMillis = 1600,
-                    easing = if (isEnteringLight) SoftEmitEasing else SoftAbsorbEasing
+            try {
+                animProgress.snapTo(0f)
+                animProgress.animateTo(
+                    targetValue = 1f,
+                    animationSpec = tween(
+                        durationMillis = 1600,
+                        easing = if (isEnteringLight) SoftEmitEasing else SoftAbsorbEasing
+                    )
                 )
-            )
-            activeTransition = null
+            } finally {
+                activeTransition = null
+            }
         }
         previousDarkState = isDark
     }
