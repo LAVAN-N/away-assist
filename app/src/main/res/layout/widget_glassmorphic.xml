@@ -5,10 +5,10 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="@drawable/bg_glass_notification"
-    android:paddingStart="14dp"
-    android:paddingEnd="14dp"
-    android:paddingTop="12dp"
-    android:paddingBottom="12dp">
+    android:paddingStart="12dp"
+    android:paddingEnd="12dp"
+    android:paddingTop="10dp"
+    android:paddingBottom="10dp">
 
     <!-- Top Header Bar -->
     <LinearLayout
@@ -67,23 +67,21 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- Center Hero Section -->
+    <!-- Compact Middle Status Section (Tight Vertical Spacing) -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
+        android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:gravity="center_vertical"
-        android:layout_marginTop="6dp"
+        android:layout_marginTop="5dp"
         android:layout_marginBottom="8dp">
 
         <TextView
             android:id="@+id/appwidget_headline"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Screen Locked ➔ Ring"
+            android:text="Screen Locked"
             android:textColor="#FFFFFFFF"
-            android:textSize="15sp"
+            android:textSize="14.5sp"
             android:textStyle="bold"
             android:includeFontPadding="false"
             android:maxLines="1"
@@ -93,10 +91,10 @@
             android:id="@+id/appwidget_subtitle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:text="Audible calls &amp; alerts • Screen is off"
+            android:layout_marginTop="1dp"
+            android:text="Audible on Lock"
             android:textColor="#B3FFFFFF"
-            android:textSize="11.5sp"
+            android:textSize="11sp"
             android:includeFontPadding="false"
             android:maxLines="1"
             android:ellipsize="end" />
@@ -105,7 +103,7 @@
     <!-- Bottom Widget Controls Deck -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="34dp"
+        android:layout_height="32dp"
         android:orientation="horizontal">
 
         <!-- Widget Btn 1: Auto -->
@@ -122,8 +120,8 @@
             android:layout_marginEnd="4dp">
 
             <ImageView
-                android:layout_width="12dp"
-                android:layout_height="12dp"
+                android:layout_width="11dp"
+                android:layout_height="11dp"
                 android:layout_gravity="center_vertical"
                 android:src="@drawable/ic_widget_auto"
                 android:contentDescription="Auto" />
@@ -157,8 +155,8 @@
             android:layout_marginEnd="2dp">
 
             <ImageView
-                android:layout_width="12dp"
-                android:layout_height="12dp"
+                android:layout_width="11dp"
+                android:layout_height="11dp"
                 android:layout_gravity="center_vertical"
                 android:src="@drawable/ic_widget_ring"
                 android:contentDescription="Ring" />
@@ -191,8 +189,8 @@
             android:layout_marginStart="4dp">
 
             <ImageView
-                android:layout_width="11dp"
-                android:layout_height="11dp"
+                android:layout_width="10dp"
+                android:layout_height="10dp"
                 android:layout_gravity="center_vertical"
                 android:src="@drawable/ic_widget_pause"
                 android:contentDescription="Pause" />

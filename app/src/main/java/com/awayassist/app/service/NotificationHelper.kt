@@ -109,33 +109,81 @@ class NotificationHelper(private val context: Context) {
             String.format(Locale.getDefault(), "%02d:%02d", mins, secs)
         } else ""
 
+        // Concise, refined max-3-words labels
         val (titleText, subtitleText, badgeText, statusIconRes) = when {
             !appState.isEnabled && appState.overrideMode == null -> {
                 Quad("Disabled", "Automation Off", "OFF", R.drawable.ic_widget_silent)
             }
             isPaused -> {
-                Quad("Paused", "Resumes in $countdownText", "PAUSE", R.drawable.ic_widget_pause)
+                Quad("Paused ($countdownText)", "Resumes in $countdownText", "PAUSE", R.drawable.ic_widget_pause)
             }
             isForceRing -> {
-                Quad("Force Ring", "Manual Override • Locked", "MANUAL", R.drawable.ic_widget_ring)
+                Quad("Force Ring", "Always Audible", "MANUAL", R.drawable.ic_widget_ring)
             }
             isForceSilent -> {
-                Quad("Force Silent", "Manual Override • Silent", "MANUAL", R.drawable.ic_widget_silent)
+                Quad("Force Silent", "Always Silent", "MANUAL", R.drawable.ic_widget_silent)
             }
             isRingMode -> {
-                Quad("Ring Mode", "Screen Locked ➔ Audible", "AUTO", R.drawable.ic_widget_ring)
+                Quad("Ring Mode", "Audible on Lock", "AUTO", R.drawable.ic_widget_ring)
             }
             else -> {
-                Quad("Silent Mode", "Screen Unlocked ➔ Silent", "AUTO", R.drawable.ic_widget_silent)
+                Quad("Silent Mode", "Vibrate in Use", "AUTO", R.drawable.ic_widget_silent)
             }
         }
 
-        // Build Ultra-Compact Single-Row RemoteViews
-        val compactViews = RemoteViews(context.packageName, R.layout.notification_glass_collapsed).apply {
+        // 1. Build Collapsed Single-Row RemoteViews (Side-by-side)
+        val collapsedViews = RemoteViews(context.packageName, R.layout.notification_glass_collapsed).apply {
             setTextViewText(R.id.notification_status_text, titleText)
             setTextViewText(R.id.notification_subtitle_text, subtitleText)
             setTextViewText(R.id.notification_mode_badge, badgeText)
             setImageViewResource(R.id.notification_status_icon, statusIconRes)
+
+            // Button 1: Force Silent / Force Ring Toggle
+            if (appState.currentMode == RingerState.RING && appState.overrideMode != RingerState.VIBRATE) {
+                setTextViewText(R.id.widget_toggle_text, "Silent")
+                setImageViewResource(R.id.widget_toggle_icon, R.drawable.ic_widget_silent)
+                setInt(
+                    R.id.widget_btn_toggle,
+                    "setBackgroundResource",
+                    if (isForceRing) R.drawable.bg_glass_widget_button_ring else R.drawable.bg_glass_widget_button
+                )
+                setOnClickPendingIntent(R.id.widget_btn_toggle, forceSilentIntent)
+            } else {
+                setTextViewText(R.id.widget_toggle_text, "Ring")
+                setImageViewResource(R.id.widget_toggle_icon, R.drawable.ic_widget_ring)
+                setInt(
+                    R.id.widget_btn_toggle,
+                    "setBackgroundResource",
+                    if (isForceSilent) R.drawable.bg_glass_widget_button_accent else R.drawable.bg_glass_widget_button
+                )
+                setOnClickPendingIntent(R.id.widget_btn_toggle, forceRingIntent)
+            }
+
+            // Button 2: Pause 10m
+            setTextViewText(R.id.widget_pause_text, if (isPaused) countdownText else "10m")
+            setInt(
+                R.id.widget_btn_pause,
+                "setBackgroundResource",
+                if (isPaused) R.drawable.bg_glass_widget_button_pause else R.drawable.bg_glass_widget_button
+            )
+            setOnClickPendingIntent(R.id.widget_btn_pause, pause10mIntent)
+
+            // Button 3: Auto
+            setTextViewText(R.id.widget_auto_text, if (isAutoMode) "● Auto" else "Auto")
+            setInt(
+                R.id.widget_btn_auto,
+                "setBackgroundResource",
+                if (isAutoMode) R.drawable.bg_glass_widget_button_auto else R.drawable.bg_glass_widget_button
+            )
+            setOnClickPendingIntent(R.id.widget_btn_auto, resumeIntent)
+        }
+
+        // 2. Build Expanded RemoteViews (Buttons Relocated Below Hint Text across Full Width)
+        val expandedViews = RemoteViews(context.packageName, R.layout.notification_glass_expanded).apply {
+            setTextViewText(R.id.expanded_status_text, titleText)
+            setTextViewText(R.id.expanded_subtitle_text, subtitleText)
+            setTextViewText(R.id.expanded_mode_badge, badgeText)
+            setImageViewResource(R.id.expanded_status_icon, statusIconRes)
 
             // Button 1: Force Silent / Force Ring Toggle
             if (appState.currentMode == RingerState.RING && appState.overrideMode != RingerState.VIBRATE) {
@@ -182,8 +230,8 @@ class NotificationHelper(private val context: Context) {
             .setContentTitle(titleText)
             .setContentText(subtitleText)
             .setContentIntent(contentIntent)
-            .setCustomContentView(compactViews)
-            .setCustomBigContentView(compactViews) // Explicitly set BigContentView so pull-to-expand retains our custom UI buttons!
+            .setCustomContentView(collapsedViews)
+            .setCustomBigContentView(expandedViews) // Big view relocates buttons cleanly below hint text!
             .setOngoing(true)
             .setShowWhen(false)
             .setSilent(true)
