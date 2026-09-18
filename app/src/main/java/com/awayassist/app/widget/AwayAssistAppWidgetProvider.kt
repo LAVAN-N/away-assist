@@ -130,7 +130,7 @@ class AwayAssistAppWidgetProvider : AppWidgetProvider() {
                 }
                 isForceRing -> {
                     views.setTextViewText(R.id.appwidget_badge, "RING")
-                    views.setTextViewText(R.id.appwidget_headline, "Force Ring [ACTIVE]")
+                    views.setTextViewText(R.id.appwidget_headline, "Force Ring Active")
                     views.setTextViewText(R.id.appwidget_subtitle, "Always audible • Ignores lock")
                     views.setTextViewText(R.id.appwidget_pause_text, "10m")
 
@@ -140,8 +140,8 @@ class AwayAssistAppWidgetProvider : AppWidgetProvider() {
                 }
                 isRingLocked -> {
                     views.setTextViewText(R.id.appwidget_badge, "AUTO")
-                    views.setTextViewText(R.id.appwidget_headline, "Ring Mode [AUTO]")
-                    views.setTextViewText(R.id.appwidget_subtitle, "Screen Locked ➔ Audible")
+                    views.setTextViewText(R.id.appwidget_headline, "Screen Locked ➔ Ring")
+                    views.setTextViewText(R.id.appwidget_subtitle, "Audible calls & alerts • Screen off")
                     views.setTextViewText(R.id.appwidget_pause_text, "10m")
 
                     views.setInt(R.id.appwidget_btn_auto, "setBackgroundResource", R.drawable.bg_glass_widget_button_auto)
@@ -150,8 +150,8 @@ class AwayAssistAppWidgetProvider : AppWidgetProvider() {
                 }
                 else -> {
                     views.setTextViewText(R.id.appwidget_badge, "AUTO")
-                    views.setTextViewText(R.id.appwidget_headline, "Silent Mode [AUTO]")
-                    views.setTextViewText(R.id.appwidget_subtitle, "Screen Unlocked ➔ Silent")
+                    views.setTextViewText(R.id.appwidget_headline, "Screen Unlocked ➔ Silent")
+                    views.setTextViewText(R.id.appwidget_subtitle, "Silent vibration in use • Screen on")
                     views.setTextViewText(R.id.appwidget_pause_text, "10m")
 
                     views.setInt(R.id.appwidget_btn_auto, "setBackgroundResource", R.drawable.bg_glass_widget_button_auto)

@@ -109,24 +109,24 @@ class NotificationHelper(private val context: Context) {
             String.format(Locale.getDefault(), "%02d:%02d", mins, secs)
         } else ""
 
-        val (titleText, subtitleText, statusIconRes) = when {
+        val (titleText, subtitleText, badgeText, statusIconRes) = when {
             !appState.isEnabled && appState.overrideMode == null -> {
-                Triple("Disabled", "Automation Off", R.drawable.ic_widget_silent)
+                Quad("Disabled", "Automation Off", "OFF", R.drawable.ic_widget_silent)
             }
             isPaused -> {
-                Triple("Paused ($countdownText)", "Resumes in $countdownText", R.drawable.ic_widget_pause)
+                Quad("Paused", "Resumes in $countdownText", "PAUSE", R.drawable.ic_widget_pause)
             }
             isForceRing -> {
-                Triple("Force Ring [ACTIVE]", "Manual Override • Locked", R.drawable.ic_widget_ring)
+                Quad("Force Ring", "Manual Override • Locked", "MANUAL", R.drawable.ic_widget_ring)
             }
             isForceSilent -> {
-                Triple("Force Silent [ACTIVE]", "Manual Override • Silent", R.drawable.ic_widget_silent)
+                Quad("Force Silent", "Manual Override • Silent", "MANUAL", R.drawable.ic_widget_silent)
             }
             isRingMode -> {
-                Triple("Ring Mode [AUTO]", "Screen Locked ➔ Audible", R.drawable.ic_widget_ring)
+                Quad("Ring Mode", "Screen Locked ➔ Audible", "AUTO", R.drawable.ic_widget_ring)
             }
             else -> {
-                Triple("Silent Mode [AUTO]", "Screen Unlocked ➔ Silent", R.drawable.ic_widget_silent)
+                Quad("Silent Mode", "Screen Unlocked ➔ Silent", "AUTO", R.drawable.ic_widget_silent)
             }
         }
 
@@ -134,6 +134,7 @@ class NotificationHelper(private val context: Context) {
         val compactViews = RemoteViews(context.packageName, R.layout.notification_glass_collapsed).apply {
             setTextViewText(R.id.notification_status_text, titleText)
             setTextViewText(R.id.notification_subtitle_text, subtitleText)
+            setTextViewText(R.id.notification_mode_badge, badgeText)
             setImageViewResource(R.id.notification_status_icon, statusIconRes)
 
             // Button 1: Force Silent / Force Ring Toggle
@@ -182,6 +183,7 @@ class NotificationHelper(private val context: Context) {
             .setContentText(subtitleText)
             .setContentIntent(contentIntent)
             .setCustomContentView(compactViews)
+            .setCustomBigContentView(compactViews) // Explicitly set BigContentView so pull-to-expand retains our custom UI buttons!
             .setOngoing(true)
             .setShowWhen(false)
             .setSilent(true)
@@ -200,4 +202,6 @@ class NotificationHelper(private val context: Context) {
             AwayAssistAppWidgetProvider.updateAll(context, appState)
         } catch (_: Exception) {}
     }
+
+    private data class Quad<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
 }

@@ -12,7 +12,7 @@
     android:paddingBottom="6dp"
     android:gravity="center_vertical">
 
-    <!-- Left Status Section: Icon + Title & Subtitle Info -->
+    <!-- Left Status Section: Icon + Title & Pill Cell Badge + Subtitle Info -->
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
@@ -36,26 +36,50 @@
             android:layout_gravity="center_vertical"
             android:orientation="vertical">
 
-            <TextView
-                android:id="@+id/notification_status_text"
+            <!-- Title & Distinct Cell Badge (No [] brackets) -->
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Ring Mode"
-                android:textColor="#DEFFFFFF"
-                android:textSize="12.5sp"
-                android:textStyle="bold"
-                android:includeFontPadding="false"
-                android:maxLines="1"
-                android:ellipsize="end" />
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:id="@+id/notification_status_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Ring Mode"
+                    android:textColor="#DEFFFFFF"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:includeFontPadding="false"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
+
+                <TextView
+                    android:id="@+id/notification_mode_badge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="5dp"
+                    android:background="@drawable/bg_glass_status_pill"
+                    android:paddingStart="5dp"
+                    android:paddingEnd="5dp"
+                    android:paddingTop="1.5dp"
+                    android:paddingBottom="1.5dp"
+                    android:text="AUTO"
+                    android:textColor="#E6FFFFFF"
+                    android:textSize="8sp"
+                    android:textStyle="bold"
+                    android:includeFontPadding="false" />
+            </LinearLayout>
 
             <TextView
                 android:id="@+id/notification_subtitle_text"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="1dp"
+                android:layout_marginTop="1.5dp"
                 android:text="Screen Locked"
                 android:textColor="#99FFFFFF"
-                android:textSize="10.5sp"
+                android:textSize="10sp"
                 android:includeFontPadding="false"
                 android:maxLines="1"
                 android:ellipsize="end" />
@@ -105,7 +129,7 @@
                 android:maxLines="1" />
         </LinearLayout>
 
-        <!-- Widget 2: Pause 1h -->
+        <!-- Widget 2: Pause 10m -->
         <LinearLayout
             android:id="@+id/widget_btn_pause"
             android:layout_width="wrap_content"
