@@ -12,6 +12,7 @@ import com.awayassist.app.MainActivity
 import com.awayassist.app.R
 import com.awayassist.app.data.AppState
 import com.awayassist.app.data.RingerState
+import com.awayassist.app.data.formatPauseDurationLabel
 import com.awayassist.app.service.NotificationHelper
 import com.awayassist.app.service.RingerService
 import java.util.Locale
@@ -97,10 +98,13 @@ class AwayAssistAppWidgetProvider : AppWidgetProvider() {
             }
             views.setOnClickPendingIntent(R.id.appwidget_btn_ring, ringPendingIntent)
 
-            // Button 3: Pause 10m
+            val customPauseDuration = appState?.customPauseDurationMs ?: (10 * 60_000L)
+            val customPauseLabel = formatPauseDurationLabel(customPauseDuration)
+
+            // Button 3: Pause Custom Duration
             val pauseIntent = Intent(context, RingerService::class.java).apply {
                 action = NotificationHelper.ACTION_PAUSE_10M
-                putExtra(NotificationHelper.EXTRA_PAUSE_DURATION_MS, NotificationHelper.DEFAULT_PAUSE_DURATION_MS)
+                putExtra(NotificationHelper.EXTRA_PAUSE_DURATION_MS, customPauseDuration)
             }
             val pausePendingIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 PendingIntent.getForegroundService(
@@ -125,6 +129,7 @@ class AwayAssistAppWidgetProvider : AppWidgetProvider() {
                 views.setTextColor(R.id.appwidget_badge, 0xFF7D7AFF.toInt())
                 views.setImageViewResource(R.id.appwidget_dot, R.drawable.anim_dot_indigo)
                 views.setTextViewText(R.id.appwidget_headline, "Away Assist Ready")
+                views.setTextViewText(R.id.appwidget_pause_text, customPauseLabel)
                 return views
             }
 
@@ -139,6 +144,7 @@ class AwayAssistAppWidgetProvider : AppWidgetProvider() {
                     views.setTextColor(R.id.appwidget_badge, 0xFF8E8E93.toInt())
                     views.setImageViewResource(R.id.appwidget_dot, R.drawable.anim_dot_gray)
                     views.setTextViewText(R.id.appwidget_headline, "Disabled")
+                    views.setTextViewText(R.id.appwidget_pause_text, customPauseLabel)
                     views.setInt(R.id.appwidget_btn_auto, "setBackgroundResource", R.drawable.bg_glass_widget_button)
                     views.setInt(R.id.appwidget_btn_ring, "setBackgroundResource", R.drawable.bg_glass_widget_button)
                     views.setInt(R.id.appwidget_btn_pause, "setBackgroundResource", R.drawable.bg_glass_widget_button)
@@ -164,7 +170,7 @@ class AwayAssistAppWidgetProvider : AppWidgetProvider() {
                     views.setTextColor(R.id.appwidget_badge, 0xFF30D158.toInt())
                     views.setImageViewResource(R.id.appwidget_dot, R.drawable.anim_dot_green)
                     views.setTextViewText(R.id.appwidget_headline, "Force Ring")
-                    views.setTextViewText(R.id.appwidget_pause_text, "10m")
+                    views.setTextViewText(R.id.appwidget_pause_text, customPauseLabel)
 
                     views.setInt(R.id.appwidget_btn_auto, "setBackgroundResource", R.drawable.bg_glass_widget_button)
                     views.setInt(R.id.appwidget_btn_ring, "setBackgroundResource", R.drawable.bg_glass_widget_button_ring)
@@ -175,7 +181,7 @@ class AwayAssistAppWidgetProvider : AppWidgetProvider() {
                     views.setTextColor(R.id.appwidget_badge, 0xFF30D158.toInt())
                     views.setImageViewResource(R.id.appwidget_dot, R.drawable.anim_dot_green)
                     views.setTextViewText(R.id.appwidget_headline, "Screen Locked")
-                    views.setTextViewText(R.id.appwidget_pause_text, "10m")
+                    views.setTextViewText(R.id.appwidget_pause_text, customPauseLabel)
 
                     views.setInt(R.id.appwidget_btn_auto, "setBackgroundResource", R.drawable.bg_glass_widget_button_auto)
                     views.setInt(R.id.appwidget_btn_ring, "setBackgroundResource", R.drawable.bg_glass_widget_button)
@@ -186,7 +192,7 @@ class AwayAssistAppWidgetProvider : AppWidgetProvider() {
                     views.setTextColor(R.id.appwidget_badge, 0xFF7D7AFF.toInt())
                     views.setImageViewResource(R.id.appwidget_dot, R.drawable.anim_dot_indigo)
                     views.setTextViewText(R.id.appwidget_headline, "Screen Unlocked")
-                    views.setTextViewText(R.id.appwidget_pause_text, "10m")
+                    views.setTextViewText(R.id.appwidget_pause_text, customPauseLabel)
 
                     views.setInt(R.id.appwidget_btn_auto, "setBackgroundResource", R.drawable.bg_glass_widget_button_auto)
                     views.setInt(R.id.appwidget_btn_ring, "setBackgroundResource", R.drawable.bg_glass_widget_button)

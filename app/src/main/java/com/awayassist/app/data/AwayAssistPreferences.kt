@@ -35,11 +35,23 @@ data class AppState(
     val currentMode: RingerState = RingerState.UNKNOWN,
     val lastChangedTimestamp: Long = 0L,
     val pauseUntilTimestamp: Long = 0L,
+    val customPauseDurationMs: Long = 10 * 60_000L,
     val overrideMode: RingerState? = null,
     val themeMode: ThemeMode = ThemeMode.SYSTEM
 ) {
     val isPaused: Boolean
         get() = pauseUntilTimestamp > System.currentTimeMillis()
+}
+
+fun formatPauseDurationLabel(durationMs: Long): String {
+    val mins = (durationMs / 60_000L).coerceAtLeast(1L)
+    val hours = mins / 60
+    val remMins = mins % 60
+    return when {
+        hours > 0 && remMins > 0 -> "${hours}h ${remMins}m"
+        hours > 0 -> "${hours}h"
+        else -> "${mins}m"
+    }
 }
 
 class AwayAssistPreferences(private val context: Context) {
@@ -51,6 +63,7 @@ class AwayAssistPreferences(private val context: Context) {
         val KEY_CURRENT_MODE = stringPreferencesKey("current_mode")
         val KEY_LAST_CHANGED_TIMESTAMP = longPreferencesKey("last_changed_timestamp")
         val KEY_PAUSE_UNTIL_TIMESTAMP = longPreferencesKey("pause_until_timestamp")
+        val KEY_CUSTOM_PAUSE_DURATION_MS = longPreferencesKey("custom_pause_duration_ms")
         val KEY_OVERRIDE_MODE = stringPreferencesKey("override_mode")
         val KEY_THEME_MODE = stringPreferencesKey("theme_mode")
 
@@ -84,6 +97,7 @@ class AwayAssistPreferences(private val context: Context) {
             }
             val lastChanged = preferences[KEY_LAST_CHANGED_TIMESTAMP] ?: 0L
             val pauseUntil = preferences[KEY_PAUSE_UNTIL_TIMESTAMP] ?: 0L
+            val customPauseDuration = preferences[KEY_CUSTOM_PAUSE_DURATION_MS] ?: (10 * 60_000L)
             val overrideStr = preferences[KEY_OVERRIDE_MODE]
             val overrideMode = overrideStr?.let {
                 try {
@@ -104,6 +118,7 @@ class AwayAssistPreferences(private val context: Context) {
                 currentMode = currentMode,
                 lastChangedTimestamp = lastChanged,
                 pauseUntilTimestamp = pauseUntil,
+                customPauseDurationMs = customPauseDuration,
                 overrideMode = overrideMode,
                 themeMode = themeMode
             )
@@ -169,6 +184,13 @@ class AwayAssistPreferences(private val context: Context) {
         dataStore.edit { preferences ->
             preferences.remove(KEY_OVERRIDE_MODE)
             preferences[KEY_PAUSE_UNTIL_TIMESTAMP] = pauseUntil
+            preferences[KEY_CUSTOM_PAUSE_DURATION_MS] = durationMs
+        }
+    }
+
+    suspend fun setCustomPauseDuration(durationMs: Long) {
+        dataStore.edit { preferences ->
+            preferences[KEY_CUSTOM_PAUSE_DURATION_MS] = durationMs
         }
     }
 

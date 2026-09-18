@@ -675,6 +675,7 @@ private data class PauseOption(val id: String, val label: String, val durationMs
 
 private val PAUSE_OPTIONS = listOf(
     PauseOption("10m", "10m", 10 * 60_000L),
+    PauseOption("15m", "15m", 15 * 60_000L),
     PauseOption("30m", "30m", 30 * 60_000L),
     PauseOption("1h", "1h", 60 * 60_000L),
     PauseOption("custom", "Custom", -1L)
@@ -696,7 +697,12 @@ private fun UnifiedControlsCard(
 ) {
     val colors = AwayAssistTheme.colors
 
-    var selectedOption by remember { mutableStateOf<PauseOption?>(PAUSE_OPTIONS[0]) }
+    var selectedOption by remember(appState.customPauseDurationMs) {
+        mutableStateOf<PauseOption?>(
+            PAUSE_OPTIONS.find { it.durationMs == appState.customPauseDurationMs }
+                ?: PAUSE_OPTIONS.last()
+        )
+    }
 
     GroupedListCard(modifier = modifier) {
         Column(
@@ -746,14 +752,8 @@ private fun UnifiedControlsCard(
                     onSelectMode(mode)
                     if (mode == OperationMode.PAUSE) {
                         val duration = when {
-                            selectedOption == null -> 600_000L // 10 minutes default
-                            selectedOption?.id == "custom" -> {
-                                if (appState.pauseUntilTimestamp > System.currentTimeMillis()) {
-                                    appState.pauseUntilTimestamp - System.currentTimeMillis()
-                                } else {
-                                    600_000L
-                                }
-                            }
+                            selectedOption == null -> appState.customPauseDurationMs
+                            selectedOption?.id == "custom" -> appState.customPauseDurationMs
                             else -> selectedOption!!.durationMs
                         }
                         onPauseForDuration(duration)
@@ -823,7 +823,7 @@ private fun UnifiedControlsCard(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // Preset Chips Row (10m, 30m, 1h, Custom)
+                    // Preset Chips Row (10m, 15m, 30m, 1h, Custom)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -870,11 +870,7 @@ private fun UnifiedControlsCard(
                                         onClick = {
                                             selectedOption = option
                                             val newDuration = if (option.id == "custom") {
-                                                if (appState.pauseUntilTimestamp > System.currentTimeMillis()) {
-                                                    appState.pauseUntilTimestamp - System.currentTimeMillis()
-                                                } else {
-                                                    3600_000L
-                                                }
+                                                appState.customPauseDurationMs
                                             } else {
                                                 option.durationMs
                                             }
@@ -900,7 +896,11 @@ private fun UnifiedControlsCard(
                         Spacer(modifier = Modifier.height(10.dp))
 
                         LiquidClockPicker(
-                            initialTargetTimestamp = appState.pauseUntilTimestamp,
+                            initialTargetTimestamp = if (appState.pauseUntilTimestamp > System.currentTimeMillis()) {
+                                appState.pauseUntilTimestamp
+                            } else {
+                                System.currentTimeMillis() + appState.customPauseDurationMs
+                            },
                             onDurationChanged = onPauseForDuration,
                             isDark = isDark
                         )

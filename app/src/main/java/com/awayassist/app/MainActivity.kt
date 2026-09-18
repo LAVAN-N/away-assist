@@ -112,11 +112,17 @@ class MainActivity : ComponentActivity() {
                                 sendServiceAction(NotificationHelper.ACTION_FORCE_RING)
                             }
                             OperationMode.PAUSE -> {
-                                RingerService.pauseService(this@MainActivity, 300_000L)
+                                scope.launch {
+                                    preferences.setCustomPauseDuration(appState.customPauseDurationMs)
+                                }
+                                RingerService.pauseService(this@MainActivity, appState.customPauseDurationMs)
                             }
                         }
                     },
                     onPauseForDuration = { durationMs ->
+                        scope.launch {
+                            preferences.setCustomPauseDuration(durationMs)
+                        }
                         RingerService.pauseService(this@MainActivity, durationMs)
                     },
                     onRequestPolicyAccess = {

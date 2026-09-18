@@ -13,6 +13,7 @@ import com.awayassist.app.MainActivity
 import com.awayassist.app.R
 import com.awayassist.app.data.AppState
 import com.awayassist.app.data.RingerState
+import com.awayassist.app.data.formatPauseDurationLabel
 import com.awayassist.app.widget.AwayAssistAppWidgetProvider
 import java.util.Locale
 
@@ -65,6 +66,19 @@ class NotificationHelper(private val context: Context) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val isPaused = appState.isPaused
+        val isAutoMode = appState.isEnabled && !isPaused && appState.overrideMode == null
+        val isRingMode = appState.currentMode == RingerState.RING && isAutoMode
+        val isForceRing = appState.overrideMode == RingerState.RING
+        val isForceSilent = appState.overrideMode == RingerState.VIBRATE || appState.overrideMode == RingerState.SILENT
+
+        val countdownText: String = if (isPaused) {
+            val diffSecs = ((appState.pauseUntilTimestamp - System.currentTimeMillis()) / 1000L).coerceAtLeast(0L)
+            val mins = (diffSecs % 3600) / 60
+            val secs = diffSecs % 60
+            String.format(Locale.getDefault(), "%02d:%02d", mins, secs)
+        } else ""
+
         // Pending Intents for Widget Buttons
         val resumeIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             PendingIntent.getForegroundService(
@@ -114,13 +128,17 @@ class NotificationHelper(private val context: Context) {
             )
         }
 
+        val customPauseDuration = appState.customPauseDurationMs
+        val customPauseLabel = formatPauseDurationLabel(customPauseDuration)
+        val pauseButtonText = if (isPaused) countdownText else customPauseLabel
+
         val pause10mIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             PendingIntent.getForegroundService(
                 context,
                 104,
                 Intent(context, RingerService::class.java).apply {
                     action = ACTION_PAUSE_10M
-                    putExtra(EXTRA_PAUSE_DURATION_MS, DEFAULT_PAUSE_DURATION_MS)
+                    putExtra(EXTRA_PAUSE_DURATION_MS, customPauseDuration)
                 },
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
@@ -130,24 +148,11 @@ class NotificationHelper(private val context: Context) {
                 104,
                 Intent(context, RingerService::class.java).apply {
                     action = ACTION_PAUSE_10M
-                    putExtra(EXTRA_PAUSE_DURATION_MS, DEFAULT_PAUSE_DURATION_MS)
+                    putExtra(EXTRA_PAUSE_DURATION_MS, customPauseDuration)
                 },
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
         }
-
-        val isPaused = appState.isPaused
-        val isAutoMode = appState.isEnabled && !isPaused && appState.overrideMode == null
-        val isRingMode = appState.currentMode == RingerState.RING && isAutoMode
-        val isForceRing = appState.overrideMode == RingerState.RING
-        val isForceSilent = appState.overrideMode == RingerState.VIBRATE || appState.overrideMode == RingerState.SILENT
-
-        val countdownText: String = if (isPaused) {
-            val diffSecs = ((appState.pauseUntilTimestamp - System.currentTimeMillis()) / 1000L).coerceAtLeast(0L)
-            val mins = (diffSecs % 3600) / 60
-            val secs = diffSecs % 60
-            String.format(Locale.getDefault(), "%02d:%02d", mins, secs)
-        } else ""
 
         // Concise, refined max-3-words labels
         val (titleText, subtitleText, badgeText, statusIconRes, dotAnimRes, badgeTextColor) = when {
@@ -201,8 +206,8 @@ class NotificationHelper(private val context: Context) {
                 setOnClickPendingIntent(R.id.widget_btn_toggle, forceRingIntent)
             }
 
-            // Button 2: Pause 10m
-            setTextViewText(R.id.widget_pause_text, if (isPaused) countdownText else "10m")
+            // Button 2: Pause
+            setTextViewText(R.id.widget_pause_text, pauseButtonText)
             setInt(
                 R.id.widget_btn_pause,
                 "setBackgroundResource",
@@ -250,8 +255,8 @@ class NotificationHelper(private val context: Context) {
                 setOnClickPendingIntent(R.id.widget_btn_toggle, forceRingIntent)
             }
 
-            // Button 2: Pause 10m
-            setTextViewText(R.id.widget_pause_text, if (isPaused) countdownText else "10m")
+            // Button 2: Pause
+            setTextViewText(R.id.widget_pause_text, pauseButtonText)
             setInt(
                 R.id.widget_btn_pause,
                 "setBackgroundResource",
