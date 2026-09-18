@@ -42,7 +42,9 @@ class MainActivity : ComponentActivity() {
 
     private val postNotificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
-            if (!isGranted) {
+            if (isGranted) {
+                startServiceIfEligible()
+            } else {
                 Toast.makeText(
                     this,
                     "Notification permission is needed to show active ringer status",
@@ -130,6 +132,11 @@ class MainActivity : ComponentActivity() {
         }
 
         // Auto-start foreground service on launch if enabled and permission granted
+        startServiceIfEligible()
+    }
+
+    override fun onResume() {
+        super.onResume()
         startServiceIfEligible()
     }
 

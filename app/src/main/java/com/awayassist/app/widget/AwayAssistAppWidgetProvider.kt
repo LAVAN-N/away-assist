@@ -95,7 +95,6 @@ class AwayAssistAppWidgetProvider : AppWidgetProvider() {
             if (appState == null) {
                 views.setTextViewText(R.id.appwidget_badge, "AUTO")
                 views.setTextViewText(R.id.appwidget_headline, "Away Assist Ready")
-                views.setTextViewText(R.id.appwidget_subtitle, "Tap to open")
                 return views
             }
 
@@ -108,7 +107,6 @@ class AwayAssistAppWidgetProvider : AppWidgetProvider() {
                 !appState.isEnabled && appState.overrideMode == null -> {
                     views.setTextViewText(R.id.appwidget_badge, "OFF")
                     views.setTextViewText(R.id.appwidget_headline, "Disabled")
-                    views.setTextViewText(R.id.appwidget_subtitle, "Automation Off")
                     views.setInt(R.id.appwidget_btn_auto, "setBackgroundResource", R.drawable.bg_glass_widget_button)
                     views.setInt(R.id.appwidget_btn_ring, "setBackgroundResource", R.drawable.bg_glass_widget_button)
                     views.setInt(R.id.appwidget_btn_pause, "setBackgroundResource", R.drawable.bg_glass_widget_button)
@@ -121,7 +119,6 @@ class AwayAssistAppWidgetProvider : AppWidgetProvider() {
 
                     views.setTextViewText(R.id.appwidget_badge, "PAUSED")
                     views.setTextViewText(R.id.appwidget_headline, "Paused ($countdown)")
-                    views.setTextViewText(R.id.appwidget_subtitle, "Resumes in $countdown")
                     views.setTextViewText(R.id.appwidget_pause_text, countdown)
 
                     views.setInt(R.id.appwidget_btn_auto, "setBackgroundResource", R.drawable.bg_glass_widget_button)
@@ -131,7 +128,6 @@ class AwayAssistAppWidgetProvider : AppWidgetProvider() {
                 isForceRing -> {
                     views.setTextViewText(R.id.appwidget_badge, "RING")
                     views.setTextViewText(R.id.appwidget_headline, "Force Ring")
-                    views.setTextViewText(R.id.appwidget_subtitle, "Always Audible")
                     views.setTextViewText(R.id.appwidget_pause_text, "10m")
 
                     views.setInt(R.id.appwidget_btn_auto, "setBackgroundResource", R.drawable.bg_glass_widget_button)
@@ -141,7 +137,6 @@ class AwayAssistAppWidgetProvider : AppWidgetProvider() {
                 isRingLocked -> {
                     views.setTextViewText(R.id.appwidget_badge, "AUTO")
                     views.setTextViewText(R.id.appwidget_headline, "Screen Locked")
-                    views.setTextViewText(R.id.appwidget_subtitle, "Audible on Lock")
                     views.setTextViewText(R.id.appwidget_pause_text, "10m")
 
                     views.setInt(R.id.appwidget_btn_auto, "setBackgroundResource", R.drawable.bg_glass_widget_button_auto)
@@ -151,7 +146,6 @@ class AwayAssistAppWidgetProvider : AppWidgetProvider() {
                 else -> {
                     views.setTextViewText(R.id.appwidget_badge, "AUTO")
                     views.setTextViewText(R.id.appwidget_headline, "Screen Unlocked")
-                    views.setTextViewText(R.id.appwidget_subtitle, "Vibrate in Use")
                     views.setTextViewText(R.id.appwidget_pause_text, "10m")
 
                     views.setInt(R.id.appwidget_btn_auto, "setBackgroundResource", R.drawable.bg_glass_widget_button_auto)

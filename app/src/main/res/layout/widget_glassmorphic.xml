@@ -7,8 +7,9 @@
     android:background="@drawable/bg_glass_notification"
     android:paddingStart="12dp"
     android:paddingEnd="12dp"
-    android:paddingTop="10dp"
-    android:paddingBottom="10dp">
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp"
+    android:gravity="center_vertical">
 
     <!-- Top Header Bar -->
     <LinearLayout
@@ -67,43 +68,25 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- Compact Middle Status Section (Tight Vertical Spacing) -->
-    <LinearLayout
+    <!-- Compact Middle Status Section (Clean Headline Only, No Subtitle Text) -->
+    <TextView
+        android:id="@+id/appwidget_headline"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
         android:layout_marginTop="5dp"
-        android:layout_marginBottom="8dp">
-
-        <TextView
-            android:id="@+id/appwidget_headline"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Screen Locked"
-            android:textColor="#FFFFFFFF"
-            android:textSize="14.5sp"
-            android:textStyle="bold"
-            android:includeFontPadding="false"
-            android:maxLines="1"
-            android:ellipsize="end" />
-
-        <TextView
-            android:id="@+id/appwidget_subtitle"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="1dp"
-            android:text="Audible on Lock"
-            android:textColor="#B3FFFFFF"
-            android:textSize="11sp"
-            android:includeFontPadding="false"
-            android:maxLines="1"
-            android:ellipsize="end" />
-    </LinearLayout>
+        android:layout_marginBottom="7dp"
+        android:text="Screen Locked"
+        android:textColor="#FFFFFFFF"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:includeFontPadding="false"
+        android:maxLines="1"
+        android:ellipsize="end" />
 
     <!-- Bottom Widget Controls Deck -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="32dp"
+        android:layout_height="34dp"
         android:orientation="horizontal">
 
         <!-- Widget Btn 1: Auto -->

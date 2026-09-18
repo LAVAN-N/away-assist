@@ -10,6 +10,7 @@ import android.os.IBinder
 import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.ServiceCompat
+import com.awayassist.app.data.AppState
 import com.awayassist.app.data.AwayAssistPreferences
 import com.awayassist.app.data.RingerState
 import com.awayassist.app.util.RingerModeController
@@ -84,6 +85,10 @@ class RingerService : Service() {
 
         when (action) {
             NotificationHelper.ACTION_START -> {
+                serviceScope.launch {
+                    val state = preferences.getAppState()
+                    notificationHelper.updateNotification(state)
+                }
                 syncInitialState()
             }
             NotificationHelper.ACTION_STOP -> {
@@ -144,22 +149,19 @@ class RingerService : Service() {
 
     private fun startForegroundNotification() {
         notificationHelper.createNotificationChannel()
-        serviceScope.launch {
-            val state = preferences.getAppState()
-            val notification = notificationHelper.buildNotification(state)
-            val foregroundServiceType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
-            } else {
-                0
-            }
-            ServiceCompat.startForeground(
-                this@RingerService,
-                NotificationHelper.NOTIFICATION_ID,
-                notification,
-                foregroundServiceType
-            )
-            Log.d(TAG, "Started foreground notification")
+        val foregroundServiceType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+        } else {
+            0
         }
+        val initialNotification = notificationHelper.buildNotification(AppState())
+        ServiceCompat.startForeground(
+            this@RingerService,
+            NotificationHelper.NOTIFICATION_ID,
+            initialNotification,
+            foregroundServiceType
+        )
+        Log.d(TAG, "Started foreground notification synchronously")
     }
 
     private fun observeAppState() {
