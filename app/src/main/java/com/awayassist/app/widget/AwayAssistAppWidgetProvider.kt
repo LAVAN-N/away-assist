@@ -78,9 +78,10 @@ class AwayAssistAppWidgetProvider : AppWidgetProvider() {
             )
             views.setOnClickPendingIntent(R.id.appwidget_btn_ring, ringPendingIntent)
 
-            // Button 3: Pause 1h
+            // Button 3: Pause 10m
             val pauseIntent = Intent(context, RingerService::class.java).apply {
-                action = NotificationHelper.ACTION_PAUSE_1H
+                action = NotificationHelper.ACTION_PAUSE_10M
+                putExtra(NotificationHelper.EXTRA_PAUSE_DURATION_MS, NotificationHelper.DEFAULT_PAUSE_DURATION_MS)
             }
             val pausePendingIntent = PendingIntent.getService(
                 context,
@@ -93,54 +94,69 @@ class AwayAssistAppWidgetProvider : AppWidgetProvider() {
             // State Population
             if (appState == null) {
                 views.setTextViewText(R.id.appwidget_badge, "AUTO")
-                views.setImageViewResource(R.id.appwidget_dot, R.drawable.ic_dot_green)
                 views.setTextViewText(R.id.appwidget_headline, "Away Assist Ready")
-                views.setTextViewText(R.id.appwidget_subtitle, "Tap to configure automation")
+                views.setTextViewText(R.id.appwidget_subtitle, "Tap to open")
                 return views
             }
+
+            val isPaused = appState.isPaused
+            val isAutoMode = appState.isEnabled && !isPaused && appState.overrideMode == null
+            val isForceRing = appState.overrideMode == RingerState.RING
+            val isRingLocked = appState.currentMode == RingerState.RING && isAutoMode
 
             when {
                 !appState.isEnabled && appState.overrideMode == null -> {
                     views.setTextViewText(R.id.appwidget_badge, "OFF")
-                    views.setImageViewResource(R.id.appwidget_dot, R.drawable.ic_dot_indigo)
-                    views.setTextViewText(R.id.appwidget_headline, "Automation Disabled")
-                    views.setTextViewText(R.id.appwidget_subtitle, "Tap Auto to resume automation")
+                    views.setTextViewText(R.id.appwidget_headline, "Disabled")
+                    views.setTextViewText(R.id.appwidget_subtitle, "Automation off")
+                    views.setInt(R.id.appwidget_btn_auto, "setBackgroundResource", R.drawable.bg_glass_widget_button)
+                    views.setInt(R.id.appwidget_btn_ring, "setBackgroundResource", R.drawable.bg_glass_widget_button)
+                    views.setInt(R.id.appwidget_btn_pause, "setBackgroundResource", R.drawable.bg_glass_widget_button)
                 }
-                appState.isPaused -> {
+                isPaused -> {
                     val diffSecs = ((appState.pauseUntilTimestamp - System.currentTimeMillis()) / 1000L).coerceAtLeast(0L)
-                    val hrs = diffSecs / 3600
                     val mins = (diffSecs % 3600) / 60
                     val secs = diffSecs % 60
-                    val countdown = String.format(Locale.getDefault(), "%02d:%02d:%02d", hrs, mins, secs)
+                    val countdown = String.format(Locale.getDefault(), "%02d:%02d", mins, secs)
 
                     views.setTextViewText(R.id.appwidget_badge, "PAUSED")
-                    views.setImageViewResource(R.id.appwidget_dot, R.drawable.ic_dot_amber)
                     views.setTextViewText(R.id.appwidget_headline, "Paused ($countdown)")
-                    views.setTextViewText(R.id.appwidget_subtitle, "Automation temporarily suspended")
+                    views.setTextViewText(R.id.appwidget_subtitle, "10m suspension active")
+                    views.setTextViewText(R.id.appwidget_pause_text, countdown)
+
+                    views.setInt(R.id.appwidget_btn_auto, "setBackgroundResource", R.drawable.bg_glass_widget_button)
+                    views.setInt(R.id.appwidget_btn_ring, "setBackgroundResource", R.drawable.bg_glass_widget_button)
+                    views.setInt(R.id.appwidget_btn_pause, "setBackgroundResource", R.drawable.bg_glass_widget_button_pause)
                 }
-                appState.overrideMode == RingerState.RING -> {
+                isForceRing -> {
                     views.setTextViewText(R.id.appwidget_badge, "RING")
-                    views.setImageViewResource(R.id.appwidget_dot, R.drawable.ic_dot_green)
-                    views.setTextViewText(R.id.appwidget_headline, "Force Ring Active")
-                    views.setTextViewText(R.id.appwidget_subtitle, "Continuous audible ring • Ignores lock")
+                    views.setTextViewText(R.id.appwidget_headline, "Force Ring [ACTIVE]")
+                    views.setTextViewText(R.id.appwidget_subtitle, "Always audible • Ignores lock")
+                    views.setTextViewText(R.id.appwidget_pause_text, "10m")
+
+                    views.setInt(R.id.appwidget_btn_auto, "setBackgroundResource", R.drawable.bg_glass_widget_button)
+                    views.setInt(R.id.appwidget_btn_ring, "setBackgroundResource", R.drawable.bg_glass_widget_button_ring)
+                    views.setInt(R.id.appwidget_btn_pause, "setBackgroundResource", R.drawable.bg_glass_widget_button)
                 }
-                appState.overrideMode != null -> {
-                    views.setTextViewText(R.id.appwidget_badge, "SILENT")
-                    views.setImageViewResource(R.id.appwidget_dot, R.drawable.ic_dot_indigo)
-                    views.setTextViewText(R.id.appwidget_headline, "Force Silent Active")
-                    views.setTextViewText(R.id.appwidget_subtitle, "Vibrate/Silent override active")
-                }
-                appState.currentMode == RingerState.RING -> {
+                isRingLocked -> {
                     views.setTextViewText(R.id.appwidget_badge, "AUTO")
-                    views.setImageViewResource(R.id.appwidget_dot, R.drawable.ic_dot_green)
-                    views.setTextViewText(R.id.appwidget_headline, "Screen Locked ➔ Ring")
-                    views.setTextViewText(R.id.appwidget_subtitle, "Calls & alerts audible • Screen is off")
+                    views.setTextViewText(R.id.appwidget_headline, "Ring Mode [AUTO]")
+                    views.setTextViewText(R.id.appwidget_subtitle, "Screen Locked ➔ Audible")
+                    views.setTextViewText(R.id.appwidget_pause_text, "10m")
+
+                    views.setInt(R.id.appwidget_btn_auto, "setBackgroundResource", R.drawable.bg_glass_widget_button_auto)
+                    views.setInt(R.id.appwidget_btn_ring, "setBackgroundResource", R.drawable.bg_glass_widget_button)
+                    views.setInt(R.id.appwidget_btn_pause, "setBackgroundResource", R.drawable.bg_glass_widget_button)
                 }
                 else -> {
                     views.setTextViewText(R.id.appwidget_badge, "AUTO")
-                    views.setImageViewResource(R.id.appwidget_dot, R.drawable.ic_dot_indigo)
-                    views.setTextViewText(R.id.appwidget_headline, "Screen Unlocked ➔ Silent")
-                    views.setTextViewText(R.id.appwidget_subtitle, "Silent vibration in use • Screen is on")
+                    views.setTextViewText(R.id.appwidget_headline, "Silent Mode [AUTO]")
+                    views.setTextViewText(R.id.appwidget_subtitle, "Screen Unlocked ➔ Silent")
+                    views.setTextViewText(R.id.appwidget_pause_text, "10m")
+
+                    views.setInt(R.id.appwidget_btn_auto, "setBackgroundResource", R.drawable.bg_glass_widget_button_auto)
+                    views.setInt(R.id.appwidget_btn_ring, "setBackgroundResource", R.drawable.bg_glass_widget_button)
+                    views.setInt(R.id.appwidget_btn_pause, "setBackgroundResource", R.drawable.bg_glass_widget_button)
                 }
             }
 

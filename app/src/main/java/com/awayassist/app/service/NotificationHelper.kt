@@ -24,11 +24,14 @@ class NotificationHelper(private val context: Context) {
         const val ACTION_FORCE_RING = "com.awayassist.app.ACTION_FORCE_RING"
         const val ACTION_FORCE_SILENT = "com.awayassist.app.ACTION_FORCE_SILENT"
         const val ACTION_PAUSE = "com.awayassist.app.ACTION_PAUSE"
+        const val ACTION_PAUSE_10M = "com.awayassist.app.ACTION_PAUSE_10M"
         const val ACTION_PAUSE_1H = "com.awayassist.app.ACTION_PAUSE_1H"
         const val ACTION_RESUME = "com.awayassist.app.ACTION_RESUME"
         const val ACTION_START = "com.awayassist.app.ACTION_START"
         const val ACTION_STOP = "com.awayassist.app.ACTION_STOP"
         const val EXTRA_PAUSE_DURATION_MS = "com.awayassist.app.EXTRA_PAUSE_DURATION_MS"
+
+        const val DEFAULT_PAUSE_DURATION_MS = 10 * 60_000L // 10 minutes default
     }
 
     private val notificationManager =
@@ -83,15 +86,19 @@ class NotificationHelper(private val context: Context) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val pause1hIntent = PendingIntent.getService(
+        val pause10mIntent = PendingIntent.getService(
             context,
             104,
-            Intent(context, RingerService::class.java).apply { action = ACTION_PAUSE_1H },
+            Intent(context, RingerService::class.java).apply {
+                action = ACTION_PAUSE_10M
+                putExtra(EXTRA_PAUSE_DURATION_MS, DEFAULT_PAUSE_DURATION_MS)
+            },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
         val isPaused = appState.isPaused
-        val isRingMode = appState.currentMode == RingerState.RING && !isPaused && appState.overrideMode == null
+        val isAutoMode = appState.isEnabled && !isPaused && appState.overrideMode == null
+        val isRingMode = appState.currentMode == RingerState.RING && isAutoMode
         val isForceRing = appState.overrideMode == RingerState.RING
         val isForceSilent = appState.overrideMode == RingerState.VIBRATE || appState.overrideMode == RingerState.SILENT
 
@@ -104,26 +111,26 @@ class NotificationHelper(private val context: Context) {
 
         val (titleText, subtitleText, statusIconRes) = when {
             !appState.isEnabled && appState.overrideMode == null -> {
-                Triple("Disabled", "Automation off", R.drawable.ic_widget_silent)
+                Triple("Disabled", "Automation Off", R.drawable.ic_widget_silent)
             }
             isPaused -> {
-                Triple("Paused", "Resumes in $countdownText", R.drawable.ic_widget_pause)
+                Triple("Paused ($countdownText)", "Resumes in $countdownText", R.drawable.ic_widget_pause)
             }
             isForceRing -> {
-                Triple("Force Ring", "Continuous audible", R.drawable.ic_widget_ring)
+                Triple("Force Ring [ACTIVE]", "Manual Override • Locked", R.drawable.ic_widget_ring)
             }
             isForceSilent -> {
-                Triple("Force Silent", "Continuous vibration", R.drawable.ic_widget_silent)
+                Triple("Force Silent [ACTIVE]", "Manual Override • Silent", R.drawable.ic_widget_silent)
             }
             isRingMode -> {
-                Triple("Ring Mode", "Screen Locked", R.drawable.ic_widget_ring)
+                Triple("Ring Mode [AUTO]", "Screen Locked ➔ Audible", R.drawable.ic_widget_ring)
             }
             else -> {
-                Triple("Silent Mode", "Screen Unlocked", R.drawable.ic_widget_silent)
+                Triple("Silent Mode [AUTO]", "Screen Unlocked ➔ Silent", R.drawable.ic_widget_silent)
             }
         }
 
-        // Build Ultra-Compact Single-Row RemoteViews (Transparent background to blend seamlessly)
+        // Build Ultra-Compact Single-Row RemoteViews
         val compactViews = RemoteViews(context.packageName, R.layout.notification_glass_collapsed).apply {
             setTextViewText(R.id.notification_status_text, titleText)
             setTextViewText(R.id.notification_subtitle_text, subtitleText)
@@ -133,17 +140,39 @@ class NotificationHelper(private val context: Context) {
             if (appState.currentMode == RingerState.RING && appState.overrideMode != RingerState.VIBRATE) {
                 setTextViewText(R.id.widget_toggle_text, "Silent")
                 setImageViewResource(R.id.widget_toggle_icon, R.drawable.ic_widget_silent)
+                setInt(
+                    R.id.widget_btn_toggle,
+                    "setBackgroundResource",
+                    if (isForceRing) R.drawable.bg_glass_widget_button_ring else R.drawable.bg_glass_widget_button
+                )
                 setOnClickPendingIntent(R.id.widget_btn_toggle, forceSilentIntent)
             } else {
                 setTextViewText(R.id.widget_toggle_text, "Ring")
                 setImageViewResource(R.id.widget_toggle_icon, R.drawable.ic_widget_ring)
+                setInt(
+                    R.id.widget_btn_toggle,
+                    "setBackgroundResource",
+                    if (isForceSilent) R.drawable.bg_glass_widget_button_accent else R.drawable.bg_glass_widget_button
+                )
                 setOnClickPendingIntent(R.id.widget_btn_toggle, forceRingIntent)
             }
 
-            // Button 2: Pause 1h
-            setOnClickPendingIntent(R.id.widget_btn_pause, pause1hIntent)
+            // Button 2: Pause 10m
+            setTextViewText(R.id.widget_pause_text, if (isPaused) countdownText else "10m")
+            setInt(
+                R.id.widget_btn_pause,
+                "setBackgroundResource",
+                if (isPaused) R.drawable.bg_glass_widget_button_pause else R.drawable.bg_glass_widget_button
+            )
+            setOnClickPendingIntent(R.id.widget_btn_pause, pause10mIntent)
 
-            // Button 3: Auto / Resume
+            // Button 3: Auto
+            setTextViewText(R.id.widget_auto_text, if (isAutoMode) "● Auto" else "Auto")
+            setInt(
+                R.id.widget_btn_auto,
+                "setBackgroundResource",
+                if (isAutoMode) R.drawable.bg_glass_widget_button_auto else R.drawable.bg_glass_widget_button
+            )
             setOnClickPendingIntent(R.id.widget_btn_auto, resumeIntent)
         }
 

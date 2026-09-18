@@ -2,197 +2,196 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
+    android:layout_height="wrap_content"
+    android:minHeight="54dp"
+    android:orientation="horizontal"
     android:background="@drawable/bg_glass_notification"
-    android:padding="16dp">
+    android:paddingStart="12dp"
+    android:paddingEnd="12dp"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp"
+    android:gravity="center_vertical">
 
-    <!-- Top Header -->
+    <!-- Left Status Section: Icon + Title & Subtitle State -->
     <LinearLayout
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:layout_weight="1"
         android:orientation="horizontal"
-        android:gravity="center_vertical">
+        android:gravity="center_vertical"
+        android:layout_marginEnd="6dp">
 
         <ImageView
+            android:id="@+id/appwidget_icon"
             android:layout_width="20dp"
             android:layout_height="20dp"
+            android:layout_gravity="center_vertical"
             android:src="@drawable/ic_notification"
             android:contentDescription="Away Assist" />
 
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginStart="8dp"
-            android:text="Away Assist"
-            android:textColor="#FFFFFFFF"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:maxLines="1"
-            android:ellipsize="end" />
-
-        <!-- Status Pill with Live Beacon -->
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:background="@drawable/bg_glass_status_pill"
-            android:paddingStart="9dp"
-            android:paddingEnd="9dp"
-            android:paddingTop="3dp"
-            android:paddingBottom="3dp"
-            android:gravity="center_vertical">
+            android:layout_marginStart="8dp"
+            android:layout_gravity="center_vertical"
+            android:orientation="vertical">
 
-            <ImageView
-                android:id="@+id/appwidget_dot"
-                android:layout_width="7dp"
-                android:layout_height="7dp"
-                android:src="@drawable/ic_dot_green"
-                android:contentDescription="Status" />
-
-            <TextView
-                android:id="@+id/appwidget_badge"
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="5dp"
-                android:text="AUTO"
-                android:textColor="#FFFFFFFF"
-                android:textSize="10sp"
-                android:textStyle="bold" />
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:id="@+id/appwidget_headline"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Ring (Locked)"
+                    android:textColor="#FFFFFFFF"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:includeFontPadding="false"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
+
+                <TextView
+                    android:id="@+id/appwidget_badge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="5dp"
+                    android:background="@drawable/bg_glass_status_pill"
+                    android:paddingStart="5dp"
+                    android:paddingEnd="5dp"
+                    android:paddingTop="1dp"
+                    android:paddingBottom="1dp"
+                    android:text="AUTO"
+                    android:textColor="#E6FFFFFF"
+                    android:textSize="8.5sp"
+                    android:textStyle="bold"
+                    android:includeFontPadding="false" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/appwidget_subtitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="Calls &amp; alerts audible"
+                android:textColor="#B3FFFFFF"
+                android:textSize="10.5sp"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:ellipsize="end" />
         </LinearLayout>
     </LinearLayout>
 
-    <!-- Center Hero Section -->
+    <!-- Right Controls Section: 3 Direct Compact Widget Action Buttons -->
     <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:orientation="vertical"
-        android:gravity="center_vertical"
-        android:layout_marginTop="8dp"
-        android:layout_marginBottom="12dp">
-
-        <TextView
-            android:id="@+id/appwidget_headline"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Screen Locked ➔ Ring"
-            android:textColor="#FFFFFFFF"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:maxLines="1"
-            android:ellipsize="end" />
-
-        <TextView
-            android:id="@+id/appwidget_subtitle"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:text="Audible calls &amp; alerts • Screen is off"
-            android:textColor="#B3FFFFFF"
-            android:textSize="12sp"
-            android:maxLines="1"
-            android:ellipsize="end" />
-    </LinearLayout>
-
-    <!-- Bottom Widget Controls Deck -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="38dp"
-        android:orientation="horizontal">
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
 
         <!-- Widget Btn 1: Auto -->
         <LinearLayout
             android:id="@+id/appwidget_btn_auto"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
+            android:layout_width="wrap_content"
+            android:layout_height="30dp"
+            android:layout_gravity="center_vertical"
             android:background="@drawable/bg_glass_widget_button"
+            android:paddingStart="9dp"
+            android:paddingEnd="9dp"
             android:gravity="center"
             android:orientation="horizontal"
-            android:paddingStart="4dp"
-            android:paddingEnd="4dp"
             android:layout_marginEnd="4dp">
 
             <ImageView
-                android:layout_width="14dp"
-                android:layout_height="14dp"
+                android:layout_width="11dp"
+                android:layout_height="11dp"
+                android:layout_gravity="center_vertical"
                 android:src="@drawable/ic_widget_auto"
                 android:contentDescription="Auto" />
 
             <TextView
+                android:id="@+id/appwidget_auto_text"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
                 android:layout_marginStart="4dp"
                 android:text="Auto"
                 android:textColor="#FFFFFFFF"
-                android:textSize="11.5sp"
+                android:textSize="11sp"
                 android:textStyle="bold"
-                android:maxLines="1"
-                android:ellipsize="end" />
+                android:includeFontPadding="false"
+                android:maxLines="1" />
         </LinearLayout>
 
-        <!-- Widget Btn 2: Force Ring -->
+        <!-- Widget Btn 2: Ring -->
         <LinearLayout
             android:id="@+id/appwidget_btn_ring"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
+            android:layout_width="wrap_content"
+            android:layout_height="30dp"
+            android:layout_gravity="center_vertical"
             android:background="@drawable/bg_glass_widget_button"
+            android:paddingStart="9dp"
+            android:paddingEnd="9dp"
             android:gravity="center"
             android:orientation="horizontal"
-            android:paddingStart="4dp"
-            android:paddingEnd="4dp"
-            android:layout_marginStart="4dp"
             android:layout_marginEnd="4dp">
 
             <ImageView
-                android:layout_width="14dp"
-                android:layout_height="14dp"
+                android:layout_width="11dp"
+                android:layout_height="11dp"
+                android:layout_gravity="center_vertical"
                 android:src="@drawable/ic_widget_ring"
                 android:contentDescription="Ring" />
 
             <TextView
+                android:id="@+id/appwidget_ring_text"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
                 android:layout_marginStart="4dp"
                 android:text="Ring"
                 android:textColor="#FFFFFFFF"
-                android:textSize="11.5sp"
+                android:textSize="11sp"
                 android:textStyle="bold"
-                android:maxLines="1"
-                android:ellipsize="end" />
+                android:includeFontPadding="false"
+                android:maxLines="1" />
         </LinearLayout>
 
-        <!-- Widget Btn 3: Pause 1h -->
+        <!-- Widget Btn 3: Pause 10m -->
         <LinearLayout
             android:id="@+id/appwidget_btn_pause"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
+            android:layout_width="wrap_content"
+            android:layout_height="30dp"
+            android:layout_gravity="center_vertical"
             android:background="@drawable/bg_glass_widget_button"
+            android:paddingStart="9dp"
+            android:paddingEnd="9dp"
             android:gravity="center"
-            android:orientation="horizontal"
-            android:paddingStart="4dp"
-            android:paddingEnd="4dp"
-            android:layout_marginStart="4dp">
+            android:orientation="horizontal">
 
             <ImageView
-                android:layout_width="14dp"
-                android:layout_height="14dp"
+                android:layout_width="10dp"
+                android:layout_height="10dp"
+                android:layout_gravity="center_vertical"
                 android:src="@drawable/ic_widget_pause"
                 android:contentDescription="Pause" />
 
             <TextView
+                android:id="@+id/appwidget_pause_text"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:text="Pause 1h"
+                android:layout_gravity="center_vertical"
+                android:layout_marginStart="3.5dp"
+                android:text="10m"
                 android:textColor="#FFFFFFFF"
-                android:textSize="11.5sp"
+                android:textSize="11sp"
                 android:textStyle="bold"
-                android:maxLines="1"
-                android:ellipsize="end" />
+                android:includeFontPadding="false"
+                android:maxLines="1" />
         </LinearLayout>
 
     </LinearLayout>

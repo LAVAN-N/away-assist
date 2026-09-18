@@ -758,12 +758,12 @@ private fun UnifiedControlsCard(
                     onSelectMode(mode)
                     if (mode == OperationMode.PAUSE) {
                         val duration = when {
-                            selectedOption == null -> 300_000L // 5 minutes default
+                            selectedOption == null -> 600_000L // 10 minutes default
                             selectedOption?.id == "custom" -> {
                                 if (appState.pauseUntilTimestamp > System.currentTimeMillis()) {
                                     appState.pauseUntilTimestamp - System.currentTimeMillis()
                                 } else {
-                                    3600_000L
+                                    600_000L
                                 }
                             }
                             else -> selectedOption!!.durationMs

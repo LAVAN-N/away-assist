@@ -99,11 +99,15 @@ class RingerService : Service() {
                 handleForceSilent()
             }
             NotificationHelper.ACTION_PAUSE -> {
-                val durationMs = intent?.getLongExtra(NotificationHelper.EXTRA_PAUSE_DURATION_MS, 3600_000L) ?: 3600_000L
+                val durationMs = intent?.getLongExtra(NotificationHelper.EXTRA_PAUSE_DURATION_MS, 600_000L) ?: 600_000L
+                handlePause(durationMs)
+            }
+            NotificationHelper.ACTION_PAUSE_10M -> {
+                val durationMs = intent?.getLongExtra(NotificationHelper.EXTRA_PAUSE_DURATION_MS, 600_000L) ?: 600_000L
                 handlePause(durationMs)
             }
             NotificationHelper.ACTION_PAUSE_1H -> {
-                handlePause(3600_000L)
+                handlePause(600_000L)
             }
             NotificationHelper.ACTION_RESUME -> {
                 handleResume()
