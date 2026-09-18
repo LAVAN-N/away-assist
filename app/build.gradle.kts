@@ -30,14 +30,18 @@ android {
                 }
                 val storeFilePath = props.getProperty("storeFile") ?: "away-assist-release.keystore"
                 storeFile = if (storeFilePath.startsWith("/")) file(storeFilePath) else rootProject.file(storeFilePath)
-                storePassword = props.getProperty("storePassword")
+                val propStorePass = props.getProperty("storePassword")
+                val propKeyPass = props.getProperty("keyPassword")
+                storePassword = propStorePass
                 keyAlias = props.getProperty("keyAlias")
-                keyPassword = props.getProperty("keyPassword")
+                keyPassword = if (!propKeyPass.isNullOrBlank()) propKeyPass else propStorePass
             } else if (System.getenv("KEYSTORE_FILE") != null) {
                 storeFile = file(System.getenv("KEYSTORE_FILE")!!)
-                storePassword = System.getenv("KEYSTORE_PASSWORD")
+                val envStorePass = System.getenv("KEYSTORE_PASSWORD")
+                val envKeyPass = System.getenv("KEY_PASSWORD")
+                storePassword = envStorePass
                 keyAlias = System.getenv("KEY_ALIAS")
-                keyPassword = System.getenv("KEY_PASSWORD")
+                keyPassword = if (!envKeyPass.isNullOrBlank()) envKeyPass else envStorePass
             }
         }
     }
