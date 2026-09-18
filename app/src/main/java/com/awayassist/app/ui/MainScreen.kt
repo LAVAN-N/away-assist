@@ -127,9 +127,12 @@ fun rememberCountdownFormatted(targetTimestamp: Long): String {
 fun MainScreen(
     appState: AppState,
     hasNotificationPolicyAccess: Boolean,
+    isBatteryOptimizationIgnored: Boolean,
     onSelectMode: (OperationMode) -> Unit,
     onPauseForDuration: (Long) -> Unit,
     onRequestPolicyAccess: () -> Unit,
+    onRequestBatteryOptimization: () -> Unit,
+    onRequestAutostart: () -> Unit,
     onSelectTheme: (ThemeMode) -> Unit
 ) {
     val scrollState = rememberScrollState()
@@ -226,56 +229,19 @@ fun MainScreen(
                     onThemeSelected = onSelectTheme,
                     isDark = isDark,
                     onBulbPositioned = { bulbScreenPosition = it },
-                    modifier = Modifier.padding(bottom = 12.dp)
+                    modifier = Modifier.padding(bottom = 16.dp)
                 )
 
-                // System Status Card (DND Permission)
-                GroupedListCard(
+                // System & Background Permissions Section (DND, Battery Saver, Autostart)
+                SystemPermissionsSection(
+                    hasPolicyAccess = hasNotificationPolicyAccess,
+                    isBatteryOptIgnored = isBatteryOptimizationIgnored,
+                    onRequestPolicyAccess = onRequestPolicyAccess,
+                    onRequestBatteryOptimization = onRequestBatteryOptimization,
+                    onRequestAutostart = onRequestAutostart,
+                    isDark = isDark,
                     modifier = Modifier.padding(bottom = 20.dp)
-                ) {
-                    GroupedListRow(
-                        title = "Do Not Disturb Access",
-                        subtitle = if (hasNotificationPolicyAccess) "Access granted" else "Required to modify ringer",
-                        leadingIcon = {
-                            Box(
-                                modifier = Modifier
-                                    .size(28.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        if (hasNotificationPolicyAccess) colors.ringState.copy(alpha = 0.15f) else colors.error.copy(alpha = 0.15f)
-                                    ),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Shield,
-                                    contentDescription = null,
-                                    tint = if (hasNotificationPolicyAccess) colors.ringState else colors.error,
-                                    modifier = Modifier.size(15.dp)
-                                )
-                            }
-                        },
-                        trailingContent = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = if (hasNotificationPolicyAccess) "Granted" else "Grant",
-                                    style = MaterialTheme.typography.bodyMedium.copy(
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 13.sp
-                                    ),
-                                    color = if (hasNotificationPolicyAccess) colors.ringState else colors.error
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
-                                    contentDescription = null,
-                                    tint = colors.textSecondary,
-                                    modifier = Modifier.size(11.dp)
-                                )
-                            }
-                        },
-                        onClick = onRequestPolicyAccess
-                    )
-                }
+                )
             }
 
             // Full-Screen Theme Wave Transition (Emits from bulb across whole screen in Light mode / Absorbed back into bulb in Dark mode)
@@ -965,7 +931,244 @@ private fun CompactPermissionCard(
 }
 
 /**
- * Info Bottom Sheet Content
+ * System Permissions & Reliability Section with direct navigators and explanations
+ */
+@Composable
+private fun SystemPermissionsSection(
+    hasPolicyAccess: Boolean,
+    isBatteryOptIgnored: Boolean,
+    onRequestPolicyAccess: () -> Unit,
+    onRequestBatteryOptimization: () -> Unit,
+    onRequestAutostart: () -> Unit,
+    isDark: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val colors = AwayAssistTheme.colors
+
+    Column(modifier = modifier.fillMaxWidth()) {
+        // Section Header
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Tune,
+                contentDescription = null,
+                tint = colors.accentSilent,
+                modifier = Modifier.size(15.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = "System & Background Settings",
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.5.sp,
+                    letterSpacing = (-0.2).sp
+                ),
+                color = colors.textPrimary
+            )
+        }
+        Text(
+            text = "Ensure uninterrupted lock detection and prevent OS background restrictions",
+            style = MaterialTheme.typography.bodySmall.copy(
+                fontSize = 11.5.sp,
+                lineHeight = 15.sp
+            ),
+            color = colors.textSecondary,
+            modifier = Modifier.padding(start = 4.dp, bottom = 10.dp)
+        )
+
+        // Card 1: Do Not Disturb Access
+        GroupedListCard(modifier = Modifier.padding(bottom = 10.dp)) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                GroupedListRow(
+                    title = "Do Not Disturb Access",
+                    subtitle = if (hasPolicyAccess) "Access granted" else "Action required",
+                    leadingIcon = {
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (hasPolicyAccess) colors.ringState.copy(alpha = 0.15f) else colors.error.copy(alpha = 0.15f)
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Shield,
+                                contentDescription = null,
+                                tint = if (hasPolicyAccess) colors.ringState else colors.error,
+                                modifier = Modifier.size(15.dp)
+                            )
+                        }
+                    },
+                    trailingContent = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = if (hasPolicyAccess) "Granted" else "Grant",
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 13.sp
+                                ),
+                                color = if (hasPolicyAccess) colors.ringState else colors.error
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+                                contentDescription = null,
+                                tint = colors.textSecondary,
+                                modifier = Modifier.size(11.dp)
+                            )
+                        }
+                    },
+                    onClick = onRequestPolicyAccess
+                )
+
+                HorizontalDivider(
+                    color = if (isDark) Color(0x18FFFFFF) else Color(0x12000000),
+                    thickness = 0.6.dp
+                )
+
+                Text(
+                    text = "Allows Away Assist to modify ringer mode between audible ring and silent vibration automatically upon screen lock and unlock.",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontSize = 11.5.sp,
+                        lineHeight = 15.5.sp
+                    ),
+                    color = colors.textSecondary,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp)
+                )
+            }
+        }
+
+        // Card 2: Battery Optimization (Battery Saver)
+        GroupedListCard(modifier = Modifier.padding(bottom = 10.dp)) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                GroupedListRow(
+                    title = "Battery Optimization",
+                    subtitle = if (isBatteryOptIgnored) "Unrestricted background usage" else "Optimized (may delay lock detection)",
+                    leadingIcon = {
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (isBatteryOptIgnored) colors.ringState.copy(alpha = 0.15f) else colors.warning.copy(alpha = 0.15f)
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Bolt,
+                                contentDescription = null,
+                                tint = if (isBatteryOptIgnored) colors.ringState else colors.warning,
+                                modifier = Modifier.size(15.dp)
+                            )
+                        }
+                    },
+                    trailingContent = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = if (isBatteryOptIgnored) "Unrestricted" else "Set Unrestricted",
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 13.sp
+                                ),
+                                color = if (isBatteryOptIgnored) colors.ringState else colors.warning
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+                                contentDescription = null,
+                                tint = colors.textSecondary,
+                                modifier = Modifier.size(11.dp)
+                            )
+                        }
+                    },
+                    onClick = onRequestBatteryOptimization
+                )
+
+                HorizontalDivider(
+                    color = if (isDark) Color(0x18FFFFFF) else Color(0x12000000),
+                    thickness = 0.6.dp
+                )
+
+                Text(
+                    text = "Exclude Away Assist from Android battery saver limits so hardware screen lock and unlock broadcasts are processed instantly without OS sleep delays.",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontSize = 11.5.sp,
+                        lineHeight = 15.5.sp
+                    ),
+                    color = colors.textSecondary,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp)
+                )
+            }
+        }
+
+        // Card 3: Autostart & App Launch
+        GroupedListCard(modifier = Modifier.padding(bottom = 12.dp)) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                GroupedListRow(
+                    title = "Autostart & Background Launch",
+                    subtitle = "OEM Task Cleaner Protection",
+                    leadingIcon = {
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .background(colors.accentSilent.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Security,
+                                contentDescription = null,
+                                tint = colors.accentSilent,
+                                modifier = Modifier.size(15.dp)
+                            )
+                        }
+                    },
+                    trailingContent = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "Manage",
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 13.sp
+                                ),
+                                color = colors.accentSilent
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+                                contentDescription = null,
+                                tint = colors.textSecondary,
+                                modifier = Modifier.size(11.dp)
+                            )
+                        }
+                    },
+                    onClick = onRequestAutostart
+                )
+
+                HorizontalDivider(
+                    color = if (isDark) Color(0x18FFFFFF) else Color(0x12000000),
+                    thickness = 0.6.dp
+                )
+
+                Text(
+                    text = "Enable autostart and background launch permissions so system task cleaners (MIUI Cleaner, Samsung Device Care, Oppo/Vivo Manager) do not terminate the service when clearing apps.",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontSize = 11.5.sp,
+                        lineHeight = 15.5.sp
+                    ),
+                    color = colors.textSecondary,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Info Bottom Sheet Content - Architectural Deep Dive & User Guides
  */
 @Composable
 private fun InfoBottomSheetContent(onClose: () -> Unit) {
@@ -1002,7 +1205,7 @@ private fun InfoBottomSheetContent(onClose: () -> Unit) {
             )
             Spacer(modifier = Modifier.width(10.dp))
             Text(
-                text = "How Away Assist Works",
+                text = "Architecture & Features",
                 style = MaterialTheme.typography.titleLarge.copy(
                     fontWeight = FontWeight.Bold,
                     fontSize = 19.sp
@@ -1016,8 +1219,8 @@ private fun InfoBottomSheetContent(onClose: () -> Unit) {
         InfoCardItem(
             icon = Icons.Default.Bolt,
             tint = colors.ringState,
-            title = "Deterministic Switching",
-            description = "Switches to Normal Audible Ring mode when your screen locks, and restores Vibrate mode the moment you unlock it.",
+            title = "Zero Battery Drain Architecture",
+            description = "Away Assist uses hardware-driven broadcast receivers (ACTION_SCREEN_OFF and ACTION_USER_PRESENT). It never runs background polling loops, alarms, or timers when idle, consuming 0% CPU.",
             isDark = isDark
         )
 
@@ -1026,40 +1229,8 @@ private fun InfoBottomSheetContent(onClose: () -> Unit) {
         InfoCardItem(
             icon = Icons.Default.Security,
             tint = colors.azureGlow,
-            title = "Zero Polling & 100% On-Device",
-            description = "Uses hardware broadcast triggers only. No background battery loops, no internet connection, completely private.",
-            isDark = isDark
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Background Reliability & Cleaner Tips
-        Text(
-            text = "Background Reliability & Cleaners",
-            style = MaterialTheme.typography.titleMedium.copy(
-                fontWeight = FontWeight.Bold,
-                fontSize = 15.sp
-            ),
-            color = colors.textPrimary
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        InfoCardItem(
-            icon = Icons.Default.Shield,
-            tint = colors.warning,
-            title = "Why 'Clear Cache' Stops the App",
-            description = "OEM task cleaners (Xiaomi Cleaner, Samsung Device Care, Smart Cleaner) terminate background processes to reclaim RAM, pausing the automation until reopened.",
-            isDark = isDark
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        InfoCardItem(
-            icon = Icons.Default.Tune,
-            tint = colors.accentSilent,
-            title = "Keep Service Always Active",
-            description = "1. App Info ➔ Battery Saver ➔ Set to 'No restrictions'.\n2. Enable 'Autostart' and optionally lock Away Assist in your Recent Apps list so cleaners skip it.",
+            title = "100% On-Device & Zero Network",
+            description = "The app has no INTERNET permission and contains no analytics or tracking SDKs. All ringer transitions happen strictly in local device memory with complete privacy.",
             isDark = isDark
         )
 
@@ -1067,9 +1238,29 @@ private fun InfoBottomSheetContent(onClose: () -> Unit) {
 
         InfoCardItem(
             icon = Icons.Default.NotificationsActive,
+            tint = colors.accentSilent,
+            title = "Widget & Notification Quick Controls",
+            description = "Toggle between Auto, Force Ring, Force Silent, or activate custom Pause durations directly from your notification drawer or home screen widget without opening the app.",
+            isDark = isDark
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        InfoCardItem(
+            icon = Icons.Default.Lock,
+            tint = colors.warning,
+            title = "Pro Tip: Lock in Recent Apps",
+            description = "To protect Away Assist from aggressive OEM memory purgers ('Clear All Apps'), open your Recent Apps overview, long-press Away Assist, and tap the Padlock icon to lock it in memory.",
+            isDark = isDark
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        InfoCardItem(
+            icon = Icons.Default.Shield,
             tint = colors.ringState,
-            title = "Instant Widget Revival",
-            description = "If closed or cleared by the OS, tapping any button on your Home Screen Widget or opening the app instantly restores the service.",
+            title = "Notification Policy Safeguard",
+            description = "Every ringer adjustment respects Android's notification access rules, ensuring your Do Not Disturb settings, alarms, and priority contacts always ring through unhindered.",
             isDark = isDark
         )
 
