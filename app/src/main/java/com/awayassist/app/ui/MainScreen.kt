@@ -696,7 +696,7 @@ private fun UnifiedControlsCard(
 ) {
     val colors = AwayAssistTheme.colors
 
-    var selectedOption by remember { mutableStateOf<PauseOption?>(null) }
+    var selectedOption by remember { mutableStateOf<PauseOption?>(PAUSE_OPTIONS[0]) }
 
     GroupedListCard(modifier = modifier) {
         Column(

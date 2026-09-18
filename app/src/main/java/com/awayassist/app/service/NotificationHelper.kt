@@ -155,7 +155,7 @@ class NotificationHelper(private val context: Context) {
                 Sextet("Disabled", "Automation Off", "OFF", R.drawable.ic_widget_silent, R.drawable.anim_dot_gray, 0xFF8E8E93.toInt())
             }
             isPaused -> {
-                Sextet("Paused ($countdownText)", "Resumes in $countdownText", "PAUSE", R.drawable.ic_widget_pause, R.drawable.anim_dot_amber, 0xFFFFB300.toInt())
+                Sextet("Paused", "Resumes in $countdownText", "PAUSE", R.drawable.ic_widget_pause, R.drawable.anim_dot_amber, 0xFFFFB300.toInt())
             }
             isForceRing -> {
                 Sextet("Force Ring", "Always Audible", "RING", R.drawable.ic_widget_ring, R.drawable.anim_dot_green, 0xFF30D158.toInt())
