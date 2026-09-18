@@ -1413,7 +1413,7 @@ private fun DeveloperStoryFooter(
             )
 
             Text(
-                text = "v1.0 • Calm Indigo",
+                text = "v1.0 • LAVAN-N",
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontWeight = FontWeight.Light,
                     fontSize = 10.sp,
