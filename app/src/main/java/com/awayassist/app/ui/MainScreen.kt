@@ -240,7 +240,13 @@ fun MainScreen(
                     onRequestBatteryOptimization = onRequestBatteryOptimization,
                     onRequestAutostart = onRequestAutostart,
                     isDark = isDark,
-                    modifier = Modifier.padding(bottom = 20.dp)
+                    modifier = Modifier.padding(bottom = 6.dp)
+                )
+
+                // Developer Story & Philosophy Footer
+                DeveloperStoryFooter(
+                    isDark = isDark,
+                    modifier = Modifier.padding(bottom = 32.dp)
                 )
             }
 
@@ -1328,6 +1334,93 @@ private fun InfoCardItem(
                     color = colors.textSecondary
                 )
             }
+        }
+    }
+}
+
+/**
+ * Developer Story & Philosophy Footer
+ */
+@Composable
+private fun DeveloperStoryFooter(
+    isDark: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val colors = AwayAssistTheme.colors
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp)
+    ) {
+        // Subtle divider (<hr>)
+        HorizontalDivider(
+            color = if (isDark) Color(0x20FFFFFF) else Color(0x18000000),
+            thickness = 0.8.dp,
+            modifier = Modifier.padding(bottom = 18.dp, top = 6.dp)
+        )
+
+        // Story Tag / Header
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(bottom = 8.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .clip(CircleShape)
+                    .background(colors.accentSilent)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "MY STORY • WHY AWAY ASSIST",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontWeight = FontWeight.Light,
+                    fontSize = 10.5.sp,
+                    letterSpacing = 1.3.sp
+                ),
+                color = colors.textSecondary.copy(alpha = 0.85f)
+            )
+        }
+
+        // Story Body in elegant light-weight editorial font
+        Text(
+            text = "I built Away Assist out of personal frustration. Like many of us, I keep my phone on silent vibrate whenever I'm using it—loud rings disrupt whatever I'm focused on. But the moment I set the phone down on a desk, slipped it into a bag, or walked away, staying on vibrate meant constantly missing critical calls from family and friends.\n\nI didn't want complex geofences, battery-draining GPS tracking, or cloud services listening in. I just wanted a simple, honest utility that does one job with mathematical precision: audible when put away, silent when in hand. 100% on-device, zero trackers, and zero background battery cost.",
+            style = MaterialTheme.typography.bodyMedium.copy(
+                fontWeight = FontWeight.Light,
+                fontSize = 12.sp,
+                lineHeight = 18.5.sp,
+                letterSpacing = 0.15.sp
+            ),
+            color = colors.textSecondary.copy(alpha = 0.80f),
+            modifier = Modifier.padding(bottom = 14.dp)
+        )
+
+        // Signature & Version
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Handcrafted with care for focused minds.",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontWeight = FontWeight.Normal,
+                    fontSize = 10.5.sp,
+                    letterSpacing = 0.2.sp
+                ),
+                color = colors.textSecondary.copy(alpha = 0.65f)
+            )
+
+            Text(
+                text = "v1.0 • Calm Indigo",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontWeight = FontWeight.Light,
+                    fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace
+                ),
+                color = colors.textSecondary.copy(alpha = 0.50f)
+            )
         }
     }
 }
