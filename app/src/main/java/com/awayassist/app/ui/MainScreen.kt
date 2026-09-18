@@ -331,30 +331,17 @@ private fun EditorialHeader(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        // App Title & Live Beacon
+        // App Title
         Column {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "Away Assist",
-                    style = MaterialTheme.typography.displayLarge.copy(
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 24.sp,
-                        letterSpacing = (-0.6).sp
-                    ),
-                    color = colors.textPrimary
-                )
-
-                if (hasPolicyAccess) {
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Box(
-                        modifier = Modifier
-                            .size(7.dp)
-                            .alpha(beaconAlpha)
-                            .clip(CircleShape)
-                            .background(statusColor)
-                    )
-                }
-            }
+            Text(
+                text = "Away Assist",
+                style = MaterialTheme.typography.displayLarge.copy(
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 24.sp,
+                    letterSpacing = (-0.6).sp
+                ),
+                color = colors.textPrimary
+            )
 
             Text(
                 text = "Dynamic Lock & Unlock Automation",
@@ -401,6 +388,7 @@ private fun EditorialHeader(
                 Box(
                     modifier = Modifier
                         .size(6.dp)
+                        .alpha(if (hasPolicyAccess) beaconAlpha else 1f)
                         .clip(CircleShape)
                         .background(statusColor)
                 )

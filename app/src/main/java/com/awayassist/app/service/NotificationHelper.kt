@@ -150,24 +150,24 @@ class NotificationHelper(private val context: Context) {
         } else ""
 
         // Concise, refined max-3-words labels
-        val (titleText, subtitleText, badgeText, statusIconRes) = when {
+        val (titleText, subtitleText, badgeText, statusIconRes, dotAnimRes, badgeTextColor) = when {
             !appState.isEnabled && appState.overrideMode == null -> {
-                Quad("Disabled", "Automation Off", "OFF", R.drawable.ic_widget_silent)
+                Sextet("Disabled", "Automation Off", "OFF", R.drawable.ic_widget_silent, R.drawable.anim_dot_gray, 0xFF8E8E93.toInt())
             }
             isPaused -> {
-                Quad("Paused ($countdownText)", "Resumes in $countdownText", "PAUSE", R.drawable.ic_widget_pause)
+                Sextet("Paused ($countdownText)", "Resumes in $countdownText", "PAUSE", R.drawable.ic_widget_pause, R.drawable.anim_dot_amber, 0xFFFFB300.toInt())
             }
             isForceRing -> {
-                Quad("Force Ring", "Always Audible", "MANUAL", R.drawable.ic_widget_ring)
+                Sextet("Force Ring", "Always Audible", "RING", R.drawable.ic_widget_ring, R.drawable.anim_dot_green, 0xFF30D158.toInt())
             }
             isForceSilent -> {
-                Quad("Force Silent", "Always Silent", "MANUAL", R.drawable.ic_widget_silent)
+                Sextet("Force Silent", "Always Silent", "SILENT", R.drawable.ic_widget_silent, R.drawable.anim_dot_indigo, 0xFF7D7AFF.toInt())
             }
             isRingMode -> {
-                Quad("Ring Mode", "Audible on Lock", "AUTO", R.drawable.ic_widget_ring)
+                Sextet("Ring Mode", "Audible on Lock", "AUTO", R.drawable.ic_widget_ring, R.drawable.anim_dot_green, 0xFF30D158.toInt())
             }
             else -> {
-                Quad("Silent Mode", "Vibrate in Use", "AUTO", R.drawable.ic_widget_silent)
+                Sextet("Silent Mode", "Vibrate in Use", "AUTO", R.drawable.ic_widget_silent, R.drawable.anim_dot_indigo, 0xFF7D7AFF.toInt())
             }
         }
 
@@ -176,6 +176,8 @@ class NotificationHelper(private val context: Context) {
             setTextViewText(R.id.notification_status_text, titleText)
             setTextViewText(R.id.notification_subtitle_text, subtitleText)
             setTextViewText(R.id.notification_mode_badge, badgeText)
+            setTextColor(R.id.notification_mode_badge, badgeTextColor)
+            setImageViewResource(R.id.notification_mode_dot, dotAnimRes)
             setImageViewResource(R.id.notification_status_icon, statusIconRes)
 
             // Button 1: Force Silent / Force Ring Toggle
@@ -209,7 +211,7 @@ class NotificationHelper(private val context: Context) {
             setOnClickPendingIntent(R.id.widget_btn_pause, pause10mIntent)
 
             // Button 3: Auto
-            setTextViewText(R.id.widget_auto_text, if (isAutoMode) "● Auto" else "Auto")
+            setTextViewText(R.id.widget_auto_text, "Auto")
             setInt(
                 R.id.widget_btn_auto,
                 "setBackgroundResource",
@@ -223,6 +225,8 @@ class NotificationHelper(private val context: Context) {
             setTextViewText(R.id.expanded_status_text, titleText)
             setTextViewText(R.id.expanded_subtitle_text, subtitleText)
             setTextViewText(R.id.expanded_mode_badge, badgeText)
+            setTextColor(R.id.expanded_mode_badge, badgeTextColor)
+            setImageViewResource(R.id.expanded_mode_dot, dotAnimRes)
             setImageViewResource(R.id.expanded_status_icon, statusIconRes)
 
             // Button 1: Force Silent / Force Ring Toggle
@@ -256,7 +260,7 @@ class NotificationHelper(private val context: Context) {
             setOnClickPendingIntent(R.id.widget_btn_pause, pause10mIntent)
 
             // Button 3: Auto
-            setTextViewText(R.id.widget_auto_text, if (isAutoMode) "● Auto" else "Auto")
+            setTextViewText(R.id.widget_auto_text, "Auto")
             setInt(
                 R.id.widget_btn_auto,
                 "setBackgroundResource",
@@ -292,4 +296,5 @@ class NotificationHelper(private val context: Context) {
     }
 
     private data class Quad<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
+    private data class Sextet<A, B, C, D, E, F>(val first: A, val second: B, val third: C, val fourth: D, val fifth: E, val sixth: F)
 }

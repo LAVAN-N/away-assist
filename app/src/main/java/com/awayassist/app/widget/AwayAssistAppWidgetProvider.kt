@@ -122,6 +122,8 @@ class AwayAssistAppWidgetProvider : AppWidgetProvider() {
             // State Population
             if (appState == null) {
                 views.setTextViewText(R.id.appwidget_badge, "AUTO")
+                views.setTextColor(R.id.appwidget_badge, 0xFF7D7AFF.toInt())
+                views.setImageViewResource(R.id.appwidget_dot, R.drawable.anim_dot_indigo)
                 views.setTextViewText(R.id.appwidget_headline, "Away Assist Ready")
                 return views
             }
@@ -134,6 +136,8 @@ class AwayAssistAppWidgetProvider : AppWidgetProvider() {
             when {
                 !appState.isEnabled && appState.overrideMode == null -> {
                     views.setTextViewText(R.id.appwidget_badge, "OFF")
+                    views.setTextColor(R.id.appwidget_badge, 0xFF8E8E93.toInt())
+                    views.setImageViewResource(R.id.appwidget_dot, R.drawable.anim_dot_gray)
                     views.setTextViewText(R.id.appwidget_headline, "Disabled")
                     views.setInt(R.id.appwidget_btn_auto, "setBackgroundResource", R.drawable.bg_glass_widget_button)
                     views.setInt(R.id.appwidget_btn_ring, "setBackgroundResource", R.drawable.bg_glass_widget_button)
@@ -146,6 +150,8 @@ class AwayAssistAppWidgetProvider : AppWidgetProvider() {
                     val countdown = String.format(Locale.getDefault(), "%02d:%02d", mins, secs)
 
                     views.setTextViewText(R.id.appwidget_badge, "PAUSED")
+                    views.setTextColor(R.id.appwidget_badge, 0xFFFFB300.toInt())
+                    views.setImageViewResource(R.id.appwidget_dot, R.drawable.anim_dot_amber)
                     views.setTextViewText(R.id.appwidget_headline, "Paused ($countdown)")
                     views.setTextViewText(R.id.appwidget_pause_text, countdown)
 
@@ -155,6 +161,8 @@ class AwayAssistAppWidgetProvider : AppWidgetProvider() {
                 }
                 isForceRing -> {
                     views.setTextViewText(R.id.appwidget_badge, "RING")
+                    views.setTextColor(R.id.appwidget_badge, 0xFF30D158.toInt())
+                    views.setImageViewResource(R.id.appwidget_dot, R.drawable.anim_dot_green)
                     views.setTextViewText(R.id.appwidget_headline, "Force Ring")
                     views.setTextViewText(R.id.appwidget_pause_text, "10m")
 
@@ -164,6 +172,8 @@ class AwayAssistAppWidgetProvider : AppWidgetProvider() {
                 }
                 isRingLocked -> {
                     views.setTextViewText(R.id.appwidget_badge, "AUTO")
+                    views.setTextColor(R.id.appwidget_badge, 0xFF30D158.toInt())
+                    views.setImageViewResource(R.id.appwidget_dot, R.drawable.anim_dot_green)
                     views.setTextViewText(R.id.appwidget_headline, "Screen Locked")
                     views.setTextViewText(R.id.appwidget_pause_text, "10m")
 
@@ -173,6 +183,8 @@ class AwayAssistAppWidgetProvider : AppWidgetProvider() {
                 }
                 else -> {
                     views.setTextViewText(R.id.appwidget_badge, "AUTO")
+                    views.setTextColor(R.id.appwidget_badge, 0xFF7D7AFF.toInt())
+                    views.setImageViewResource(R.id.appwidget_dot, R.drawable.anim_dot_indigo)
                     views.setTextViewText(R.id.appwidget_headline, "Screen Unlocked")
                     views.setTextViewText(R.id.appwidget_pause_text, "10m")
 
