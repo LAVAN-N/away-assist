@@ -1,0 +1,150 @@
+package com.awayassist.app.widget
+
+import android.app.PendingIntent
+import android.appwidget.AppWidgetManager
+import android.appwidget.AppWidgetProvider
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.widget.RemoteViews
+import com.awayassist.app.MainActivity
+import com.awayassist.app.R
+import com.awayassist.app.data.AppState
+import com.awayassist.app.data.RingerState
+import com.awayassist.app.service.NotificationHelper
+import com.awayassist.app.service.RingerService
+import java.util.Locale
+
+class AwayAssistAppWidgetProvider : AppWidgetProvider() {
+
+    override fun onUpdate(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetIds: IntArray
+    ) {
+        for (appWidgetId in appWidgetIds) {
+            val views = buildRemoteViews(context, null)
+            appWidgetManager.updateAppWidget(appWidgetId, views)
+        }
+    }
+
+    companion object {
+        fun updateAll(context: Context, appState: AppState) {
+            val appWidgetManager = AppWidgetManager.getInstance(context) ?: return
+            val componentName = ComponentName(context, AwayAssistAppWidgetProvider::class.java)
+            val appWidgetIds = appWidgetManager.getAppWidgetIds(componentName)
+            if (appWidgetIds.isNotEmpty()) {
+                val views = buildRemoteViews(context, appState)
+                appWidgetManager.updateAppWidget(componentName, views)
+            }
+        }
+
+        fun buildRemoteViews(context: Context, appState: AppState?): RemoteViews {
+            val views = RemoteViews(context.packageName, R.layout.widget_glassmorphic)
+
+            // Content Click (Open App)
+            val openAppIntent = Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+            val openAppPendingIntent = PendingIntent.getActivity(
+                context,
+                200,
+                openAppIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(R.id.widget_root, openAppPendingIntent)
+
+            // Button 1: Auto / Resume
+            val autoIntent = Intent(context, RingerService::class.java).apply {
+                action = NotificationHelper.ACTION_RESUME
+            }
+            val autoPendingIntent = PendingIntent.getService(
+                context,
+                201,
+                autoIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(R.id.appwidget_btn_auto, autoPendingIntent)
+
+            // Button 2: Force Ring
+            val ringIntent = Intent(context, RingerService::class.java).apply {
+                action = NotificationHelper.ACTION_FORCE_RING
+            }
+            val ringPendingIntent = PendingIntent.getService(
+                context,
+                202,
+                ringIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(R.id.appwidget_btn_ring, ringPendingIntent)
+
+            // Button 3: Pause 1h
+            val pauseIntent = Intent(context, RingerService::class.java).apply {
+                action = NotificationHelper.ACTION_PAUSE_1H
+            }
+            val pausePendingIntent = PendingIntent.getService(
+                context,
+                203,
+                pauseIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(R.id.appwidget_btn_pause, pausePendingIntent)
+
+            // State Population
+            if (appState == null) {
+                views.setTextViewText(R.id.appwidget_badge, "AUTO")
+                views.setImageViewResource(R.id.appwidget_dot, R.drawable.ic_dot_green)
+                views.setTextViewText(R.id.appwidget_headline, "Away Assist Ready")
+                views.setTextViewText(R.id.appwidget_subtitle, "Tap to configure automation")
+                return views
+            }
+
+            when {
+                !appState.isEnabled && appState.overrideMode == null -> {
+                    views.setTextViewText(R.id.appwidget_badge, "OFF")
+                    views.setImageViewResource(R.id.appwidget_dot, R.drawable.ic_dot_indigo)
+                    views.setTextViewText(R.id.appwidget_headline, "Automation Disabled")
+                    views.setTextViewText(R.id.appwidget_subtitle, "Tap Auto to resume automation")
+                }
+                appState.isPaused -> {
+                    val diffSecs = ((appState.pauseUntilTimestamp - System.currentTimeMillis()) / 1000L).coerceAtLeast(0L)
+                    val hrs = diffSecs / 3600
+                    val mins = (diffSecs % 3600) / 60
+                    val secs = diffSecs % 60
+                    val countdown = String.format(Locale.getDefault(), "%02d:%02d:%02d", hrs, mins, secs)
+
+                    views.setTextViewText(R.id.appwidget_badge, "PAUSED")
+                    views.setImageViewResource(R.id.appwidget_dot, R.drawable.ic_dot_amber)
+                    views.setTextViewText(R.id.appwidget_headline, "Paused ($countdown)")
+                    views.setTextViewText(R.id.appwidget_subtitle, "Automation temporarily suspended")
+                }
+                appState.overrideMode == RingerState.RING -> {
+                    views.setTextViewText(R.id.appwidget_badge, "RING")
+                    views.setImageViewResource(R.id.appwidget_dot, R.drawable.ic_dot_green)
+                    views.setTextViewText(R.id.appwidget_headline, "Force Ring Active")
+                    views.setTextViewText(R.id.appwidget_subtitle, "Continuous audible ring • Ignores lock")
+                }
+                appState.overrideMode != null -> {
+                    views.setTextViewText(R.id.appwidget_badge, "SILENT")
+                    views.setImageViewResource(R.id.appwidget_dot, R.drawable.ic_dot_indigo)
+                    views.setTextViewText(R.id.appwidget_headline, "Force Silent Active")
+                    views.setTextViewText(R.id.appwidget_subtitle, "Vibrate/Silent override active")
+                }
+                appState.currentMode == RingerState.RING -> {
+                    views.setTextViewText(R.id.appwidget_badge, "AUTO")
+                    views.setImageViewResource(R.id.appwidget_dot, R.drawable.ic_dot_green)
+                    views.setTextViewText(R.id.appwidget_headline, "Screen Locked ➔ Ring")
+                    views.setTextViewText(R.id.appwidget_subtitle, "Calls & alerts audible • Screen is off")
+                }
+                else -> {
+                    views.setTextViewText(R.id.appwidget_badge, "AUTO")
+                    views.setImageViewResource(R.id.appwidget_dot, R.drawable.ic_dot_indigo)
+                    views.setTextViewText(R.id.appwidget_headline, "Screen Unlocked ➔ Silent")
+                    views.setTextViewText(R.id.appwidget_subtitle, "Silent vibration in use • Screen is on")
+                }
+            }
+
+            return views
+        }
+    }
+}

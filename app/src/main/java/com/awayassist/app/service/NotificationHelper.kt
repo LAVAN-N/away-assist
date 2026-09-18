@@ -6,11 +6,14 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import com.awayassist.app.MainActivity
 import com.awayassist.app.R
 import com.awayassist.app.data.AppState
 import com.awayassist.app.data.RingerState
+import com.awayassist.app.widget.AwayAssistAppWidgetProvider
+import java.util.Locale
 
 class NotificationHelper(private val context: Context) {
 
@@ -58,75 +61,103 @@ class NotificationHelper(private val context: Context) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val contentText = when {
-            !appState.isEnabled && appState.overrideMode == null -> "Automation disabled"
-            appState.isPaused -> {
-                val diffSecs = ((appState.pauseUntilTimestamp - System.currentTimeMillis()) / 1000L).coerceAtLeast(0L)
-                val hrs = diffSecs / 3600
-                val mins = (diffSecs % 3600) / 60
-                val secs = diffSecs % 60
-                val countdown = String.format(java.util.Locale.getDefault(), "%02d:%02d:%02d", hrs, mins, secs)
-                "⏸ Paused ($countdown)"
+        // Pending Intents for Widget Buttons
+        val resumeIntent = PendingIntent.getService(
+            context,
+            101,
+            Intent(context, RingerService::class.java).apply { action = ACTION_RESUME },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val forceSilentIntent = PendingIntent.getService(
+            context,
+            102,
+            Intent(context, RingerService::class.java).apply { action = ACTION_FORCE_SILENT },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val forceRingIntent = PendingIntent.getService(
+            context,
+            103,
+            Intent(context, RingerService::class.java).apply { action = ACTION_FORCE_RING },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val pause1hIntent = PendingIntent.getService(
+            context,
+            104,
+            Intent(context, RingerService::class.java).apply { action = ACTION_PAUSE_1H },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val isPaused = appState.isPaused
+        val isRingMode = appState.currentMode == RingerState.RING && !isPaused && appState.overrideMode == null
+        val isForceRing = appState.overrideMode == RingerState.RING
+        val isForceSilent = appState.overrideMode == RingerState.VIBRATE || appState.overrideMode == RingerState.SILENT
+
+        val countdownText: String = if (isPaused) {
+            val diffSecs = ((appState.pauseUntilTimestamp - System.currentTimeMillis()) / 1000L).coerceAtLeast(0L)
+            val mins = (diffSecs % 3600) / 60
+            val secs = diffSecs % 60
+            String.format(Locale.getDefault(), "%02d:%02d", mins, secs)
+        } else ""
+
+        val (statusText, statusIconRes, badgeText) = when {
+            !appState.isEnabled && appState.overrideMode == null -> {
+                Triple("Disabled", R.drawable.ic_widget_silent, "OFF")
             }
-            appState.overrideMode != null -> {
-                when (appState.overrideMode) {
-                    RingerState.RING -> "🔔 Force Ring active"
-                    RingerState.VIBRATE, RingerState.SILENT -> "🔕 Force Silent active"
-                    else -> "Manual override active"
-                }
+            isPaused -> {
+                Triple("Paused $countdownText", R.drawable.ic_widget_pause, "PAUSE")
             }
-            appState.currentMode == RingerState.RING -> "🔔 Ring mode — screen locked"
-            appState.currentMode == RingerState.VIBRATE || appState.currentMode == RingerState.SILENT -> "🔕 Silent — screen unlocked"
-            else -> "Monitoring lock state"
+            isForceRing -> {
+                Triple("Ring (Forced)", R.drawable.ic_widget_ring, "RING")
+            }
+            isForceSilent -> {
+                Triple("Silent (Forced)", R.drawable.ic_widget_silent, "SILENT")
+            }
+            isRingMode -> {
+                Triple("Ring", R.drawable.ic_widget_ring, "LOCKED")
+            }
+            else -> {
+                Triple("Silent", R.drawable.ic_widget_silent, "IN USE")
+            }
+        }
+
+        // Build Ultra-Compact Single-Row RemoteViews
+        val compactViews = RemoteViews(context.packageName, R.layout.notification_glass_collapsed).apply {
+            setTextViewText(R.id.notification_status_text, statusText)
+            setTextViewText(R.id.notification_mode_badge, badgeText)
+            setImageViewResource(R.id.notification_status_icon, statusIconRes)
+
+            // Button 1: Force Silent / Force Ring Toggle
+            if (appState.currentMode == RingerState.RING && appState.overrideMode != RingerState.VIBRATE) {
+                setTextViewText(R.id.widget_toggle_text, "Silent")
+                setImageViewResource(R.id.widget_toggle_icon, R.drawable.ic_widget_silent)
+                setOnClickPendingIntent(R.id.widget_btn_toggle, forceSilentIntent)
+            } else {
+                setTextViewText(R.id.widget_toggle_text, "Ring")
+                setImageViewResource(R.id.widget_toggle_icon, R.drawable.ic_widget_ring)
+                setOnClickPendingIntent(R.id.widget_btn_toggle, forceRingIntent)
+            }
+
+            // Button 2: Pause 1h
+            setOnClickPendingIntent(R.id.widget_btn_pause, pause1hIntent)
+
+            // Button 3: Auto / Resume
+            setOnClickPendingIntent(R.id.widget_btn_auto, resumeIntent)
         }
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("Away Assist")
-            .setContentText(contentText)
+            .setContentText(statusText)
             .setContentIntent(contentIntent)
+            .setCustomContentView(compactViews)
             .setOngoing(true)
             .setShowWhen(false)
             .setSilent(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
-
-        // Add inline actions (max 2)
-        if (appState.isPaused || appState.overrideMode != null) {
-            val resumeIntent = PendingIntent.getService(
-                context,
-                101,
-                Intent(context, RingerService::class.java).apply { action = ACTION_RESUME },
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            builder.addAction(0, "Resume", resumeIntent)
-        } else {
-            if (appState.currentMode == RingerState.RING) {
-                val silentIntent = PendingIntent.getService(
-                    context,
-                    102,
-                    Intent(context, RingerService::class.java).apply { action = ACTION_FORCE_SILENT },
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-                builder.addAction(0, "Force Silent", silentIntent)
-            } else {
-                val ringIntent = PendingIntent.getService(
-                    context,
-                    103,
-                    Intent(context, RingerService::class.java).apply { action = ACTION_FORCE_RING },
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-                builder.addAction(0, "Force Ring", ringIntent)
-            }
-
-            val pauseIntent = PendingIntent.getService(
-                context,
-                104,
-                Intent(context, RingerService::class.java).apply { action = ACTION_PAUSE_1H },
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            builder.addAction(0, "Pause 1h", pauseIntent)
-        }
 
         return builder.build()
     }
@@ -134,5 +165,10 @@ class NotificationHelper(private val context: Context) {
     fun updateNotification(appState: AppState) {
         val notification = buildNotification(appState)
         notificationManager.notify(NOTIFICATION_ID, notification)
+
+        // Synchronously update home screen widgets whenever state changes
+        try {
+            AwayAssistAppWidgetProvider.updateAll(context, appState)
+        } catch (_: Exception) {}
     }
 }
