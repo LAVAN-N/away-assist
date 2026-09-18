@@ -983,10 +983,12 @@ private fun CompactPermissionCard(
 private fun InfoBottomSheetContent(onClose: () -> Unit) {
     val colors = AwayAssistTheme.colors
     val isDark = colors.isDark
+    val scrollState = rememberScrollState()
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .verticalScroll(scrollState)
             .padding(horizontal = 20.dp, vertical = 20.dp)
     ) {
         // Drag Handle
@@ -1041,7 +1043,49 @@ private fun InfoBottomSheetContent(onClose: () -> Unit) {
             isDark = isDark
         )
 
-        Spacer(modifier = Modifier.height(18.dp))
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Background Reliability & Cleaner Tips
+        Text(
+            text = "Background Reliability & Cleaners",
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp
+            ),
+            color = colors.textPrimary
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        InfoCardItem(
+            icon = Icons.Default.Shield,
+            tint = colors.warning,
+            title = "Why 'Clear Cache' Stops the App",
+            description = "OEM task cleaners (Xiaomi Cleaner, Samsung Device Care, Smart Cleaner) terminate background processes to reclaim RAM, pausing the automation until reopened.",
+            isDark = isDark
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        InfoCardItem(
+            icon = Icons.Default.Tune,
+            tint = colors.accentSilent,
+            title = "Keep Service Always Active",
+            description = "1. App Info ➔ Battery Saver ➔ Set to 'No restrictions'.\n2. Enable 'Autostart' and optionally lock Away Assist in your Recent Apps list so cleaners skip it.",
+            isDark = isDark
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        InfoCardItem(
+            icon = Icons.Default.NotificationsActive,
+            tint = colors.ringState,
+            title = "Instant Widget Revival",
+            description = "If closed or cleared by the OS, tapping any button on your Home Screen Widget or opening the app instantly restores the service.",
+            isDark = isDark
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
 
         AppleStyleButton(
             text = "Done",
