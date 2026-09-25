@@ -38,6 +38,8 @@ import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.SimCard
 import androidx.compose.material.icons.filled.StopCircle
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -63,6 +65,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.awayassist.app.data.SosLocateState
@@ -103,6 +107,8 @@ fun SosLocateSettingsScreen(
     var tempPrefix by remember(sosState.commandPrefix) {
         mutableStateOf(sosState.commandPrefix)
     }
+    var isPrefixRevealed by remember { mutableStateOf(false) }
+    var isDialogPrefixRevealed by remember { mutableStateOf(false) }
 
     BackHandler(enabled = true) {
         if (showEditNumberDialog) {
@@ -309,7 +315,7 @@ fun SosLocateSettingsScreen(
                         GroupedListRow(
                             title = "Secret Command Prefix",
                             subtitle = if (sosState.commandPrefix.isNotBlank()) {
-                                "${sosState.commandPrefix} (${sosState.prefixSha256.take(12)}...)"
+                                if (isPrefixRevealed) sosState.commandPrefix else "••••••••"
                             } else "Not configured",
                             leadingIcon = {
                                 Icon(
@@ -320,15 +326,32 @@ fun SosLocateSettingsScreen(
                                 )
                             },
                             trailingContent = {
-                                Icon(
-                                    imageVector = Icons.Default.Edit,
-                                    contentDescription = "Edit",
-                                    tint = AwayAssistTheme.colors.textSecondary,
-                                    modifier = Modifier.size(18.dp)
-                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (sosState.commandPrefix.isNotBlank()) {
+                                        IconButton(
+                                            onClick = { isPrefixRevealed = !isPrefixRevealed },
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = if (isPrefixRevealed) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                                contentDescription = if (isPrefixRevealed) "Hide prefix" else "Show prefix",
+                                                tint = AwayAssistTheme.colors.textSecondary,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                    }
+                                    Icon(
+                                        imageVector = Icons.Default.Edit,
+                                        contentDescription = "Edit",
+                                        tint = AwayAssistTheme.colors.textSecondary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
                             },
                             onClick = {
                                 tempPrefix = sosState.commandPrefix
+                                isDialogPrefixRevealed = false
                                 showEditPrefixDialog = true
                             },
                             showDivider = true
@@ -530,7 +553,6 @@ fun SosLocateSettingsScreen(
 
     // Dialog: Edit Command Prefix
     if (showEditPrefixDialog) {
-        val previewHash = remember(tempPrefix) { computeSha256(tempPrefix.trim()) }
         AlertDialog(
             onDismissRequest = { showEditPrefixDialog = false },
             title = {
@@ -543,7 +565,7 @@ fun SosLocateSettingsScreen(
             text = {
                 Column {
                     Text(
-                        text = "Enter a new secret passkey prefix. Live SHA-256 checksum will be stored.",
+                        text = "Enter a secret passkey prefix for emergency SMS commands (e.g. #FIND, #TRACK).",
                         style = MaterialTheme.typography.bodySmall,
                         color = AwayAssistTheme.colors.textSecondary
                     )
@@ -553,6 +575,16 @@ fun SosLocateSettingsScreen(
                         onValueChange = { tempPrefix = it },
                         label = { Text("New Prefix") },
                         singleLine = true,
+                        visualTransformation = if (isDialogPrefixRevealed) VisualTransformation.None else PasswordVisualTransformation(),
+                        trailingIcon = {
+                            IconButton(onClick = { isDialogPrefixRevealed = !isDialogPrefixRevealed }) {
+                                Icon(
+                                    imageVector = if (isDialogPrefixRevealed) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                    contentDescription = if (isDialogPrefixRevealed) "Hide prefix" else "Show prefix",
+                                    tint = AwayAssistTheme.colors.textSecondary
+                                )
+                            }
+                        },
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = AwayAssistTheme.colors.accent,
                             unfocusedBorderColor = AwayAssistTheme.colors.textSecondary.copy(alpha = 0.4f),
@@ -561,12 +593,6 @@ fun SosLocateSettingsScreen(
                         ),
                         shape = SquircleMedium,
                         modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "SHA-256: ${if (previewHash.isNotBlank()) previewHash.take(24) + "..." else "None"}",
-                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                        color = AwayAssistTheme.colors.accent
                     )
                 }
             },
