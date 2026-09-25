@@ -127,12 +127,10 @@ fun HardeningChecklistCard(
     val keyguardManager = remember {
         context.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
     }
-    val sosLocateController = remember { com.awayassist.app.util.SosLocateController(context) }
 
     var isDeviceSecure by remember { mutableStateOf(keyguardManager?.isDeviceSecure ?: false) }
     var isLockNotificationHidden by remember { mutableStateOf(checkIsLockScreenNotificationHidden(context)) }
     var isQuickSettingsRestricted by remember { mutableStateOf(checkIsQuickSettingsRestricted(context)) }
-    var hasAdbPermission by remember { mutableStateOf(sosLocateController.hasWriteSecureSettingsPermission()) }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -140,19 +138,12 @@ fun HardeningChecklistCard(
                 isDeviceSecure = keyguardManager?.isDeviceSecure ?: false
                 isLockNotificationHidden = checkIsLockScreenNotificationHidden(context)
                 isQuickSettingsRestricted = checkIsQuickSettingsRestricted(context)
-                hasAdbPermission = sosLocateController.hasWriteSecureSettingsPermission()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
         }
-    }
-
-    var showAdbGuideSheet by remember { mutableStateOf(false) }
-
-    if (showAdbGuideSheet) {
-        AdbSetupGuideSheet(onDismiss = { showAdbGuideSheet = false })
     }
 
     GroupedListCard(
@@ -272,46 +263,7 @@ fun HardeningChecklistCard(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Item 3: Remote Location Switching (ADB / Shizuku)
-            val hasAdb = hasAdbPermission
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = if (hasAdb) Icons.Default.CheckCircle else Icons.Default.Warning,
-                    contentDescription = null,
-                    tint = if (hasAdb) RingState else AwayAssistTheme.colors.accent,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = if (hasAdb) "Remote Location Switching: Enabled" else "Remote Location Switching: Optional",
-                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                        color = AwayAssistTheme.colors.textPrimary
-                    )
-                    Text(
-                        text = if (hasAdb) {
-                            "App can automatically turn ON location when emergency SMS arrives and turn it OFF after fix."
-                        } else {
-                            "Only needed if you keep phone location OFF. Tap 'Guide' for 1-tap Shizuku or PC setup."
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = AwayAssistTheme.colors.textSecondary
-                    )
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                AppleStyleButton(
-                    text = if (hasAdb) "Status" else "Guide",
-                    onClick = { showAdbGuideSheet = true },
-                    style = AppleButtonStyle.SECONDARY
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Item 4: Restrict Control Centre & Quick Settings on Lock Screen
+            // Item 3: Restrict Control Centre & Quick Settings on Lock Screen
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -343,6 +295,77 @@ fun HardeningChecklistCard(
                 AppleStyleButton(
                     text = "Configure",
                     onClick = { openLockScreenQuickSettings(context) },
+                    style = AppleButtonStyle.SECONDARY
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun RemoteLocationSwitchingCard(
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val sosLocateController = remember { com.awayassist.app.util.SosLocateController(context) }
+
+    var hasAdbPermission by remember { mutableStateOf(sosLocateController.hasWriteSecureSettingsPermission()) }
+    var showAdbGuideSheet by remember { mutableStateOf(false) }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                hasAdbPermission = sosLocateController.hasWriteSecureSettingsPermission()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    if (showAdbGuideSheet) {
+        AdbSetupGuideSheet(onDismiss = { showAdbGuideSheet = false })
+    }
+
+    GroupedListCard(
+        header = "Remote Location Switching",
+        footer = "Enables Away Assist to automatically turn system location ON when emergency SMS arrives and turn it OFF after GPS fix.",
+        modifier = modifier
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = if (hasAdbPermission) Icons.Default.CheckCircle else Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = if (hasAdbPermission) RingState else AwayAssistTheme.colors.accent,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (hasAdbPermission) "Remote Switching: Enabled" else "Remote Switching: Optional",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = AwayAssistTheme.colors.textPrimary
+                    )
+                    Text(
+                        text = if (hasAdbPermission) {
+                            "System location will auto-toggle ON upon emergency SMS triggers and OFF after fix."
+                        } else {
+                            "Only needed if you keep phone location OFF. Tap 'Guide' for 1-tap Shizuku or PC setup."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AwayAssistTheme.colors.textSecondary
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                AppleStyleButton(
+                    text = if (hasAdbPermission) "Status" else "Guide",
+                    onClick = { showAdbGuideSheet = true },
                     style = AppleButtonStyle.SECONDARY
                 )
             }

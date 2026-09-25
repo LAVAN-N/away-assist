@@ -1,6 +1,11 @@
 package com.awayassist.app.ui.sos
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -144,103 +149,6 @@ fun SosLocateSettingsScreen(
         ) {
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Prefix Rotation Appeal / Reminder Banner
-            if (sosState.prefixRotationNeeded) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(SquircleLarge)
-                        .background(AwayAssistTheme.colors.accent.copy(alpha = 0.12f))
-                        .border(1.dp, AwayAssistTheme.colors.accent.copy(alpha = 0.35f), SquircleLarge)
-                        .padding(16.dp)
-                ) {
-                    Column {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Warning,
-                                contentDescription = null,
-                                tint = AwayAssistTheme.colors.accent,
-                                modifier = Modifier.size(22.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Security Notice: Passkey Used",
-                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                                color = AwayAssistTheme.colors.textPrimary
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = "An emergency SMS command was recently authenticated. For continued safety after recovery, rotate your secret passkey prefix.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = AwayAssistTheme.colors.textSecondary
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            AppleStyleButton(
-                                text = "Rotate Prefix",
-                                onClick = {
-                                    tempPrefix = ""
-                                    showEditPrefixDialog = true
-                                },
-                                style = AppleButtonStyle.PRIMARY,
-                                modifier = Modifier.weight(1f)
-                            )
-                            AppleStyleButton(
-                                text = "Dismiss",
-                                onClick = onDismissRotationReminder,
-                                style = AppleButtonStyle.SECONDARY,
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                    }
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-
-            // Active Tracking Session Status Card
-            if (sosState.isSessionActive) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(SquircleLarge)
-                        .background(RingState.copy(alpha = 0.15f))
-                        .border(1.dp, RingState.copy(alpha = 0.4f), SquircleLarge)
-                        .padding(16.dp)
-                ) {
-                    Column {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.LocationOn,
-                                contentDescription = null,
-                                tint = RingState,
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Active ${sosState.sessionState.name} Session",
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                color = AwayAssistTheme.colors.textPrimary
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = "Replying to ${sosState.activeTargetNumber}. Auto-timeout in ${sosState.autoTimeoutHours}h.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = AwayAssistTheme.colors.textSecondary
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        AppleStyleButton(
-                            text = "Stop Active Session",
-                            onClick = onStopActiveSession,
-                            style = AppleButtonStyle.SECONDARY,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-
             // Master SOS Toggle
             GroupedListCard(
                 header = "SOS Locate Protocol"
@@ -257,194 +165,308 @@ fun SosLocateSettingsScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Configuration Group
-            GroupedListCard(
-                header = "Configuration"
+            // Foldable content when SOS Locate is Enabled
+            AnimatedVisibility(
+                visible = sosState.isSosEnabled,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
             ) {
-                GroupedListRow(
-                    title = "Emergency Contact Number",
-                    subtitle = if (sosState.emergencyAlertNumber.isNotBlank()) sosState.emergencyAlertNumber else "Not set",
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.Phone,
-                            contentDescription = null,
-                            tint = AwayAssistTheme.colors.accent,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    },
-                    trailingContent = {
-                        Icon(
-                            imageVector = Icons.Default.Edit,
-                            contentDescription = "Edit",
-                            tint = AwayAssistTheme.colors.textSecondary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    },
-                    onClick = {
-                        tempEmergencyNumber = sosState.emergencyAlertNumber
-                        showEditNumberDialog = true
-                    },
-                    showDivider = true
-                )
+                Column {
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                GroupedListRow(
-                    title = "Secret Command Prefix",
-                    subtitle = if (sosState.commandPrefix.isNotBlank()) {
-                        "${sosState.commandPrefix} (${sosState.prefixSha256.take(12)}...)"
-                    } else "Not configured",
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.Key,
-                            contentDescription = null,
-                            tint = AwayAssistTheme.colors.accent,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    },
-                    trailingContent = {
-                        Icon(
-                            imageVector = Icons.Default.Edit,
-                            contentDescription = "Edit",
-                            tint = AwayAssistTheme.colors.textSecondary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    },
-                    onClick = {
-                        tempPrefix = sosState.commandPrefix
-                        showEditPrefixDialog = true
-                    },
-                    showDivider = true
-                )
-
-                GroupedListRow(
-                    title = "Auto-Timeout Safety Net",
-                    subtitle = "${sosState.autoTimeoutHours} hours maximum duration",
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.Timer,
-                            contentDescription = null,
-                            tint = AwayAssistTheme.colors.accent,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    },
-                    onClick = {
-                        val nextHours = when (sosState.autoTimeoutHours) {
-                            1 -> 2
-                            2 -> 4
-                            4 -> 6
-                            6 -> 12
-                            12 -> 24
-                            else -> 1
+                    // Prefix Rotation Appeal / Reminder Banner
+                    if (sosState.prefixRotationNeeded) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(SquircleLarge)
+                                .background(AwayAssistTheme.colors.accent.copy(alpha = 0.12f))
+                                .border(1.dp, AwayAssistTheme.colors.accent.copy(alpha = 0.35f), SquircleLarge)
+                                .padding(16.dp)
+                        ) {
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Warning,
+                                        contentDescription = null,
+                                        tint = AwayAssistTheme.colors.accent,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Security Notice: Passkey Used",
+                                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                        color = AwayAssistTheme.colors.textPrimary
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = "An emergency SMS command was recently authenticated. For continued safety after recovery, rotate your secret passkey prefix.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = AwayAssistTheme.colors.textSecondary
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    AppleStyleButton(
+                                        text = "Rotate Prefix",
+                                        onClick = {
+                                            tempPrefix = ""
+                                            showEditPrefixDialog = true
+                                        },
+                                        style = AppleButtonStyle.PRIMARY,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    AppleStyleButton(
+                                        text = "Dismiss",
+                                        onClick = onDismissRotationReminder,
+                                        style = AppleButtonStyle.SECONDARY,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                            }
                         }
-                        onUpdateTimeoutHours(nextHours)
+                        Spacer(modifier = Modifier.height(16.dp))
                     }
-                )
+
+                    // Active Tracking Session Status Card
+                    if (sosState.isSessionActive) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(SquircleLarge)
+                                .background(RingState.copy(alpha = 0.15f))
+                                .border(1.dp, RingState.copy(alpha = 0.4f), SquircleLarge)
+                                .padding(16.dp)
+                        ) {
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.LocationOn,
+                                        contentDescription = null,
+                                        tint = RingState,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Active ${sosState.sessionState.name} Session",
+                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = AwayAssistTheme.colors.textPrimary
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = "Replying to ${sosState.activeTargetNumber}. Auto-timeout in ${sosState.autoTimeoutHours}h.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = AwayAssistTheme.colors.textSecondary
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                AppleStyleButton(
+                                    text = "Stop Active Session",
+                                    onClick = onStopActiveSession,
+                                    style = AppleButtonStyle.SECONDARY,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+
+                    // Separate Heading next to SOS Locate Protocol: Remote Location Switching
+                    RemoteLocationSwitchingCard()
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Configuration Group
+                    GroupedListCard(
+                        header = "Configuration"
+                    ) {
+                        GroupedListRow(
+                            title = "Emergency Contact Number",
+                            subtitle = if (sosState.emergencyAlertNumber.isNotBlank()) sosState.emergencyAlertNumber else "Not set",
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Phone,
+                                    contentDescription = null,
+                                    tint = AwayAssistTheme.colors.accent,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            },
+                            trailingContent = {
+                                Icon(
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = "Edit",
+                                    tint = AwayAssistTheme.colors.textSecondary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            },
+                            onClick = {
+                                tempEmergencyNumber = sosState.emergencyAlertNumber
+                                showEditNumberDialog = true
+                            },
+                            showDivider = true
+                        )
+
+                        GroupedListRow(
+                            title = "Secret Command Prefix",
+                            subtitle = if (sosState.commandPrefix.isNotBlank()) {
+                                "${sosState.commandPrefix} (${sosState.prefixSha256.take(12)}...)"
+                            } else "Not configured",
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Key,
+                                    contentDescription = null,
+                                    tint = AwayAssistTheme.colors.accent,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            },
+                            trailingContent = {
+                                Icon(
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = "Edit",
+                                    tint = AwayAssistTheme.colors.textSecondary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            },
+                            onClick = {
+                                tempPrefix = sosState.commandPrefix
+                                showEditPrefixDialog = true
+                            },
+                            showDivider = true
+                        )
+
+                        GroupedListRow(
+                            title = "Auto-Timeout Safety Net",
+                            subtitle = "${sosState.autoTimeoutHours} hours maximum duration",
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Timer,
+                                    contentDescription = null,
+                                    tint = AwayAssistTheme.colors.accent,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            },
+                            onClick = {
+                                val nextHours = when (sosState.autoTimeoutHours) {
+                                    1 -> 2
+                                    2 -> 4
+                                    4 -> 6
+                                    6 -> 12
+                                    12 -> 24
+                                    else -> 1
+                                }
+                                onUpdateTimeoutHours(nextHours)
+                            }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Trigger Toggles
+                    GroupedListCard(
+                        header = "Emergency Triggers"
+                    ) {
+                        GroupedListRow(
+                            title = "SIM Card Removed",
+                            subtitle = "Alert emergency number when SIM is pulled",
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.SimCard,
+                                    contentDescription = null,
+                                    tint = AwayAssistTheme.colors.accent,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            },
+                            trailingContent = {
+                                AppleStyleSwitch(
+                                    checked = sosState.triggerSimRemoved,
+                                    onCheckedChange = { checked ->
+                                        onUpdateTriggers(checked, sosState.triggerShutdown, sosState.triggerSmsCommands, sosState.triggerBoot)
+                                    }
+                                )
+                            },
+                            showDivider = true
+                        )
+
+                        GroupedListRow(
+                            title = "Phone Switched Off",
+                            subtitle = "Best-effort location alert during shutdown",
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.PowerSettingsNew,
+                                    contentDescription = null,
+                                    tint = AwayAssistTheme.colors.accent,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            },
+                            trailingContent = {
+                                AppleStyleSwitch(
+                                    checked = sosState.triggerShutdown,
+                                    onCheckedChange = { checked ->
+                                        onUpdateTriggers(sosState.triggerSimRemoved, checked, sosState.triggerSmsCommands, sosState.triggerBoot)
+                                    }
+                                )
+                            },
+                            showDivider = true
+                        )
+
+                        GroupedListRow(
+                            title = "Remote SMS Commands",
+                            subtitle = "Respond to FIND, TRACK, TRACE, STOP from any phone",
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.CellTower,
+                                    contentDescription = null,
+                                    tint = AwayAssistTheme.colors.accent,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            },
+                            trailingContent = {
+                                AppleStyleSwitch(
+                                    checked = sosState.triggerSmsCommands,
+                                    onCheckedChange = { checked ->
+                                        onUpdateTriggers(sosState.triggerSimRemoved, sosState.triggerShutdown, checked, sosState.triggerBoot)
+                                    }
+                                )
+                            },
+                            showDivider = true
+                        )
+
+                        GroupedListRow(
+                            title = "Device Restart Alert",
+                            subtitle = "Notify emergency contact upon boot",
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.RestartAlt,
+                                    contentDescription = null,
+                                    tint = AwayAssistTheme.colors.accent,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            },
+                            trailingContent = {
+                                AppleStyleSwitch(
+                                    checked = sosState.triggerBoot,
+                                    onCheckedChange = { checked ->
+                                        onUpdateTriggers(sosState.triggerSimRemoved, sosState.triggerShutdown, sosState.triggerSmsCommands, checked)
+                                    }
+                                )
+                            }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Trigger Toggles
-            GroupedListCard(
-                header = "Emergency Triggers"
-            ) {
-                GroupedListRow(
-                    title = "SIM Card Removed",
-                    subtitle = "Alert emergency number when SIM is pulled",
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.SimCard,
-                            contentDescription = null,
-                            tint = AwayAssistTheme.colors.accent,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    },
-                    trailingContent = {
-                        AppleStyleSwitch(
-                            checked = sosState.triggerSimRemoved,
-                            onCheckedChange = { checked ->
-                                onUpdateTriggers(checked, sosState.triggerShutdown, sosState.triggerSmsCommands, sosState.triggerBoot)
-                            }
-                        )
-                    },
-                    showDivider = true
-                )
-
-                GroupedListRow(
-                    title = "Phone Switched Off",
-                    subtitle = "Best-effort location alert during shutdown",
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.PowerSettingsNew,
-                            contentDescription = null,
-                            tint = AwayAssistTheme.colors.accent,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    },
-                    trailingContent = {
-                        AppleStyleSwitch(
-                            checked = sosState.triggerShutdown,
-                            onCheckedChange = { checked ->
-                                onUpdateTriggers(sosState.triggerSimRemoved, checked, sosState.triggerSmsCommands, sosState.triggerBoot)
-                            }
-                        )
-                    },
-                    showDivider = true
-                )
-
-                GroupedListRow(
-                    title = "Remote SMS Commands",
-                    subtitle = "Respond to FIND, TRACK, TRACE, STOP from any phone",
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.CellTower,
-                            contentDescription = null,
-                            tint = AwayAssistTheme.colors.accent,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    },
-                    trailingContent = {
-                        AppleStyleSwitch(
-                            checked = sosState.triggerSmsCommands,
-                            onCheckedChange = { checked ->
-                                onUpdateTriggers(sosState.triggerSimRemoved, sosState.triggerShutdown, checked, sosState.triggerBoot)
-                            }
-                        )
-                    },
-                    showDivider = true
-                )
-
-                GroupedListRow(
-                    title = "Device Restart Alert",
-                    subtitle = "Notify emergency contact upon boot",
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.RestartAlt,
-                            contentDescription = null,
-                            tint = AwayAssistTheme.colors.accent,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    },
-                    trailingContent = {
-                        AppleStyleSwitch(
-                            checked = sosState.triggerBoot,
-                            onCheckedChange = { checked ->
-                                onUpdateTriggers(sosState.triggerSimRemoved, sosState.triggerShutdown, sosState.triggerSmsCommands, checked)
-                            }
-                        )
-                    }
-                )
+            if (!sosState.isSosEnabled) {
+                Spacer(modifier = Modifier.height(16.dp))
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Hardening Checklist Card
+            // Hardening Checklist Card (Always visible)
             HardeningChecklistCard()
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Last Triggered Summary
+            // Last Triggered Summary (Always visible when present)
             if (sosState.lastTriggeredTimestamp > 0L) {
+                Spacer(modifier = Modifier.height(16.dp))
                 val timeStr = SimpleDateFormat("MMM d, HH:mm", Locale.getDefault()).format(Date(sosState.lastTriggeredTimestamp))
                 Text(
                     text = "Last Triggered: ${sosState.lastTriggerDesc} at $timeStr",
@@ -452,7 +474,6 @@ fun SosLocateSettingsScreen(
                     color = AwayAssistTheme.colors.textSecondary,
                     modifier = Modifier.padding(horizontal = 8.dp)
                 )
-                Spacer(modifier = Modifier.height(16.dp))
             }
 
             Spacer(modifier = Modifier.height(24.dp))
