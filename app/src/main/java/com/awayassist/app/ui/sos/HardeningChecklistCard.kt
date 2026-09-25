@@ -150,7 +150,57 @@ fun HardeningChecklistCard(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Item 3: Quick Settings Restriction Advisory
+            // Item 3: Remote Location Switching (ADB Permission)
+            val sosLocateController = remember { com.awayassist.app.util.SosLocateController(context) }
+            val hasAdbPermission = remember { sosLocateController.hasWriteSecureSettingsPermission() }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = if (hasAdbPermission) Icons.Default.CheckCircle else Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = if (hasAdbPermission) RingState else AwayAssistTheme.colors.accent,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (hasAdbPermission) "Remote Location Switching: Enabled" else "Remote Location Switching: Needs ADB",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = AwayAssistTheme.colors.textPrimary
+                    )
+                    Text(
+                        text = if (hasAdbPermission) {
+                            "App can automatically turn ON location when emergency SMS arrives and turn it OFF after fix."
+                        } else {
+                            "Grant WRITE_SECURE_SETTINGS via ADB so the app can remotely toggle location when needed."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AwayAssistTheme.colors.textSecondary
+                    )
+                }
+                if (!hasAdbPermission) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    AppleStyleButton(
+                        text = "Copy ADB",
+                        onClick = {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+                            val clip = android.content.ClipData.newPlainText(
+                                "ADB Command",
+                                "adb shell pm grant com.awayassist.app android.permission.WRITE_SECURE_SETTINGS"
+                            )
+                            clipboard?.setPrimaryClip(clip)
+                            android.widget.Toast.makeText(context, "ADB command copied to clipboard", android.widget.Toast.LENGTH_SHORT).show()
+                        },
+                        style = AppleButtonStyle.SECONDARY
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Item 4: Quick Settings Restriction Advisory
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically

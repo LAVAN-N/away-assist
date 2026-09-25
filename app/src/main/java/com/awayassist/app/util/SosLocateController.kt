@@ -13,6 +13,7 @@ import android.os.BatteryManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Looper
+import android.provider.Settings
 import android.telephony.SmsManager
 import android.util.Log
 import androidx.core.content.ContextCompat
@@ -20,6 +21,7 @@ import com.awayassist.app.data.AwayAssistPreferences
 import com.awayassist.app.data.SosSessionState
 import com.awayassist.app.data.computeSha256
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -117,6 +119,46 @@ class SosLocateController(private val context: Context) {
         return@withContext true
     }
 
+    fun hasWriteSecureSettingsPermission(): Boolean {
+        return ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.WRITE_SECURE_SETTINGS
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    fun enableSystemLocation(): Boolean {
+        if (!hasWriteSecureSettingsPermission()) return false
+        return try {
+            @Suppress("DEPRECATION")
+            Settings.Secure.putInt(
+                context.contentResolver,
+                Settings.Secure.LOCATION_MODE,
+                Settings.Secure.LOCATION_MODE_HIGH_ACCURACY
+            )
+            Log.d(TAG, "Successfully enabled system master location switch via WRITE_SECURE_SETTINGS.")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to enable system location", e)
+            false
+        }
+    }
+
+    fun disableSystemLocation(): Boolean {
+        if (!hasWriteSecureSettingsPermission()) return false
+        return try {
+            Settings.Secure.putInt(
+                context.contentResolver,
+                Settings.Secure.LOCATION_MODE,
+                Settings.Secure.LOCATION_MODE_OFF
+            )
+            Log.d(TAG, "Successfully disabled system master location switch via WRITE_SECURE_SETTINGS.")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to disable system location", e)
+            false
+        }
+    }
+
     fun isLocationEnabled(): Boolean {
         if (locationManager == null) return false
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -136,8 +178,23 @@ class SosLocateController(private val context: Context) {
     private suspend fun handleFind(senderNumber: String) {
         val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val batteryLevel = getBatteryPercentage()
+        val wasLocationOff = !isLocationEnabled()
+        var toggledOn = false
+
+        if (wasLocationOff && hasWriteSecureSettingsPermission()) {
+            toggledOn = enableSystemLocation()
+            if (toggledOn) {
+                delay(1200L)
+            }
+        }
+
         val isLocOn = isLocationEnabled()
         val location = acquireLocation(8_000L)
+
+        // Turn location back OFF immediately if we turned it on for a single fix
+        if (toggledOn) {
+            disableSystemLocation()
+        }
 
         val message = if (location != null) {
             val accuracyStr = if (location.hasAccuracy()) "Accuracy: ~${location.accuracy.toInt()}m" else "Accuracy: unknown"
@@ -146,7 +203,7 @@ class SosLocateController(private val context: Context) {
             "$accuracyStr | Battery: $batteryLevel%"
         } else {
             if (!isLocOn) {
-                "Away Assist: Location fix unavailable (Device location is turned OFF) at $timeStr.\nBattery: $batteryLevel%"
+                "Away Assist: Location fix unavailable (Location toggle is OFF; grant WRITE_SECURE_SETTINGS via ADB for remote switching) at $timeStr.\nBattery: $batteryLevel%"
             } else {
                 "Away Assist: Location fix unavailable at $timeStr (GPS fix timed out).\nBattery: $batteryLevel%"
             }
@@ -157,18 +214,25 @@ class SosLocateController(private val context: Context) {
     }
 
     private suspend fun handleTrack(senderNumber: String, autoTimeoutHours: Int) {
+        if (!isLocationEnabled() && hasWriteSecureSettingsPermission()) {
+            enableSystemLocation()
+        }
         preferences.startSosSession(SosSessionState.TRACK, senderNumber)
         val isLocOn = isLocationEnabled()
-        val note = if (!isLocOn) " (Note: Master location toggle is currently OFF on phone)" else ""
-        val message = "Away Assist: Location tracking active$note. Use Find My Device or Maps to view. Reply STOP with your prefix to turn off, or it will auto-stop after ${autoTimeoutHours}h."
+        val note = if (!isLocOn) " (Note: Location is OFF; grant WRITE_SECURE_SETTINGS via ADB to allow remote ON)" else ""
+        val message = "Away Assist: Location turned on$note. Use Find My Device or Maps to view. Reply STOP with your prefix to turn off, or it will auto-stop after ${autoTimeoutHours}h."
         sendSms(senderNumber, message)
         preferences.recordSosTrigger("TRACK started from $senderNumber")
     }
 
     private suspend fun handleTrace(senderNumber: String, intervalMins: Int, autoTimeoutHours: Int) {
+        if (!isLocationEnabled() && hasWriteSecureSettingsPermission()) {
+            enableSystemLocation()
+            delay(1200L)
+        }
         preferences.startSosSession(SosSessionState.TRACE, senderNumber, intervalMins)
         val isLocOn = isLocationEnabled()
-        val note = if (!isLocOn) " (Device location toggle is OFF)" else ""
+        val note = if (!isLocOn) " (Location is OFF; grant ADB permission to allow remote ON)" else ""
         val ackMessage = "Away Assist: Tracing active$note. Sending updates every ${intervalMins}m. Reply STOP with your prefix to cancel, or it will auto-stop after ${autoTimeoutHours}h."
         sendSms(senderNumber, ackMessage)
         preferences.recordSosTrigger("TRACE started from $senderNumber")
@@ -179,6 +243,9 @@ class SosLocateController(private val context: Context) {
 
     private suspend fun handleStop(senderNumber: String) {
         preferences.stopSosSession()
+        if (hasWriteSecureSettingsPermission()) {
+            disableSystemLocation()
+        }
         val message = "Away Assist: Tracking stopped, location turned off."
         sendSms(senderNumber, message)
         preferences.recordSosTrigger("STOP command received from $senderNumber")
@@ -197,7 +264,19 @@ class SosLocateController(private val context: Context) {
 
         val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val batteryLevel = getBatteryPercentage()
+        val wasLocationOff = !isLocationEnabled()
+        var toggledOn = false
+
+        if (wasLocationOff && hasWriteSecureSettingsPermission()) {
+            toggledOn = enableSystemLocation()
+            if (toggledOn) delay(1200L)
+        }
+
         val location = acquireLocation(8_000L) ?: getLastKnownLocation()
+
+        if (toggledOn) {
+            disableSystemLocation()
+        }
 
         val locationText = if (location != null) {
             "https://maps.google.com/?q=${location.latitude},${location.longitude} (~${location.accuracy.toInt()}m)"
