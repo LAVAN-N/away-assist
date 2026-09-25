@@ -22,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -80,6 +81,7 @@ fun GroupedListRow(
     title: String,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
+    subtitleColor: Color = AwayAssistTheme.colors.textSecondary,
     leadingIcon: (@Composable () -> Unit)? = null,
     trailingContent: (@Composable () -> Unit)? = null,
     onClick: (() -> Unit)? = null,
@@ -132,7 +134,7 @@ fun GroupedListRow(
                     Text(
                         text = subtitle,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = AwayAssistTheme.colors.textSecondary
+                        color = subtitleColor
                     )
                 }
             }

@@ -161,7 +161,8 @@ fun SosLocateSettingsScreen(
             ) {
                 GroupedListRow(
                     title = "Enable SOS Locate",
-                    subtitle = "Automated remote location on emergency triggers",
+                    subtitle = if (sosState.isSosEnabled) "Active" else "Disabled",
+                    subtitleColor = if (sosState.isSosEnabled) RingState else AwayAssistTheme.colors.textSecondary,
                     trailingContent = {
                         AppleStyleSwitch(
                             checked = sosState.isSosEnabled,
@@ -282,6 +283,71 @@ fun SosLocateSettingsScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
+                    // Message Workflow & Commands Group (Before Configuration)
+                    val activePrefix = if (sosState.commandPrefix.isNotBlank()) sosState.commandPrefix else "[PREFIX]"
+                    GroupedListCard(
+                        header = "Message Workflow & Commands",
+                        footer = "Text from any mobile phone. Always prefix the command with your secret passkey."
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.CellTower,
+                                    contentDescription = null,
+                                    tint = AwayAssistTheme.colors.accent,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column {
+                                    Text(
+                                        text = "SMS Command Protocol",
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                        color = AwayAssistTheme.colors.textPrimary
+                                    )
+                                    Text(
+                                        text = "Send SMS formatted as: [PREFIX] [COMMAND]",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = AwayAssistTheme.colors.textSecondary
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            // FIND Command
+                            CommandItem(
+                                command = "$activePrefix FIND",
+                                description = "Instant GPS fix replied via SMS with Google Maps link & battery %."
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // TRACK Command
+                            CommandItem(
+                                command = "$activePrefix TRACK",
+                                description = "Streams real-time updates whenever the phone is in motion (>50m)."
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // TRACE Command
+                            CommandItem(
+                                command = "$activePrefix TRACE",
+                                description = "Periodic interval updates reported every 5 minutes."
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // STOP Command
+                            CommandItem(
+                                command = "$activePrefix STOP",
+                                description = "Terminates active tracking or tracing immediately."
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
                     // Configuration Group
                     GroupedListCard(
                         header = "Configuration"
@@ -339,7 +405,7 @@ fun SosLocateSettingsScreen(
                                                 modifier = Modifier.size(18.dp)
                                             )
                                         }
-                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Spacer(modifier = Modifier.width(8.dp))
                                     }
                                     Icon(
                                         imageVector = Icons.Default.Edit,
@@ -614,6 +680,35 @@ fun SosLocateSettingsScreen(
                 }
             },
             containerColor = AwayAssistTheme.colors.cardSurface
+        )
+    }
+}
+
+@Composable
+private fun CommandItem(
+    command: String,
+    description: String
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(SquircleMedium)
+            .background(AwayAssistTheme.colors.cardSurface.copy(alpha = 0.5f))
+            .padding(horizontal = 12.dp, vertical = 10.dp)
+    ) {
+        Text(
+            text = command,
+            style = MaterialTheme.typography.bodyMedium.copy(
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace
+            ),
+            color = AwayAssistTheme.colors.accent
+        )
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+            text = description,
+            style = MaterialTheme.typography.bodySmall,
+            color = AwayAssistTheme.colors.textSecondary
         )
     }
 }

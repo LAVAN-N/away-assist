@@ -419,10 +419,11 @@ private fun SosLocateCard(
             title = "SOS Locate Protocol",
             subtitle = when {
                 sosState.isSessionActive -> "🚨 Active ${sosState.sessionState.name} session running"
-                sosState.isSosEnabled -> "Active (SHA-256 Protected)"
+                sosState.isSosEnabled -> "Active"
                 sosState.isOnboarded -> "Disabled"
                 else -> "Offline SMS & Hardware Emergency Triggers"
             },
+            subtitleColor = if (sosState.isSessionActive || sosState.isSosEnabled) RingState else colors.textSecondary,
             leadingIcon = {
                 Box(
                     modifier = Modifier
