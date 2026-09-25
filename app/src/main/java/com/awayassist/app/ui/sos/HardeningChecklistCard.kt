@@ -39,19 +39,78 @@ import com.awayassist.app.ui.components.GroupedListCard
 import com.awayassist.app.ui.theme.AwayAssistTheme
 import com.awayassist.app.ui.theme.RingState
 
+import android.app.Notification
+import android.app.NotificationManager
+import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.awayassist.app.service.NotificationHelper
+
+private fun checkIsLockScreenNotificationHidden(context: Context): Boolean {
+    val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return false
+
+    // 1. Check if notifications are disabled completely
+    if (!nm.areNotificationsEnabled()) {
+        return true
+    }
+
+    // 2. Check global lock screen notification setting
+    try {
+        val globalShow = Settings.Secure.getInt(
+            context.contentResolver,
+            "lock_screen_show_notifications",
+            1
+        )
+        if (globalShow == 0) return true
+    } catch (_: Exception) {}
+
+    // 3. Check channel-level lock screen visibility
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        val channel = nm.getNotificationChannel(NotificationHelper.CHANNEL_ID)
+        if (channel != null) {
+            if (channel.importance == NotificationManager.IMPORTANCE_NONE) {
+                return true
+            }
+            if (channel.lockscreenVisibility == Notification.VISIBILITY_SECRET) {
+                return true
+            }
+        }
+    }
+
+    return false
+}
+
 @Composable
 fun HardeningChecklistCard(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val keyguardManager = remember {
         context.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
     }
-    val isDeviceSecure = remember(keyguardManager) {
-        keyguardManager?.isDeviceSecure ?: false
+    val sosLocateController = remember { com.awayassist.app.util.SosLocateController(context) }
+
+    var isDeviceSecure by remember { mutableStateOf(keyguardManager?.isDeviceSecure ?: false) }
+    var isLockNotificationHidden by remember { mutableStateOf(checkIsLockScreenNotificationHidden(context)) }
+    var hasAdbPermission by remember { mutableStateOf(sosLocateController.hasWriteSecureSettingsPermission()) }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                isDeviceSecure = keyguardManager?.isDeviceSecure ?: false
+                isLockNotificationHidden = checkIsLockScreenNotificationHidden(context)
+                hasAdbPermission = sosLocateController.hasWriteSecureSettingsPermission()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
     }
 
-    var showAdbGuideSheet by remember { androidx.compose.runtime.mutableStateOf(false) }
+    var showAdbGuideSheet by remember { mutableStateOf(false) }
 
     if (showAdbGuideSheet) {
         AdbSetupGuideSheet(onDismiss = { showAdbGuideSheet = false })
@@ -111,50 +170,65 @@ fun HardeningChecklistCard(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Item 2: Hide Notification Content
+            // Item 2: Hide Lock Screen Notification Content
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    imageVector = Icons.Default.NotificationsOff,
+                    imageVector = if (isLockNotificationHidden) Icons.Default.CheckCircle else Icons.Default.Warning,
                     contentDescription = null,
-                    tint = AwayAssistTheme.colors.textSecondary,
+                    tint = if (isLockNotificationHidden) RingState else AwayAssistTheme.colors.accent,
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(10.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Hide Lock Screen SMS Previews",
+                        text = if (isLockNotificationHidden) "Lock Screen Notification: Hidden" else "Lock Screen Notification: Visible",
                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                         color = AwayAssistTheme.colors.textPrimary
                     )
                     Text(
-                        text = "Hiding sensitive notifications prevents someone from seeing secret command responses on the lock screen.",
+                        text = if (isLockNotificationHidden) {
+                            "Away Assist notifications are hidden on the lock screen so secrets cannot be viewed."
+                        } else {
+                            "Hide Away Assist notifications on the lock screen to prevent exposing status or secret responses."
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         color = AwayAssistTheme.colors.textSecondary
                     )
                 }
-                Spacer(modifier = Modifier.width(8.dp))
-                AppleStyleButton(
-                    text = "Configure",
-                    onClick = {
-                        try {
-                            val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
-                                    putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                if (!isLockNotificationHidden) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    AppleStyleButton(
+                        text = "Hide on Lock",
+                        onClick = {
+                            try {
+                                val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                    Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
+                                        putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                                        putExtra(Settings.EXTRA_CHANNEL_ID, NotificationHelper.CHANNEL_ID)
+                                    }
+                                } else {
+                                    Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                                        putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                                    }
                                 }
-                            } else {
-                                Intent(Settings.ACTION_SETTINGS)
+                                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                try {
+                                    val fallbackIntent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                                        putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    }
+                                    context.startActivity(fallbackIntent)
+                                } catch (_: Exception) {}
                             }
-                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            context.startActivity(intent)
-                        } catch (e: Exception) {
-                            // Fallback
-                        }
-                    },
-                    style = AppleButtonStyle.SECONDARY
-                )
+                        },
+                        style = AppleButtonStyle.SECONDARY
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
