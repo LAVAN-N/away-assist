@@ -3,6 +3,7 @@ package com.awayassist.app.ui.sos
 import android.app.KeyguardManager
 import android.app.Notification
 import android.app.NotificationManager
+import android.app.SearchManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -94,25 +95,50 @@ private fun checkIsQuickSettingsRestricted(context: Context): Boolean {
 }
 
 private fun openLockScreenQuickSettings(context: Context) {
-    val intents = listOf(
-        // Standard Android & OEM-exported Notification & Status Bar / Control Centre settings
-        Intent("android.settings.NOTIFICATION_SETTINGS"),
-        Intent("android.settings.STATUS_BAR_SETTINGS"),
-        Intent("android.settings.LOCKSCREEN_SETTINGS"),
-
-        // Samsung One UI Secure Lock / Status Bar
-        Intent("com.samsung.settings.SECURE_LOCK_SETTINGS"),
-
-        // OnePlus / Oppo / Realme / ColorOS
-        Intent().setComponent(ComponentName("com.coloros.notificationmanager", "com.coloros.notificationmanager.NotificationCenterSettingsActivity")),
-        Intent().setComponent(ComponentName("com.oplus.notificationmanager", "com.oplus.notificationmanager.NotificationCenterSettingsActivity")),
-
-        // Security / Main Settings Fallback
-        Intent(Settings.ACTION_SECURITY_SETTINGS),
-        Intent(Settings.ACTION_SETTINGS)
+    val query = "Control centre"
+    val searchIntents = listOf(
+        // 1. Android standard Settings Search
+        Intent("android.settings.APP_SEARCH_SETTINGS").apply {
+            putExtra("query", query)
+            putExtra(SearchManager.QUERY, query)
+            putExtra("android.intent.extra.TEXT", query)
+        },
+        // 2. Settings search action
+        Intent(Intent.ACTION_SEARCH).apply {
+            setPackage("com.android.settings")
+            putExtra("query", query)
+            putExtra(SearchManager.QUERY, query)
+            putExtra("android.intent.extra.TEXT", query)
+        },
+        // 3. Xiaomi / MIUI / HyperOS Settings Search
+        Intent().apply {
+            component = ComponentName("com.android.settings", "com.android.settings.search.SearchActivity")
+            putExtra("query", query)
+            putExtra(SearchManager.QUERY, query)
+            putExtra("android.intent.extra.TEXT", query)
+        },
+        // 4. Intelligence Search (Stock / Pixel / OEM)
+        Intent().apply {
+            component = ComponentName("com.android.settings.intelligence", "com.android.settings.intelligence.search.SearchActivity")
+            putExtra("query", query)
+            putExtra(SearchManager.QUERY, query)
+            putExtra("android.intent.extra.TEXT", query)
+        },
+        Intent().apply {
+            component = ComponentName("com.google.android.settings.intelligence", "com.google.android.settings.intelligence.search.SearchActivity")
+            putExtra("query", query)
+            putExtra(SearchManager.QUERY, query)
+            putExtra("android.intent.extra.TEXT", query)
+        },
+        // 5. Standard Settings fallback
+        Intent(Settings.ACTION_SETTINGS).apply {
+            putExtra("query", query)
+            putExtra(SearchManager.QUERY, query)
+            putExtra("android.intent.extra.TEXT", query)
+        }
     )
 
-    for (intent in intents) {
+    for (intent in searchIntents) {
         try {
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             if (intent.resolveActivity(context.packageManager) != null) {
