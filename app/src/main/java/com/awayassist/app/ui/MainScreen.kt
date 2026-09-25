@@ -419,19 +419,16 @@ private fun SosLocateCard(
             title = "SOS Locate Protocol",
             subtitle = when {
                 sosState.isSessionActive -> "🚨 Active ${sosState.sessionState.name} session running"
-                sosState.isSosEnabled -> "Active"
-                sosState.isOnboarded -> "Disabled"
+                sosState.isOnboarded && !sosState.isSosEnabled -> "Disabled"
                 else -> "Offline SMS & Hardware Emergency Triggers"
             },
-            subtitleColor = if (sosState.isSessionActive || sosState.isSosEnabled) RingState else colors.textSecondary,
             leadingIcon = {
                 Box(
                     modifier = Modifier
                         .size(28.dp)
                         .clip(CircleShape)
                         .background(
-                            if (sosState.isSessionActive) RingState.copy(alpha = 0.18f)
-                            else if (sosState.isSosEnabled) colors.accent.copy(alpha = 0.18f)
+                            if (sosState.isSessionActive || sosState.isSosEnabled) RingState.copy(alpha = 0.18f)
                             else colors.textSecondary.copy(alpha = 0.15f)
                         ),
                     contentAlignment = Alignment.Center
@@ -439,7 +436,7 @@ private fun SosLocateCard(
                     Icon(
                         imageVector = if (sosState.isSessionActive) Icons.Default.LocationOn else Icons.Default.Shield,
                         contentDescription = null,
-                        tint = if (sosState.isSessionActive) RingState else if (sosState.isSosEnabled) colors.accent else colors.textSecondary,
+                        tint = if (sosState.isSessionActive || sosState.isSosEnabled) RingState else colors.textSecondary,
                         modifier = Modifier.size(15.dp)
                     )
                 }
@@ -452,13 +449,13 @@ private fun SosLocateCard(
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 13.sp
                         ),
-                        color = if (sosState.isSessionActive) RingState else if (sosState.isSosEnabled) colors.accent else colors.textSecondary
+                        color = if (sosState.isSessionActive || sosState.isSosEnabled) RingState else colors.textSecondary
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
                         contentDescription = null,
-                        tint = colors.textSecondary,
+                        tint = if (sosState.isSessionActive || sosState.isSosEnabled) RingState else colors.textSecondary.copy(alpha = 0.5f),
                         modifier = Modifier.size(11.dp)
                     )
                 }

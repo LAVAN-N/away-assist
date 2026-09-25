@@ -161,8 +161,7 @@ fun SosLocateSettingsScreen(
             ) {
                 GroupedListRow(
                     title = "Enable SOS Locate",
-                    subtitle = if (sosState.isSosEnabled) "Active" else "Disabled",
-                    subtitleColor = if (sosState.isSosEnabled) RingState else AwayAssistTheme.colors.textSecondary,
+                    subtitle = "Automated remote location on emergency triggers",
                     trailingContent = {
                         AppleStyleSwitch(
                             checked = sosState.isSosEnabled,
@@ -284,10 +283,9 @@ fun SosLocateSettingsScreen(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     // Message Workflow & Commands Group (Before Configuration)
-                    val activePrefix = if (sosState.commandPrefix.isNotBlank()) sosState.commandPrefix else "[PREFIX]"
                     GroupedListCard(
                         header = "Message Workflow & Commands",
-                        footer = "Text from any mobile phone. Always prefix the command with your secret passkey."
+                        footer = "Text from any mobile phone. Always prefix the command with your secret passkey, e.g. '<PREFIX> FIND'."
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -305,7 +303,7 @@ fun SosLocateSettingsScreen(
                                         color = AwayAssistTheme.colors.textPrimary
                                     )
                                     Text(
-                                        text = "Send SMS formatted as: [PREFIX] [COMMAND]",
+                                        text = "Send SMS formatted as: <PREFIX> <COMMAND>",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = AwayAssistTheme.colors.textSecondary
                                     )
@@ -316,7 +314,7 @@ fun SosLocateSettingsScreen(
 
                             // FIND Command
                             CommandItem(
-                                command = "$activePrefix FIND",
+                                command = "<PREFIX> FIND",
                                 description = "Instant GPS fix replied via SMS with Google Maps link & battery %."
                             )
 
@@ -324,7 +322,7 @@ fun SosLocateSettingsScreen(
 
                             // TRACK Command
                             CommandItem(
-                                command = "$activePrefix TRACK",
+                                command = "<PREFIX> TRACK",
                                 description = "Streams real-time updates whenever the phone is in motion (>50m)."
                             )
 
@@ -332,7 +330,7 @@ fun SosLocateSettingsScreen(
 
                             // TRACE Command
                             CommandItem(
-                                command = "$activePrefix TRACE",
+                                command = "<PREFIX> TRACE",
                                 description = "Periodic interval updates reported every 5 minutes."
                             )
 
@@ -340,7 +338,7 @@ fun SosLocateSettingsScreen(
 
                             // STOP Command
                             CommandItem(
-                                command = "$activePrefix STOP",
+                                command = "<PREFIX> STOP",
                                 description = "Terminates active tracking or tracing immediately."
                             )
                         }
