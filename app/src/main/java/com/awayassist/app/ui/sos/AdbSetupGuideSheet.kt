@@ -75,6 +75,32 @@ fun AdbSetupGuideSheet(
     var selectedMethodTab by remember { mutableIntStateOf(0) } // 0 = Shizuku (Phone only), 1 = Computer (ADB)
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
+    val shizukuPermissionListener = remember {
+        rikka.shizuku.Shizuku.OnRequestPermissionResultListener { _, grantResult ->
+            if (grantResult == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                val ok = controller.grantWriteSecureSettingsViaShizuku()
+                isGranted = ok
+                if (ok) {
+                    Toast.makeText(context, "Permission granted via Shizuku!", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        try {
+            rikka.shizuku.Shizuku.addRequestPermissionResultListener(shizukuPermissionListener)
+        } catch (e: Exception) {}
+        onDispose {
+            try {
+                rikka.shizuku.Shizuku.removeRequestPermissionResultListener(shizukuPermissionListener)
+            } catch (e: Exception) {}
+        }
+    }
+
+    val isShizukuRunning = remember { controller.isShizukuAvailable() }
+    val isShizukuAuthorized = remember(isShizukuRunning) { controller.isShizukuPermissionGranted() }
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -232,7 +258,7 @@ fun AdbSetupGuideSheet(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Shizuku (No PC)",
+                            text = "Shizuku (1-Tap on Phone)",
                             style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
                             color = if (selectedMethodTab == 0) AwayAssistTheme.colors.background else AwayAssistTheme.colors.textSecondary
                         )
@@ -270,7 +296,7 @@ fun AdbSetupGuideSheet(
             if (selectedMethodTab == 0) {
                 // SHIZUKU STEP-BY-STEP GUIDE (100% ON PHONE)
                 Text(
-                    text = "Method 1: Setup directly on Phone with Shizuku",
+                    text = "Method 1: 1-Tap Setup with Shizuku (Free & No PC)",
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                     color = AwayAssistTheme.colors.accent
                 )
@@ -279,7 +305,7 @@ fun AdbSetupGuideSheet(
                 // Step 1: Install Shizuku
                 GuideStepItem(
                     stepNumber = "1",
-                    title = "Install Shizuku App",
+                    title = "Install Free Shizuku App",
                     description = "Download the official, free Shizuku app from the Google Play Store on this phone.",
                     actionLabel = "Open Shizuku in Play Store",
                     onAction = {
@@ -302,8 +328,8 @@ fun AdbSetupGuideSheet(
                 // Step 2: Start Shizuku via Wireless Debugging
                 GuideStepItem(
                     stepNumber = "2",
-                    title = "Start Shizuku (Wireless Debugging)",
-                    description = "1. Enable 'Developer Options' & toggle 'Wireless Debugging' ON.\n2. Open Shizuku, tap 'Pairing', enter 6-digit code in the notification.\n3. Return to Shizuku and tap 'Start'.",
+                    title = "Start Shizuku via Wireless Debugging",
+                    description = "1. Enable 'Developer Options' & toggle 'Wireless Debugging' ON.\n2. Open Shizuku, tap 'Pairing' (enter 6-digit code in the notification).\n3. Return to Shizuku and tap 'Start'.",
                     actionLabel = "Open Developer Options",
                     onAction = {
                         try {
@@ -318,84 +344,34 @@ fun AdbSetupGuideSheet(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Step 3: Run command with a-Shell (or Termux)
+                // Step 3: Direct 1-Tap Grant inside Away Assist
                 GuideStepItem(
                     stepNumber = "3",
-                    title = "Run Permission Command via a-Shell",
-                    description = "Install the free 'a-Shell' app from Play Store (which connects to Shizuku) and run the command below:",
-                    actionLabel = "Open a-Shell in Play Store",
+                    title = "Grant Permission in 1-Tap",
+                    description = "Once Shizuku is started, tap the button below. Away Assist will directly communicate with Shizuku to grant the permission automatically—no shell or terminal app needed!",
+                    actionLabel = if (!isGranted) "Grant with Shizuku" else "Permission Granted ✓",
                     onAction = {
-                        try {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=in.sunilpaulmathew.ashell")).apply {
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        if (!isGranted) {
+                            if (!controller.isShizukuAvailable()) {
+                                Toast.makeText(context, "Shizuku is not running. Please open Shizuku and tap 'Start'.", Toast.LENGTH_LONG).show()
+                            } else if (!controller.isShizukuPermissionGranted()) {
+                                try {
+                                    rikka.shizuku.Shizuku.requestPermission(1001)
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Failed to request Shizuku permission", Toast.LENGTH_SHORT).show()
+                                }
+                            } else {
+                                val success = controller.grantWriteSecureSettingsViaShizuku()
+                                isGranted = success
+                                if (success) {
+                                    Toast.makeText(context, "Successfully granted via Shizuku!", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    Toast.makeText(context, "Grant failed. Please check Shizuku status.", Toast.LENGTH_SHORT).show()
+                                }
                             }
-                            context.startActivity(intent)
-                        } catch (e: Exception) {
-                            val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=in.sunilpaulmathew.ashell")).apply {
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            }
-                            context.startActivity(webIntent)
                         }
                     }
                 )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Command Box for Shizuku / a-Shell
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(SquircleMedium)
-                        .background(AwayAssistTheme.colors.cardSurface)
-                        .border(1.dp, AwayAssistTheme.colors.textSecondary.copy(alpha = 0.2f), SquircleMedium)
-                        .padding(14.dp)
-                ) {
-                    Column {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "COMMAND FOR A-SHELL / TERMINAL:",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                color = AwayAssistTheme.colors.textSecondary
-                            )
-                            Row(
-                                modifier = Modifier
-                                    .clip(SquircleMedium)
-                                    .clickable {
-                                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-                                        val clip = ClipData.newPlainText("Command", GRANT_COMMAND)
-                                        clipboard?.setPrimaryClip(clip)
-                                        Toast.makeText(context, "Command copied!", Toast.LENGTH_SHORT).show()
-                                    }
-                                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.ContentCopy,
-                                    contentDescription = "Copy",
-                                    tint = AwayAssistTheme.colors.accent,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = "Copy",
-                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                    color = AwayAssistTheme.colors.accent
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = GRANT_COMMAND,
-                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                            color = AwayAssistTheme.colors.textPrimary
-                        )
-                    }
-                }
-
             } else {
                 // PC / ADB STEP-BY-STEP GUIDE
                 Text(

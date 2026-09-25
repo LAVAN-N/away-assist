@@ -126,6 +126,48 @@ class SosLocateController(private val context: Context) {
         ) == PackageManager.PERMISSION_GRANTED
     }
 
+    fun isShizukuAvailable(): Boolean {
+        return try {
+            rikka.shizuku.Shizuku.pingBinder()
+        } catch (e: Throwable) {
+            false
+        }
+    }
+
+    fun isShizukuPermissionGranted(): Boolean {
+        return try {
+            if (!isShizukuAvailable()) false
+            else rikka.shizuku.Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
+        } catch (e: Throwable) {
+            false
+        }
+    }
+
+    fun grantWriteSecureSettingsViaShizuku(): Boolean {
+        return try {
+            if (!isShizukuAvailable()) return false
+            val newProcessMethod = rikka.shizuku.Shizuku::class.java.getDeclaredMethod(
+                "newProcess",
+                Array<String>::class.java,
+                Array<String>::class.java,
+                String::class.java
+            )
+            newProcessMethod.isAccessible = true
+            val process = newProcessMethod.invoke(
+                null,
+                arrayOf("pm", "grant", context.packageName, Manifest.permission.WRITE_SECURE_SETTINGS),
+                null,
+                null
+            ) as java.lang.Process
+            val exitCode = process.waitFor()
+            Log.d(TAG, "Shizuku pm grant exitCode: $exitCode")
+            hasWriteSecureSettingsPermission()
+        } catch (e: Throwable) {
+            Log.e(TAG, "Failed to grant permission via Shizuku", e)
+            false
+        }
+    }
+
     fun enableSystemLocation(): Boolean {
         if (!hasWriteSecureSettingsPermission()) return false
         return try {

@@ -18,3 +18,7 @@
 -keep public class com.awayassist.app.service.BootReceiver
 -keep public class com.awayassist.app.widget.AwayAssistAppWidgetProvider
 
+# Keep Shizuku IPC classes
+-keep class rikka.shizuku.** { *; }
+-keep class dev.rikka.shizuku.** { *; }
+
