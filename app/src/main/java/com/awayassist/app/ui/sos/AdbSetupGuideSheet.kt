@@ -4,7 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import android.os.Build
+import android.net.Uri
 import android.provider.Settings
 import android.widget.Toast
 import androidx.compose.foundation.background
@@ -29,7 +29,8 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.OpenInNew
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material.icons.filled.Laptop
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -39,6 +40,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -59,7 +61,8 @@ import com.awayassist.app.ui.theme.SquircleLarge
 import com.awayassist.app.ui.theme.SquircleMedium
 import com.awayassist.app.util.SosLocateController
 
-private const val ADB_COMMAND = "adb shell pm grant com.awayassist.app android.permission.WRITE_SECURE_SETTINGS"
+private const val GRANT_COMMAND = "pm grant com.awayassist.app android.permission.WRITE_SECURE_SETTINGS"
+private const val ADB_GRANT_COMMAND = "adb shell pm grant com.awayassist.app android.permission.WRITE_SECURE_SETTINGS"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,6 +72,7 @@ fun AdbSetupGuideSheet(
     val context = LocalContext.current
     val controller = remember { SosLocateController(context) }
     var isGranted by remember { mutableStateOf(controller.hasWriteSecureSettingsPermission()) }
+    var selectedMethodTab by remember { mutableIntStateOf(0) } // 0 = Shizuku (Phone only), 1 = Computer (ADB)
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
@@ -91,7 +95,7 @@ fun AdbSetupGuideSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Remote Location Switching Guide",
+                    text = "Remote Location Switching Setup",
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = AwayAssistTheme.colors.textPrimary
                 )
@@ -125,13 +129,13 @@ fun AdbSetupGuideSheet(
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
                         Text(
-                            text = "Do I really need this?",
+                            text = "Do I really need this setup?",
                             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                             color = AwayAssistTheme.colors.textPrimary
                         )
                         Spacer(modifier = Modifier.height(3.dp))
                         Text(
-                            text = "No computer needed if you keep your phone's Location toggle ON! On modern Android, leaving location ON consumes 0% battery when idle.\n\nThis 1-time setup is only needed if you prefer keeping your phone's location switch OFF manually at all times.",
+                            text = "No setup is needed if you keep your phone's Location toggle ON! On modern Android, leaving location ON consumes 0% battery when idle.\n\nThis 1-time setup is only needed if you prefer keeping your phone's location switch OFF manually at all times.",
                             style = MaterialTheme.typography.bodySmall,
                             color = AwayAssistTheme.colors.textSecondary,
                             lineHeight = 18.sp
@@ -140,9 +144,9 @@ fun AdbSetupGuideSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
-            // Status Indicator
+            // Live Permission Status Card
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -173,12 +177,12 @@ fun AdbSetupGuideSheet(
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
                             Text(
-                                text = if (isGranted) "Permission Active" else "Permission Not Yet Granted",
+                                text = if (isGranted) "Permission Active" else "Permission Not Granted",
                                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                                 color = AwayAssistTheme.colors.textPrimary
                             )
                             Text(
-                                text = if (isGranted) "Remote switching is ready" else "Follow steps below to enable",
+                                text = if (isGranted) "Remote switching is ready" else "Follow Shizuku or PC guide below",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = AwayAssistTheme.colors.textSecondary
                             )
@@ -199,115 +203,316 @@ fun AdbSetupGuideSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(18.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            // Step 1: Enable Developer Options
-            GuideStepItem(
-                stepNumber = "1",
-                title = "Enable Developer Options",
-                description = "Go to Settings > About Phone, and tap 'Build Number' 7 times until you see the message 'You are now a developer!'",
-                actionLabel = "Open About Phone",
-                onAction = {
-                    try {
-                        context.startActivity(Intent(Settings.ACTION_DEVICE_INFO_SETTINGS).apply {
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        })
-                    } catch (e: Exception) {
-                        try {
-                            context.startActivity(Intent(Settings.ACTION_SETTINGS).apply {
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            })
-                        } catch (e2: Exception) {
-                            // Fallback
-                        }
-                    }
-                }
-            )
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Step 2: Turn on USB Debugging
-            GuideStepItem(
-                stepNumber = "2",
-                title = "Turn on USB Debugging",
-                description = "In Developer Options, turn on 'USB Debugging'.\n(Xiaomi / Redmi / MIUI users: also turn on 'USB debugging (Security settings)')",
-                actionLabel = "Open Developer Options",
-                onAction = {
-                    try {
-                        context.startActivity(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).apply {
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        })
-                    } catch (e: Exception) {
-                        Toast.makeText(context, "Please open Settings > Developer Options manually", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            )
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Step 3: Run the 1-Time Command
-            GuideStepItem(
-                stepNumber = "3",
-                title = "Run 1-Time Command",
-                description = "Connect phone to PC/Mac via USB:\n\n• Easy (No install): In Chrome or Edge on PC, open app.webadb.com, click 'Connect', allow on phone, open 'Interactive Shell', and paste command.\n\n• Advanced: Run via ADB Terminal in PowerShell / Mac Terminal.",
-                actionLabel = null,
-                onAction = null
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Command Box with 1-tap copy
-            Box(
+            // Method Selector (Shizuku vs PC ADB)
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(SquircleMedium)
                     .background(AwayAssistTheme.colors.cardSurface)
-                    .border(1.dp, AwayAssistTheme.colors.textSecondary.copy(alpha = 0.2f), SquircleMedium)
-                    .padding(14.dp)
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "COMMAND TO RUN:",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                            color = AwayAssistTheme.colors.textSecondary
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(SquircleMedium)
+                        .background(if (selectedMethodTab == 0) AwayAssistTheme.colors.accent else androidx.compose.ui.graphics.Color.Transparent)
+                        .clickable { selectedMethodTab = 0 }
+                        .padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.PhoneAndroid,
+                            contentDescription = null,
+                            tint = if (selectedMethodTab == 0) AwayAssistTheme.colors.background else AwayAssistTheme.colors.textSecondary,
+                            modifier = Modifier.size(16.dp)
                         )
-                        Row(
-                            modifier = Modifier
-                                .clip(SquircleMedium)
-                                .clickable {
-                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-                                    val clip = ClipData.newPlainText("ADB Command", ADB_COMMAND)
-                                    clipboard?.setPrimaryClip(clip)
-                                    Toast.makeText(context, "Command copied!", Toast.LENGTH_SHORT).show()
-                                }
-                                .padding(horizontal = 8.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.ContentCopy,
-                                contentDescription = "Copy",
-                                tint = AwayAssistTheme.colors.accent,
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "Copy",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                color = AwayAssistTheme.colors.accent
-                            )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Shizuku (No PC)",
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                            color = if (selectedMethodTab == 0) AwayAssistTheme.colors.background else AwayAssistTheme.colors.textSecondary
+                        )
+                    }
+                }
+
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(SquircleMedium)
+                        .background(if (selectedMethodTab == 1) AwayAssistTheme.colors.accent else androidx.compose.ui.graphics.Color.Transparent)
+                        .clickable { selectedMethodTab = 1 }
+                        .padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Laptop,
+                            contentDescription = null,
+                            tint = if (selectedMethodTab == 1) AwayAssistTheme.colors.background else AwayAssistTheme.colors.textSecondary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Computer (ADB)",
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                            color = if (selectedMethodTab == 1) AwayAssistTheme.colors.background else AwayAssistTheme.colors.textSecondary
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            if (selectedMethodTab == 0) {
+                // SHIZUKU STEP-BY-STEP GUIDE (100% ON PHONE)
+                Text(
+                    text = "Method 1: Setup directly on Phone with Shizuku",
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    color = AwayAssistTheme.colors.accent
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Step 1: Install Shizuku
+                GuideStepItem(
+                    stepNumber = "1",
+                    title = "Install Shizuku App",
+                    description = "Download the official, free Shizuku app from the Google Play Store on this phone.",
+                    actionLabel = "Open Shizuku in Play Store",
+                    onAction = {
+                        try {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=moe.shizuku.privileged.api")).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(intent)
+                        } catch (e: Exception) {
+                            val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=moe.shizuku.privileged.api")).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(webIntent)
                         }
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = ADB_COMMAND,
-                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                        color = AwayAssistTheme.colors.textPrimary
-                    )
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Step 2: Start Shizuku via Wireless Debugging
+                GuideStepItem(
+                    stepNumber = "2",
+                    title = "Start Shizuku (Wireless Debugging)",
+                    description = "1. Enable 'Developer Options' & toggle 'Wireless Debugging' ON.\n2. Open Shizuku, tap 'Pairing', enter 6-digit code in the notification.\n3. Return to Shizuku and tap 'Start'.",
+                    actionLabel = "Open Developer Options",
+                    onAction = {
+                        try {
+                            context.startActivity(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            })
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Open Settings > Developer Options manually", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Step 3: Run command with a-Shell (or Termux)
+                GuideStepItem(
+                    stepNumber = "3",
+                    title = "Run Permission Command via a-Shell",
+                    description = "Install the free 'a-Shell' app from Play Store (which connects to Shizuku) and run the command below:",
+                    actionLabel = "Open a-Shell in Play Store",
+                    onAction = {
+                        try {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=in.sunilpaulmathew.ashell")).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(intent)
+                        } catch (e: Exception) {
+                            val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=in.sunilpaulmathew.ashell")).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(webIntent)
+                        }
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Command Box for Shizuku / a-Shell
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(SquircleMedium)
+                        .background(AwayAssistTheme.colors.cardSurface)
+                        .border(1.dp, AwayAssistTheme.colors.textSecondary.copy(alpha = 0.2f), SquircleMedium)
+                        .padding(14.dp)
+                ) {
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "COMMAND FOR A-SHELL / TERMINAL:",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = AwayAssistTheme.colors.textSecondary
+                            )
+                            Row(
+                                modifier = Modifier
+                                    .clip(SquircleMedium)
+                                    .clickable {
+                                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                                        val clip = ClipData.newPlainText("Command", GRANT_COMMAND)
+                                        clipboard?.setPrimaryClip(clip)
+                                        Toast.makeText(context, "Command copied!", Toast.LENGTH_SHORT).show()
+                                    }
+                                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ContentCopy,
+                                    contentDescription = "Copy",
+                                    tint = AwayAssistTheme.colors.accent,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Copy",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = AwayAssistTheme.colors.accent
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = GRANT_COMMAND,
+                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                            color = AwayAssistTheme.colors.textPrimary
+                        )
+                    }
+                }
+
+            } else {
+                // PC / ADB STEP-BY-STEP GUIDE
+                Text(
+                    text = "Method 2: Setup via Computer (USB / WebADB)",
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    color = AwayAssistTheme.colors.accent
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Step 1: Enable Developer Options
+                GuideStepItem(
+                    stepNumber = "1",
+                    title = "Enable Developer Options",
+                    description = "Go to Settings > About Phone, and tap 'Build Number' 7 times until you see 'You are now a developer!'.",
+                    actionLabel = "Open About Phone",
+                    onAction = {
+                        try {
+                            context.startActivity(Intent(Settings.ACTION_DEVICE_INFO_SETTINGS).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            })
+                        } catch (e: Exception) {
+                            try {
+                                context.startActivity(Intent(Settings.ACTION_SETTINGS).apply {
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                })
+                            } catch (e2: Exception) {
+                                // Fallback
+                            }
+                        }
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Step 2: Turn on USB Debugging
+                GuideStepItem(
+                    stepNumber = "2",
+                    title = "Turn on USB Debugging",
+                    description = "In Developer Options, turn on 'USB Debugging'.\n(Xiaomi / POCO / Redmi users: also turn on 'USB debugging (Security settings)').",
+                    actionLabel = "Open Developer Options",
+                    onAction = {
+                        try {
+                            context.startActivity(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            })
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Please open Settings > Developer Options manually", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Step 3: Run command
+                GuideStepItem(
+                    stepNumber = "3",
+                    title = "Connect & Run Command",
+                    description = "Plug phone into PC/Mac via USB:\n\n• Easy: In Chrome/Edge on PC, open app.webadb.com, click 'Connect', open 'Interactive Shell', and paste command.\n\n• Terminal: Run in Command Prompt / Terminal.",
+                    actionLabel = null,
+                    onAction = null
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Command Box for PC
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(SquircleMedium)
+                        .background(AwayAssistTheme.colors.cardSurface)
+                        .border(1.dp, AwayAssistTheme.colors.textSecondary.copy(alpha = 0.2f), SquircleMedium)
+                        .padding(14.dp)
+                ) {
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "COMMAND FOR PC / WEBADB:",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = AwayAssistTheme.colors.textSecondary
+                            )
+                            Row(
+                                modifier = Modifier
+                                    .clip(SquircleMedium)
+                                    .clickable {
+                                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                                        val clip = ClipData.newPlainText("ADB Command", ADB_GRANT_COMMAND)
+                                        clipboard?.setPrimaryClip(clip)
+                                        Toast.makeText(context, "Command copied!", Toast.LENGTH_SHORT).show()
+                                    }
+                                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ContentCopy,
+                                    contentDescription = "Copy",
+                                    tint = AwayAssistTheme.colors.accent,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Copy",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = AwayAssistTheme.colors.accent
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = ADB_GRANT_COMMAND,
+                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                            color = AwayAssistTheme.colors.textPrimary
+                        )
+                    }
                 }
             }
 
