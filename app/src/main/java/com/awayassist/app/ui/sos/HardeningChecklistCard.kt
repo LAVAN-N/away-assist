@@ -331,7 +331,7 @@ fun RemoteLocationSwitchingCard(
 
     GroupedListCard(
         header = "Remote Location Switching",
-        footer = "Enables Away Assist to automatically turn system location ON when emergency SMS arrives and turn it OFF after GPS fix.",
+        footer = "Away Assist SOS works as usual if phone location is already ON. In unexpected cases where location was turned OFF when the device is lost, this setting comes into play to automatically toggle it ON.",
         modifier = modifier
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -354,9 +354,9 @@ fun RemoteLocationSwitchingCard(
                     )
                     Text(
                         text = if (hasAdbPermission) {
-                            "System location will auto-toggle ON upon emergency SMS triggers and OFF after fix."
+                            "Location auto-toggle is active. If location is ever OFF when phone is lost, Away Assist will turn it ON via SMS."
                         } else {
-                            "Only needed if you keep phone location OFF. Tap 'Guide' for 1-tap Shizuku or PC setup."
+                            "Away Assist SOS works as usual if location is ON. If location is OFF when phone is lost, this setting comes into play to enable it remotely. Tap 'Guide' for setup."
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = AwayAssistTheme.colors.textSecondary

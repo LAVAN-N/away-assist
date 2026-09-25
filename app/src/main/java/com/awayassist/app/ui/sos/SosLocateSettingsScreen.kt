@@ -285,7 +285,7 @@ fun SosLocateSettingsScreen(
                     // Message Workflow & Commands Group (Before Configuration)
                     GroupedListCard(
                         header = "Message Workflow & Commands",
-                        footer = "Text from any mobile phone. Always prefix the command with your secret passkey, e.g. '<PREFIX> FIND'."
+                        footer = "Text from any mobile phone and any cell number. Always prefix the command with your secret passkey, e.g. '<PREFIX> FIND' to hit it."
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
