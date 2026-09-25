@@ -1,5 +1,8 @@
 package com.awayassist.app.ui.sos
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -26,9 +29,11 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.CellTower
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Phone
@@ -62,6 +67,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -99,8 +105,10 @@ fun SosLocateSettingsScreen(
     onUpdateTraceInterval: (Int) -> Unit,
     onStopActiveSession: () -> Unit
 ) {
+    val context = LocalContext.current
     var showEditNumberDialog by remember { mutableStateOf(false) }
     var showEditPrefixDialog by remember { mutableStateOf(false) }
+    var showAboutSosDialog by remember { mutableStateOf(false) }
     var tempEmergencyNumber by remember(sosState.emergencyAlertNumber) {
         mutableStateOf(sosState.emergencyAlertNumber)
     }
@@ -111,7 +119,9 @@ fun SosLocateSettingsScreen(
     var isDialogPrefixRevealed by remember { mutableStateOf(false) }
 
     BackHandler(enabled = true) {
-        if (showEditNumberDialog) {
+        if (showAboutSosDialog) {
+            showAboutSosDialog = false
+        } else if (showEditNumberDialog) {
             showEditNumberDialog = false
         } else if (showEditPrefixDialog) {
             showEditPrefixDialog = false
@@ -135,6 +145,15 @@ fun SosLocateSettingsScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
+                            tint = AwayAssistTheme.colors.textPrimary
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { showAboutSosDialog = true }) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = "About SOS Locate",
                             tint = AwayAssistTheme.colors.textPrimary
                         )
                     }
@@ -679,6 +698,105 @@ fun SosLocateSettingsScreen(
             },
             containerColor = AwayAssistTheme.colors.cardSurface
         )
+    }
+
+    // Dialog: About SOS Locate & Find My Device Synergy
+    if (showAboutSosDialog) {
+        AlertDialog(
+            onDismissRequest = { showAboutSosDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = null,
+                        tint = AwayAssistTheme.colors.accent,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Why SOS Locate?",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = AwayAssistTheme.colors.textPrimary
+                    )
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "Away Assist SOS is built to empower and bridge the gap for tracking apps like Google Find My Device / Find Hub.",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = AwayAssistTheme.colors.textPrimary
+                    )
+                    Text(
+                        text = "• Primary Objective: Standard tracking apps rely on an active internet connection and location services. If your phone is lost while offline or location was turned OFF, Away Assist acts as the emergency fallback.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AwayAssistTheme.colors.textSecondary
+                    )
+                    Text(
+                        text = "• SMS Synergy: When triggered, Away Assist can turn location ON automatically and send live GPS coordinates and Google Maps links via SMS to your trusted emergency contact.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AwayAssistTheme.colors.textSecondary
+                    )
+                    Text(
+                        text = "• Total Protection: Together, Away Assist and Find My Device ensure your device can be found whether it is online, offline, or location was disabled.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AwayAssistTheme.colors.textSecondary
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        openFindMyDevice(context)
+                    }
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Find My Device", color = AwayAssistTheme.colors.accent, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                            contentDescription = null,
+                            tint = AwayAssistTheme.colors.accent,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAboutSosDialog = false }) {
+                    Text("Close", color = AwayAssistTheme.colors.textSecondary)
+                }
+            },
+            containerColor = AwayAssistTheme.colors.cardSurface
+        )
+    }
+}
+
+private fun openFindMyDevice(context: Context) {
+    val packageName = "com.google.android.apps.adm"
+    try {
+        val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
+        if (launchIntent != null) {
+            context.startActivity(launchIntent)
+            return
+        }
+    } catch (_: Exception) {}
+
+    try {
+        val marketIntent = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$packageName")).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(marketIntent)
+    } catch (_: Exception) {
+        try {
+            val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=$packageName")).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(webIntent)
+        } catch (_: Exception) {}
     }
 }
 
