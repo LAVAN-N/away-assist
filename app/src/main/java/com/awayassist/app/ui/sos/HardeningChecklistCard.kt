@@ -4,11 +4,15 @@ import android.app.KeyguardManager
 import android.app.Notification
 import android.app.NotificationManager
 import android.app.SearchManager
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.Bundle
 import android.provider.Settings
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -96,46 +100,57 @@ private fun checkIsQuickSettingsRestricted(context: Context): Boolean {
 
 private fun openLockScreenQuickSettings(context: Context) {
     val query = "Control centre"
+
+    // 1. Copy query to clipboard and notify user for effortless 1-tap paste
+    try {
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+        val clip = ClipData.newPlainText("Search Term", query)
+        clipboard?.setPrimaryClip(clip)
+        Toast.makeText(context, "Copied \"$query\" — paste in Settings search", Toast.LENGTH_SHORT).show()
+    } catch (_: Exception) {}
+
+    fun Intent.applySearchExtras(): Intent = apply {
+        putExtra("query", query)
+        putExtra(SearchManager.QUERY, query)
+        putExtra("android.intent.extra.TEXT", query)
+        putExtra("search_query", query)
+        putExtra("raw_query", query)
+        putExtra("key_search_query", query)
+        putExtra("keyword", query)
+        putExtra("miui.intent.extra.SEARCH_QUERY", query)
+        putExtra("android.provider.Settings.EXTRA_APP_SEARCH_QUERY", query)
+        val args = Bundle().apply {
+            putString(":settings:fragment_args_key", query)
+            putString("query", query)
+        }
+        putExtra(":settings:show_fragment_args", args)
+    }
+
     val searchIntents = listOf(
-        // 1. Android standard Settings Search
-        Intent("android.settings.APP_SEARCH_SETTINGS").apply {
-            putExtra("query", query)
-            putExtra(SearchManager.QUERY, query)
-            putExtra("android.intent.extra.TEXT", query)
-        },
-        // 2. Settings search action
-        Intent(Intent.ACTION_SEARCH).apply {
-            setPackage("com.android.settings")
-            putExtra("query", query)
-            putExtra(SearchManager.QUERY, query)
-            putExtra("android.intent.extra.TEXT", query)
-        },
-        // 3. Xiaomi / MIUI / HyperOS Settings Search
+        // 1. Xiaomi / MIUI / HyperOS Settings Search
         Intent().apply {
             component = ComponentName("com.android.settings", "com.android.settings.search.SearchActivity")
-            putExtra("query", query)
-            putExtra(SearchManager.QUERY, query)
-            putExtra("android.intent.extra.TEXT", query)
-        },
+        }.applySearchExtras(),
+
+        // 2. Android standard Settings Search
+        Intent("android.settings.APP_SEARCH_SETTINGS").applySearchExtras(),
+
+        // 3. Settings search action
+        Intent(Intent.ACTION_SEARCH).apply {
+            setPackage("com.android.settings")
+        }.applySearchExtras(),
+
         // 4. Intelligence Search (Stock / Pixel / OEM)
         Intent().apply {
             component = ComponentName("com.android.settings.intelligence", "com.android.settings.intelligence.search.SearchActivity")
-            putExtra("query", query)
-            putExtra(SearchManager.QUERY, query)
-            putExtra("android.intent.extra.TEXT", query)
-        },
+        }.applySearchExtras(),
+
         Intent().apply {
             component = ComponentName("com.google.android.settings.intelligence", "com.google.android.settings.intelligence.search.SearchActivity")
-            putExtra("query", query)
-            putExtra(SearchManager.QUERY, query)
-            putExtra("android.intent.extra.TEXT", query)
-        },
+        }.applySearchExtras(),
+
         // 5. Standard Settings fallback
-        Intent(Settings.ACTION_SETTINGS).apply {
-            putExtra("query", query)
-            putExtra(SearchManager.QUERY, query)
-            putExtra("android.intent.extra.TEXT", query)
-        }
+        Intent(Settings.ACTION_SETTINGS).applySearchExtras()
     )
 
     for (intent in searchIntents) {
@@ -151,7 +166,7 @@ private fun openLockScreenQuickSettings(context: Context) {
     try {
         context.startActivity(Intent(Settings.ACTION_SETTINGS).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        })
+        }.applySearchExtras())
     } catch (_: Exception) {}
 }
 
