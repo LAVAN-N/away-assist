@@ -117,23 +117,38 @@ class SosLocateController(private val context: Context) {
         return@withContext true
     }
 
+    fun isLocationEnabled(): Boolean {
+        if (locationManager == null) return false
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            locationManager.isLocationEnabled
+        } else {
+            locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
+            locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+        }
+    }
+
+    fun hasLocationPermission(): Boolean {
+        val fine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        val coarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        return fine || coarse
+    }
+
     private suspend fun handleFind(senderNumber: String) {
         val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val batteryLevel = getBatteryPercentage()
-        val location = acquireLocation(LOCATION_TIMEOUT_MS)
+        val isLocOn = isLocationEnabled()
+        val location = acquireLocation(8_000L)
 
         val message = if (location != null) {
+            val accuracyStr = if (location.hasAccuracy()) "Accuracy: ~${location.accuracy.toInt()}m" else "Accuracy: unknown"
             "Away Assist: Location fix at $timeStr.\n" +
             "https://maps.google.com/?q=${location.latitude},${location.longitude}\n" +
-            "Accuracy: ~${location.accuracy.toInt()}m | Battery: $batteryLevel%"
+            "$accuracyStr | Battery: $batteryLevel%"
         } else {
-            val lastKnown = getLastKnownLocation()
-            if (lastKnown != null) {
-                "Away Assist: Last known location at $timeStr.\n" +
-                "https://maps.google.com/?q=${lastKnown.latitude},${lastKnown.longitude}\n" +
-                "Accuracy: ~${lastKnown.accuracy.toInt()}m | Battery: $batteryLevel%"
+            if (!isLocOn) {
+                "Away Assist: Location fix unavailable (Device location is turned OFF) at $timeStr.\nBattery: $batteryLevel%"
             } else {
-                "Away Assist: Location fix unavailable at $timeStr.\nBattery: $batteryLevel%"
+                "Away Assist: Location fix unavailable at $timeStr (GPS fix timed out).\nBattery: $batteryLevel%"
             }
         }
 
@@ -143,14 +158,18 @@ class SosLocateController(private val context: Context) {
 
     private suspend fun handleTrack(senderNumber: String, autoTimeoutHours: Int) {
         preferences.startSosSession(SosSessionState.TRACK, senderNumber)
-        val message = "Away Assist: Location turned on. Use Find My Device or Maps to view. Reply STOP with your prefix to turn off, or it will auto-stop after ${autoTimeoutHours}h."
+        val isLocOn = isLocationEnabled()
+        val note = if (!isLocOn) " (Note: Master location toggle is currently OFF on phone)" else ""
+        val message = "Away Assist: Location tracking active$note. Use Find My Device or Maps to view. Reply STOP with your prefix to turn off, or it will auto-stop after ${autoTimeoutHours}h."
         sendSms(senderNumber, message)
         preferences.recordSosTrigger("TRACK started from $senderNumber")
     }
 
     private suspend fun handleTrace(senderNumber: String, intervalMins: Int, autoTimeoutHours: Int) {
         preferences.startSosSession(SosSessionState.TRACE, senderNumber, intervalMins)
-        val ackMessage = "Away Assist: Tracing active. Sending updates every ${intervalMins}m. Reply STOP with your prefix to cancel, or it will auto-stop after ${autoTimeoutHours}h."
+        val isLocOn = isLocationEnabled()
+        val note = if (!isLocOn) " (Device location toggle is OFF)" else ""
+        val ackMessage = "Away Assist: Tracing active$note. Sending updates every ${intervalMins}m. Reply STOP with your prefix to cancel, or it will auto-stop after ${autoTimeoutHours}h."
         sendSms(senderNumber, ackMessage)
         preferences.recordSosTrigger("TRACE started from $senderNumber")
 
@@ -178,7 +197,7 @@ class SosLocateController(private val context: Context) {
 
         val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val batteryLevel = getBatteryPercentage()
-        val location = acquireLocation(LOCATION_TIMEOUT_MS) ?: getLastKnownLocation()
+        val location = acquireLocation(8_000L) ?: getLastKnownLocation()
 
         val locationText = if (location != null) {
             "https://maps.google.com/?q=${location.latitude},${location.longitude} (~${location.accuracy.toInt()}m)"
@@ -273,7 +292,7 @@ class SosLocateController(private val context: Context) {
     private suspend fun sendTraceFix(targetNumber: String) {
         val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val batteryLevel = getBatteryPercentage()
-        val location = acquireLocation(LOCATION_TIMEOUT_MS) ?: getLastKnownLocation()
+        val location = acquireLocation(8_000L) ?: getLastKnownLocation()
 
         val message = if (location != null) {
             "Away Assist TRACE: Location at $timeStr\n" +
@@ -286,21 +305,22 @@ class SosLocateController(private val context: Context) {
         sendSms(targetNumber, message)
     }
 
-    fun hasLocationPermission(): Boolean {
-        val fine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        val coarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        return fine || coarse
-    }
-
     @SuppressLint("MissingPermission")
-    private suspend fun acquireLocation(timeoutMs: Long): Location? = withContext(Dispatchers.Main) {
+    private suspend fun acquireLocation(timeoutMs: Long = 8_000L): Location? = withContext(Dispatchers.IO) {
         if (!hasLocationPermission() || locationManager == null) return@withContext null
+        if (!isLocationEnabled()) return@withContext getLastKnownLocation()
 
-        withTimeoutOrNull(timeoutMs) {
+        val lastKnown = getLastKnownLocation()
+
+        val freshLocation = withTimeoutOrNull(timeoutMs) {
             suspendCancellableCoroutine { continuation ->
                 val listener = object : LocationListener {
                     override fun onLocationChanged(location: Location) {
-                        locationManager.removeUpdates(this)
+                        try {
+                            locationManager.removeUpdates(this)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Error removing location updates", e)
+                        }
                         if (continuation.isActive) {
                             continuation.resume(location)
                         }
@@ -312,6 +332,7 @@ class SosLocateController(private val context: Context) {
                     override fun onProviderDisabled(provider: String) {}
                 }
 
+                var registered = false
                 try {
                     val hasGps = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
                     val hasNetwork = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
@@ -324,6 +345,7 @@ class SosLocateController(private val context: Context) {
                             listener,
                             Looper.getMainLooper()
                         )
+                        registered = true
                     }
                     if (hasNetwork) {
                         locationManager.requestLocationUpdates(
@@ -333,20 +355,35 @@ class SosLocateController(private val context: Context) {
                             listener,
                             Looper.getMainLooper()
                         )
+                        registered = true
                     }
 
-                    continuation.invokeOnCancellation {
-                        locationManager.removeUpdates(listener)
+                    if (!registered) {
+                        if (continuation.isActive) {
+                            continuation.resume(null)
+                        }
+                    } else {
+                        continuation.invokeOnCancellation {
+                            try {
+                                locationManager.removeUpdates(listener)
+                            } catch (e: Exception) {
+                                Log.w(TAG, "Error removing location listener on cancellation", e)
+                            }
+                        }
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to request location updates", e)
-                    locationManager.removeUpdates(listener)
+                    try {
+                        locationManager.removeUpdates(listener)
+                    } catch (ignored: Exception) {}
                     if (continuation.isActive) {
                         continuation.resume(null)
                     }
                 }
             }
         }
+
+        return@withContext freshLocation ?: lastKnown
     }
 
     @SuppressLint("MissingPermission")
