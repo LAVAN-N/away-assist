@@ -95,19 +95,40 @@ private fun checkIsQuickSettingsRestricted(context: Context): Boolean {
 
 private fun openLockScreenQuickSettings(context: Context) {
     val intents = listOf(
-        // Xiaomi / POCO / Redmi (Status Bar / Control Center on Lock Screen)
+        // Xiaomi / POCO / Redmi (Notifications & Control Centre / Status Bar Settings)
+        Intent().setComponent(ComponentName("com.android.settings", "com.android.settings.Settings\$NotificationAppListActivity")),
+        Intent().setComponent(ComponentName("com.android.settings", "com.android.settings.Settings\$ControlCenterAndStatusbarSettingsActivity")),
+        Intent().setComponent(ComponentName("com.android.settings", "com.android.settings.Settings\$ControlCenterActivity")),
         Intent().setComponent(ComponentName("com.android.settings", "com.android.settings.Settings\$StatusBarSettingsActivity")),
-        Intent().setComponent(ComponentName("com.android.settings", "com.android.settings.Settings\$LockScreenSettingsActivity")),
-        // Samsung (Secure Lock Settings / Lock Network & Security)
+        Intent().setComponent(ComponentName("com.android.settings", "com.android.settings.Settings\$StatusbarAndNotificationCenterActivity")),
+        Intent().setComponent(ComponentName("com.android.settings", "com.android.settings.SubSettings")).apply {
+            putExtra(":settings:show_fragment", "com.android.settings.statusbar.ControlCenterSettings")
+        },
+        Intent().setComponent(ComponentName("com.android.settings", "com.android.settings.SubSettings")).apply {
+            putExtra(":settings:show_fragment", "com.android.settings.statusbar.StatusBarSettings")
+        },
+        Intent().setComponent(ComponentName("com.android.settings", "com.android.settings.SubSettings")).apply {
+            putExtra(":settings:show_fragment", "com.android.settings.notification.NotificationAppList")
+        },
+        Intent("android.settings.STATUS_BAR_SETTINGS"),
+        Intent("android.settings.NOTIFICATION_SETTINGS"),
+
+        // OnePlus / Oppo / Realme / ColorOS / OxygenOS (Notification & Status Bar)
+        Intent().setComponent(ComponentName("com.android.settings", "com.android.settings.Settings\$NotificationAndStatusBarActivity")),
+        Intent().setComponent(ComponentName("com.coloros.notificationmanager", "com.coloros.notificationmanager.NotificationCenterSettingsActivity")),
+        Intent().setComponent(ComponentName("com.oplus.notificationmanager", "com.oplus.notificationmanager.NotificationCenterSettingsActivity")),
+
+        // Samsung One UI (Notification & Status Bar / Secure Lock Settings)
+        Intent().setComponent(ComponentName("com.android.settings", "com.android.settings.Settings\$NotificationSettingsActivity")),
         Intent("com.samsung.settings.SECURE_LOCK_SETTINGS"),
         Intent("android.settings.LOCKSCREEN_SETTINGS"),
         Intent().setComponent(ComponentName("com.android.settings", "com.android.settings.Settings\$LockScreenSettingsActivity")),
-        // Oppo / Realme / ColorOS
-        Intent().setComponent(ComponentName("com.coloros.notificationmanager", "com.coloros.notificationmanager.NotificationCenterSettingsActivity")),
-        // Vivo / iQOO
+
+        // Vivo / iQOO / FuntouchOS
+        Intent().setComponent(ComponentName("com.vivo.permissionmanager", "com.vivo.permissionmanager.activity.BgStartUpManagerActivity")),
         Intent().setComponent(ComponentName("com.android.settings", "com.android.settings.Settings\$LockScreenSettingsActivity")),
+
         // Standard Android Settings
-        Intent("android.settings.NOTIFICATION_SETTINGS"),
         Intent(Settings.ACTION_SECURITY_SETTINGS),
         Intent(Settings.ACTION_SETTINGS)
     )
@@ -322,7 +343,7 @@ fun HardeningChecklistCard(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Item 4: Restrict Quick Settings on Lock Screen
+            // Item 4: Restrict Control Centre & Quick Settings on Lock Screen
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -336,15 +357,15 @@ fun HardeningChecklistCard(
                 Spacer(modifier = Modifier.width(10.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = if (isQuickSettingsRestricted) "Quick Settings: Restricted on Lock" else "Restrict Quick Settings on Lock",
+                        text = if (isQuickSettingsRestricted) "Control Centre: Restricted on Lock" else "Restrict Control Centre on Lock",
                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                         color = AwayAssistTheme.colors.textPrimary
                     )
                     Text(
                         text = if (isQuickSettingsRestricted) {
-                            "Quick Settings cannot be pulled down while locked, preventing unauthorized Airplane Mode toggle."
+                            "Control Centre and Quick Settings cannot be pulled down while locked, preventing Airplane Mode tampering."
                         } else {
-                            "Disallow pulling down Notification Shade / Control Center while locked so a thief cannot toggle Airplane Mode."
+                            "Disallow pulling down Control Centre & Notification Shade while locked so a thief cannot toggle Airplane Mode."
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = AwayAssistTheme.colors.textSecondary
