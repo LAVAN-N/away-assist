@@ -109,64 +109,12 @@ private fun openLockScreenQuickSettings(context: Context) {
         Toast.makeText(context, "Copied \"$query\" — paste in Settings search", Toast.LENGTH_SHORT).show()
     } catch (_: Exception) {}
 
-    fun Intent.applySearchExtras(): Intent = apply {
-        putExtra("query", query)
-        putExtra(SearchManager.QUERY, query)
-        putExtra("android.intent.extra.TEXT", query)
-        putExtra("search_query", query)
-        putExtra("raw_query", query)
-        putExtra("key_search_query", query)
-        putExtra("keyword", query)
-        putExtra("miui.intent.extra.SEARCH_QUERY", query)
-        putExtra("android.provider.Settings.EXTRA_APP_SEARCH_QUERY", query)
-        val args = Bundle().apply {
-            putString(":settings:fragment_args_key", query)
-            putString("query", query)
-        }
-        putExtra(":settings:show_fragment_args", args)
-    }
-
-    val searchIntents = listOf(
-        // 1. Xiaomi / MIUI / HyperOS Settings Search
-        Intent().apply {
-            component = ComponentName("com.android.settings", "com.android.settings.search.SearchActivity")
-        }.applySearchExtras(),
-
-        // 2. Android standard Settings Search
-        Intent("android.settings.APP_SEARCH_SETTINGS").applySearchExtras(),
-
-        // 3. Settings search action
-        Intent(Intent.ACTION_SEARCH).apply {
-            setPackage("com.android.settings")
-        }.applySearchExtras(),
-
-        // 4. Intelligence Search (Stock / Pixel / OEM)
-        Intent().apply {
-            component = ComponentName("com.android.settings.intelligence", "com.android.settings.intelligence.search.SearchActivity")
-        }.applySearchExtras(),
-
-        Intent().apply {
-            component = ComponentName("com.google.android.settings.intelligence", "com.google.android.settings.intelligence.search.SearchActivity")
-        }.applySearchExtras(),
-
-        // 5. Standard Settings fallback
-        Intent(Settings.ACTION_SETTINGS).applySearchExtras()
-    )
-
-    for (intent in searchIntents) {
-        try {
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            if (intent.resolveActivity(context.packageManager) != null) {
-                context.startActivity(intent)
-                return
-            }
-        } catch (_: Exception) {}
-    }
-
+    // 2. Open Settings directly in a single task (avoiding duplicate recent app windows)
     try {
-        context.startActivity(Intent(Settings.ACTION_SETTINGS).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }.applySearchExtras())
+        val intent = Intent(Settings.ACTION_SETTINGS).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        }
+        context.startActivity(intent)
     } catch (_: Exception) {}
 }
 
