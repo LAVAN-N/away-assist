@@ -24,7 +24,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -46,6 +49,12 @@ fun HardeningChecklistCard(
     }
     val isDeviceSecure = remember(keyguardManager) {
         keyguardManager?.isDeviceSecure ?: false
+    }
+
+    var showAdbGuideSheet by remember { androidx.compose.runtime.mutableStateOf(false) }
+
+    if (showAdbGuideSheet) {
+        AdbSetupGuideSheet(onDismiss = { showAdbGuideSheet = false })
     }
 
     GroupedListCard(
@@ -166,7 +175,7 @@ fun HardeningChecklistCard(
                 Spacer(modifier = Modifier.width(10.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = if (hasAdbPermission) "Remote Location Switching: Enabled" else "Remote Location Switching: Needs ADB",
+                        text = if (hasAdbPermission) "Remote Location Switching: Enabled" else "Remote Location Switching: Optional",
                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                         color = AwayAssistTheme.colors.textPrimary
                     )
@@ -174,28 +183,18 @@ fun HardeningChecklistCard(
                         text = if (hasAdbPermission) {
                             "App can automatically turn ON location when emergency SMS arrives and turn it OFF after fix."
                         } else {
-                            "Grant WRITE_SECURE_SETTINGS via ADB so the app can remotely toggle location when needed."
+                            "Only needed if you keep phone location OFF. Tap 'Guide' for step-by-step setup."
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = AwayAssistTheme.colors.textSecondary
                     )
                 }
-                if (!hasAdbPermission) {
-                    Spacer(modifier = Modifier.width(8.dp))
-                    AppleStyleButton(
-                        text = "Copy ADB",
-                        onClick = {
-                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
-                            val clip = android.content.ClipData.newPlainText(
-                                "ADB Command",
-                                "adb shell pm grant com.awayassist.app android.permission.WRITE_SECURE_SETTINGS"
-                            )
-                            clipboard?.setPrimaryClip(clip)
-                            android.widget.Toast.makeText(context, "ADB command copied to clipboard", android.widget.Toast.LENGTH_SHORT).show()
-                        },
-                        style = AppleButtonStyle.SECONDARY
-                    )
-                }
+                Spacer(modifier = Modifier.width(8.dp))
+                AppleStyleButton(
+                    text = if (hasAdbPermission) "Status" else "Guide",
+                    onClick = { showAdbGuideSheet = true },
+                    style = AppleButtonStyle.SECONDARY
+                )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
