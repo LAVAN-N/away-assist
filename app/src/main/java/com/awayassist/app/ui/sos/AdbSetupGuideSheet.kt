@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -235,57 +236,97 @@ fun AdbSetupGuideSheet(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .height(44.dp)
                     .clip(SquircleMedium)
                     .background(AwayAssistTheme.colors.cardSurface)
                     .padding(4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(SquircleMedium)
-                        .background(if (selectedMethodTab == 0) AwayAssistTheme.colors.accent else androidx.compose.ui.graphics.Color.Transparent)
-                        .clickable { selectedMethodTab = 0 }
-                        .padding(vertical = 8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.PhoneAndroid,
-                            contentDescription = null,
-                            tint = if (selectedMethodTab == 0) AwayAssistTheme.colors.background else AwayAssistTheme.colors.textSecondary,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "Shizuku (1-Tap on Phone)",
-                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                            color = if (selectedMethodTab == 0) AwayAssistTheme.colors.background else AwayAssistTheme.colors.textSecondary
-                        )
-                    }
-                }
+                // Tab 0: Shizuku (Phone)
+                val tab0Selected = selectedMethodTab == 0
+                val tab0Bg by androidx.compose.animation.animateColorAsState(
+                    targetValue = if (tab0Selected) AwayAssistTheme.colors.accent else androidx.compose.ui.graphics.Color.Transparent,
+                    animationSpec = androidx.compose.animation.core.spring(),
+                    label = "tab0Bg"
+                )
+                val tab0Fg by androidx.compose.animation.animateColorAsState(
+                    targetValue = if (tab0Selected) androidx.compose.ui.graphics.Color.White else AwayAssistTheme.colors.textSecondary,
+                    animationSpec = androidx.compose.animation.core.spring(),
+                    label = "tab0Fg"
+                )
 
                 Box(
                     modifier = Modifier
                         .weight(1f)
+                        .fillMaxHeight()
                         .clip(SquircleMedium)
-                        .background(if (selectedMethodTab == 1) AwayAssistTheme.colors.accent else androidx.compose.ui.graphics.Color.Transparent)
-                        .clickable { selectedMethodTab = 1 }
-                        .padding(vertical = 8.dp),
+                        .background(tab0Bg)
+                        .clickable { selectedMethodTab = 0 },
                     contentAlignment = Alignment.Center
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PhoneAndroid,
+                            contentDescription = null,
+                            tint = tab0Fg,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Shizuku (Phone)",
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                            color = tab0Fg,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                // Tab 1: Computer (ADB)
+                val tab1Selected = selectedMethodTab == 1
+                val tab1Bg by androidx.compose.animation.animateColorAsState(
+                    targetValue = if (tab1Selected) AwayAssistTheme.colors.accent else androidx.compose.ui.graphics.Color.Transparent,
+                    animationSpec = androidx.compose.animation.core.spring(),
+                    label = "tab1Bg"
+                )
+                val tab1Fg by androidx.compose.animation.animateColorAsState(
+                    targetValue = if (tab1Selected) androidx.compose.ui.graphics.Color.White else AwayAssistTheme.colors.textSecondary,
+                    animationSpec = androidx.compose.animation.core.spring(),
+                    label = "tab1Fg"
+                )
+
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clip(SquircleMedium)
+                        .background(tab1Bg)
+                        .clickable { selectedMethodTab = 1 },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    ) {
                         Icon(
                             imageVector = Icons.Default.Laptop,
                             contentDescription = null,
-                            tint = if (selectedMethodTab == 1) AwayAssistTheme.colors.background else AwayAssistTheme.colors.textSecondary,
+                            tint = tab1Fg,
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = "Computer (ADB)",
-                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                            color = if (selectedMethodTab == 1) AwayAssistTheme.colors.background else AwayAssistTheme.colors.textSecondary
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                            color = tab1Fg,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                         )
                     }
                 }
