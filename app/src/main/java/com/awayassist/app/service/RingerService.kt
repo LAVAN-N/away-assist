@@ -14,12 +14,14 @@ import com.awayassist.app.data.AppState
 import com.awayassist.app.data.AwayAssistPreferences
 import com.awayassist.app.data.RingerState
 import com.awayassist.app.util.RingerModeController
+import com.awayassist.app.util.SosLocateController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 class RingerService : Service() {
@@ -60,9 +62,11 @@ class RingerService : Service() {
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var stateObservationJob: Job? = null
+    private var sosSessionJob: Job? = null
 
     private lateinit var preferences: AwayAssistPreferences
     private lateinit var ringerController: RingerModeController
+    private lateinit var sosLocateController: SosLocateController
     private lateinit var notificationHelper: NotificationHelper
     private var screenStateReceiver: ScreenStateReceiver? = null
 
@@ -72,6 +76,7 @@ class RingerService : Service() {
 
         preferences = AwayAssistPreferences.getInstance(this)
         ringerController = RingerModeController(this)
+        sosLocateController = SosLocateController(this)
         notificationHelper = NotificationHelper(this)
 
         registerScreenReceiver()
@@ -150,7 +155,11 @@ class RingerService : Service() {
     private fun startForegroundNotification() {
         notificationHelper.createNotificationChannel()
         val foregroundServiceType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+            if (sosLocateController.hasLocationPermission()) {
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+            } else {
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+            }
         } else {
             0
         }
@@ -169,6 +178,26 @@ class RingerService : Service() {
         stateObservationJob = serviceScope.launch {
             preferences.appStateFlow.collectLatest { state ->
                 notificationHelper.updateNotification(state)
+                manageSosSessionJob(state.sosLocateState)
+            }
+        }
+    }
+
+    private fun manageSosSessionJob(sosState: com.awayassist.app.data.SosLocateState) {
+        if (!sosState.isSessionActive) {
+            sosSessionJob?.cancel()
+            sosSessionJob = null
+            return
+        }
+
+        if (sosSessionJob == null || sosSessionJob?.isActive != true) {
+            sosSessionJob = serviceScope.launch {
+                val intervalMinutes = sosState.traceIntervalMins.coerceAtLeast(1)
+                val intervalMs = intervalMinutes * 60_000L
+                while (isActive) {
+                    kotlinx.coroutines.delay(intervalMs)
+                    sosLocateController.checkSessionTimeoutAndExecuteTraceTick()
+                }
             }
         }
     }
