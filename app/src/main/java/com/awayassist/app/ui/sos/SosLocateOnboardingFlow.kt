@@ -2,6 +2,7 @@ package com.awayassist.app.ui.sos
 
 import android.Manifest
 import android.content.pm.PackageManager
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -110,6 +111,14 @@ fun SosLocateOnboardingFlow(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         hasPhoneStatePerm = isGranted
+    }
+
+    BackHandler(enabled = true) {
+        if (currentStep > 1) {
+            currentStep -= 1
+        } else {
+            onDismiss()
+        }
     }
 
     Scaffold(

@@ -1,5 +1,6 @@
 package com.awayassist.app.ui.sos
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -96,6 +97,16 @@ fun SosLocateSettingsScreen(
     }
     var tempPrefix by remember(sosState.commandPrefix) {
         mutableStateOf(sosState.commandPrefix)
+    }
+
+    BackHandler(enabled = true) {
+        if (showEditNumberDialog) {
+            showEditNumberDialog = false
+        } else if (showEditPrefixDialog) {
+            showEditPrefixDialog = false
+        } else {
+            onBack()
+        }
     }
 
     Scaffold(

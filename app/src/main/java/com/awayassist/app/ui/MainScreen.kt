@@ -1,5 +1,6 @@
 package com.awayassist.app.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -181,6 +182,22 @@ fun MainScreen(
         animationSpec = spring(),
         label = "ambientMeshColor"
     )
+
+    BackHandler(enabled = showSosSettingsScreen) {
+        showSosSettingsScreen = false
+    }
+
+    BackHandler(enabled = showSosOnboardingFlow) {
+        showSosOnboardingFlow = false
+    }
+
+    BackHandler(enabled = showSosChoosePathSheet) {
+        showSosChoosePathSheet = false
+    }
+
+    BackHandler(enabled = showInfoSheet) {
+        showInfoSheet = false
+    }
 
     if (showSosSettingsScreen) {
         SosLocateSettingsScreen(
