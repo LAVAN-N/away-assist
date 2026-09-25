@@ -95,40 +95,19 @@ private fun checkIsQuickSettingsRestricted(context: Context): Boolean {
 
 private fun openLockScreenQuickSettings(context: Context) {
     val intents = listOf(
-        // Xiaomi / POCO / Redmi (Notifications & Control Centre / Status Bar Settings)
-        Intent().setComponent(ComponentName("com.android.settings", "com.android.settings.Settings\$NotificationAppListActivity")),
-        Intent().setComponent(ComponentName("com.android.settings", "com.android.settings.Settings\$ControlCenterAndStatusbarSettingsActivity")),
-        Intent().setComponent(ComponentName("com.android.settings", "com.android.settings.Settings\$ControlCenterActivity")),
-        Intent().setComponent(ComponentName("com.android.settings", "com.android.settings.Settings\$StatusBarSettingsActivity")),
-        Intent().setComponent(ComponentName("com.android.settings", "com.android.settings.Settings\$StatusbarAndNotificationCenterActivity")),
-        Intent().setComponent(ComponentName("com.android.settings", "com.android.settings.SubSettings")).apply {
-            putExtra(":settings:show_fragment", "com.android.settings.statusbar.ControlCenterSettings")
-        },
-        Intent().setComponent(ComponentName("com.android.settings", "com.android.settings.SubSettings")).apply {
-            putExtra(":settings:show_fragment", "com.android.settings.statusbar.StatusBarSettings")
-        },
-        Intent().setComponent(ComponentName("com.android.settings", "com.android.settings.SubSettings")).apply {
-            putExtra(":settings:show_fragment", "com.android.settings.notification.NotificationAppList")
-        },
-        Intent("android.settings.STATUS_BAR_SETTINGS"),
+        // Standard Android & OEM-exported Notification & Status Bar / Control Centre settings
         Intent("android.settings.NOTIFICATION_SETTINGS"),
+        Intent("android.settings.STATUS_BAR_SETTINGS"),
+        Intent("android.settings.LOCKSCREEN_SETTINGS"),
 
-        // OnePlus / Oppo / Realme / ColorOS / OxygenOS (Notification & Status Bar)
-        Intent().setComponent(ComponentName("com.android.settings", "com.android.settings.Settings\$NotificationAndStatusBarActivity")),
+        // Samsung One UI Secure Lock / Status Bar
+        Intent("com.samsung.settings.SECURE_LOCK_SETTINGS"),
+
+        // OnePlus / Oppo / Realme / ColorOS
         Intent().setComponent(ComponentName("com.coloros.notificationmanager", "com.coloros.notificationmanager.NotificationCenterSettingsActivity")),
         Intent().setComponent(ComponentName("com.oplus.notificationmanager", "com.oplus.notificationmanager.NotificationCenterSettingsActivity")),
 
-        // Samsung One UI (Notification & Status Bar / Secure Lock Settings)
-        Intent().setComponent(ComponentName("com.android.settings", "com.android.settings.Settings\$NotificationSettingsActivity")),
-        Intent("com.samsung.settings.SECURE_LOCK_SETTINGS"),
-        Intent("android.settings.LOCKSCREEN_SETTINGS"),
-        Intent().setComponent(ComponentName("com.android.settings", "com.android.settings.Settings\$LockScreenSettingsActivity")),
-
-        // Vivo / iQOO / FuntouchOS
-        Intent().setComponent(ComponentName("com.vivo.permissionmanager", "com.vivo.permissionmanager.activity.BgStartUpManagerActivity")),
-        Intent().setComponent(ComponentName("com.android.settings", "com.android.settings.Settings\$LockScreenSettingsActivity")),
-
-        // Standard Android Settings
+        // Security / Main Settings Fallback
         Intent(Settings.ACTION_SECURITY_SETTINGS),
         Intent(Settings.ACTION_SETTINGS)
     )
