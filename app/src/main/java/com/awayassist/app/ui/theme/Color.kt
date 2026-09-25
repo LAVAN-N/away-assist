@@ -48,7 +48,10 @@ data class AwayAssistColors(
     val error: Color,
     val switchOffTrack: Color,
     val isDark: Boolean
-)
+) {
+    val accent: Color
+        get() = accentSilent
+}
 
 val LocalAwayAssistColors = staticCompositionLocalOf {
     AwayAssistColors(

@@ -37,6 +37,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Notifications
@@ -87,12 +88,17 @@ import com.awayassist.app.ui.components.LiquidClockPicker
 import com.awayassist.app.ui.components.LiquidMeshBackground
 import com.awayassist.app.ui.components.LiquidModeSelector
 import com.awayassist.app.ui.components.LiquidPillBadge
+import com.awayassist.app.data.SosLocateState
 import com.awayassist.app.ui.components.LiquidPulsingHalo
 import com.awayassist.app.ui.components.LiquidThemeSelector
 import com.awayassist.app.ui.components.OperationMode
 import com.awayassist.app.ui.components.VintagePullLightToggle
 import com.awayassist.app.ui.components.glassmorphic
+import com.awayassist.app.ui.sos.SosLocateChoosePathSheet
+import com.awayassist.app.ui.sos.SosLocateOnboardingFlow
+import com.awayassist.app.ui.sos.SosLocateSettingsScreen
 import com.awayassist.app.ui.theme.AwayAssistTheme
+import com.awayassist.app.ui.theme.RingState
 import com.awayassist.app.ui.theme.SquircleLarge
 import com.awayassist.app.ui.theme.SquircleMedium
 import com.awayassist.app.ui.theme.SquirclePill
@@ -133,13 +139,25 @@ fun MainScreen(
     onRequestPolicyAccess: () -> Unit,
     onRequestBatteryOptimization: () -> Unit,
     onRequestAutostart: () -> Unit,
-    onSelectTheme: (ThemeMode) -> Unit
+    onSelectTheme: (ThemeMode) -> Unit,
+    onToggleSosEnabled: (Boolean) -> Unit = {},
+    onCompleteSosOnboarding: (emergencyNumber: String, prefix: String) -> Unit = { _, _ -> },
+    onUpdateSosPrefix: (String) -> Unit = {},
+    onUpdateSosEmergencyNumber: (String) -> Unit = {},
+    onDismissSosRotationReminder: () -> Unit = {},
+    onUpdateSosTriggers: (sim: Boolean, shutdown: Boolean, sms: Boolean, boot: Boolean) -> Unit = { _, _, _, _ -> },
+    onUpdateSosTimeoutHours: (Int) -> Unit = {},
+    onUpdateSosTraceInterval: (Int) -> Unit = {},
+    onStopSosActiveSession: () -> Unit = {}
 ) {
     val scrollState = rememberScrollState()
     val colors = AwayAssistTheme.colors
     val isDark = colors.isDark
 
     var showInfoSheet by remember { mutableStateOf(false) }
+    var showSosChoosePathSheet by remember { mutableStateOf(false) }
+    var showSosOnboardingFlow by remember { mutableStateOf(false) }
+    var showSosSettingsScreen by remember { mutableStateOf(false) }
     var bulbScreenPosition by remember { mutableStateOf<Offset?>(null) }
     val countdownText = rememberCountdownFormatted(appState.pauseUntilTimestamp)
 
@@ -164,111 +182,271 @@ fun MainScreen(
         label = "ambientMeshColor"
     )
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        LiquidMeshBackground(
-            activeColor = animatedAmbientColor,
-            isDark = isDark
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(scrollState)
-                    .padding(horizontal = 16.dp, vertical = 10.dp)
+    if (showSosSettingsScreen) {
+        SosLocateSettingsScreen(
+            sosState = appState.sosLocateState,
+            onBack = { showSosSettingsScreen = false },
+            onToggleSosEnabled = onToggleSosEnabled,
+            onUpdateEmergencyNumber = onUpdateSosEmergencyNumber,
+            onUpdatePrefix = onUpdateSosPrefix,
+            onDismissRotationReminder = onDismissSosRotationReminder,
+            onUpdateTriggers = onUpdateSosTriggers,
+            onUpdateTimeoutHours = onUpdateSosTimeoutHours,
+            onUpdateTraceInterval = onUpdateSosTraceInterval,
+            onStopActiveSession = onStopSosActiveSession
+        )
+    } else if (showSosOnboardingFlow) {
+        SosLocateOnboardingFlow(
+            onDismiss = { showSosOnboardingFlow = false },
+            onComplete = { emergencyNumber, prefix ->
+                onCompleteSosOnboarding(emergencyNumber, prefix)
+                showSosOnboardingFlow = false
+                showSosSettingsScreen = true
+            }
+        )
+    } else {
+        Box(modifier = Modifier.fillMaxSize()) {
+            LiquidMeshBackground(
+                activeColor = animatedAmbientColor,
+                isDark = isDark
             ) {
-                // Editorial Glass Header
-                EditorialHeader(
-                    currentMode = currentOperationMode,
-                    hasPolicyAccess = hasNotificationPolicyAccess,
-                    statusColor = animatedAmbientColor,
-                    isDark = isDark,
-                    onInfoClick = { showInfoSheet = true }
-                )
-
-                // Missing Permission Card
-                AnimatedVisibility(
-                    visible = !hasNotificationPolicyAccess,
-                    enter = fadeIn(),
-                    exit = fadeOut()
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(scrollState)
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
                 ) {
-                    CompactPermissionCard(
-                        onRequestPolicyAccess = onRequestPolicyAccess,
+                    // Editorial Glass Header
+                    EditorialHeader(
+                        currentMode = currentOperationMode,
+                        hasPolicyAccess = hasNotificationPolicyAccess,
+                        statusColor = animatedAmbientColor,
+                        isDark = isDark,
+                        onInfoClick = { showInfoSheet = true }
+                    )
+
+                    // Post-use Prefix Rotation Reminder Banner
+                    if (appState.sosLocateState.prefixRotationNeeded) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 12.dp)
+                                .clip(SquircleLarge)
+                                .background(colors.accent.copy(alpha = 0.12f))
+                                .border(1.dp, colors.accent.copy(alpha = 0.35f), SquircleLarge)
+                                .padding(14.dp)
+                        ) {
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Warning,
+                                        contentDescription = null,
+                                        tint = colors.accent,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Security Notice: Passkey Used",
+                                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                        color = colors.textPrimary
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "An emergency SMS command was recently executed. For ongoing safety, rotate your secret passkey prefix.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = colors.textSecondary
+                                )
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    AppleStyleButton(
+                                        text = "Rotate Prefix",
+                                        onClick = { showSosSettingsScreen = true },
+                                        style = AppleButtonStyle.PRIMARY,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    AppleStyleButton(
+                                        text = "Dismiss",
+                                        onClick = onDismissSosRotationReminder,
+                                        style = AppleButtonStyle.SECONDARY,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Missing Permission Card
+                    AnimatedVisibility(
+                        visible = !hasNotificationPolicyAccess,
+                        enter = fadeIn(),
+                        exit = fadeOut()
+                    ) {
+                        CompactPermissionCard(
+                            onRequestPolicyAccess = onRequestPolicyAccess,
+                            isDark = isDark,
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        )
+                    }
+
+                    // Hero Status Card
+                    CompactStatusCard(
+                        appState = appState,
+                        currentMode = currentOperationMode,
+                        countdownText = countdownText,
+                        hasPolicyAccess = hasNotificationPolicyAccess,
+                        onResumeAuto = { onSelectMode(OperationMode.AUTO) },
                         isDark = isDark,
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
+
+                    // 2-Tile Rules Grid (Screen Locked vs Screen Unlocked)
+                    CompactRulesGrid(
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+
+                    // Unified Single-Toggle Controls Card
+                    UnifiedControlsCard(
+                        appState = appState,
+                        currentMode = currentOperationMode,
+                        onSelectMode = onSelectMode,
+                        onPauseForDuration = onPauseForDuration,
+                        isDark = isDark,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+
+                    // Realistic Vintage Pull-Cord Light Switch Theme Toggle Card
+                    VintagePullLightToggle(
+                        currentTheme = appState.themeMode,
+                        onThemeSelected = onSelectTheme,
+                        isDark = isDark,
+                        onBulbPositioned = { bulbScreenPosition = it },
+                        modifier = Modifier.padding(bottom = 14.dp)
+                    )
+
+                    // SOS Locate Card
+                    SosLocateCard(
+                        sosState = appState.sosLocateState,
+                        onOpenSos = {
+                            if (!appState.sosLocateState.isOnboarded) {
+                                showSosChoosePathSheet = true
+                            } else {
+                                showSosSettingsScreen = true
+                            }
+                        },
+                        modifier = Modifier.padding(bottom = 14.dp)
+                    )
+
+                    // System & Background Permissions Section (DND, Battery Saver, Autostart)
+                    SystemPermissionsSection(
+                        hasPolicyAccess = hasNotificationPolicyAccess,
+                        isBatteryOptIgnored = isBatteryOptimizationIgnored,
+                        onRequestPolicyAccess = onRequestPolicyAccess,
+                        onRequestBatteryOptimization = onRequestBatteryOptimization,
+                        onRequestAutostart = onRequestAutostart,
+                        isDark = isDark,
+                        modifier = Modifier.padding(bottom = 6.dp)
+                    )
+
+                    // Developer Story & Philosophy Footer
+                    DeveloperStoryFooter(
+                        isDark = isDark,
+                        modifier = Modifier.padding(bottom = 32.dp)
+                    )
                 }
 
-                // Hero Status Card
-                CompactStatusCard(
-                    appState = appState,
-                    currentMode = currentOperationMode,
-                    countdownText = countdownText,
-                    hasPolicyAccess = hasNotificationPolicyAccess,
-                    onResumeAuto = { onSelectMode(OperationMode.AUTO) },
+                // Full-Screen Theme Wave Transition (Emits from bulb across whole screen in Light mode / Absorbed back into bulb in Dark mode)
+                FullScreenThemeWaveOverlay(
                     isDark = isDark,
-                    modifier = Modifier.padding(bottom = 12.dp)
+                    bulbScreenPosition = bulbScreenPosition
                 )
 
-                // 2-Tile Rules Grid (Screen Locked vs Screen Unlocked)
-                CompactRulesGrid(
-                    modifier = Modifier.padding(bottom = 12.dp)
-                )
+                // Choose Your Path Sheet
+                if (showSosChoosePathSheet) {
+                    SosLocateChoosePathSheet(
+                        onDismiss = { showSosChoosePathSheet = false },
+                        onProceedToSetup = {
+                            showSosChoosePathSheet = false
+                            showSosOnboardingFlow = true
+                        }
+                    )
+                }
 
-                // Unified Single-Toggle Controls Card
-                UnifiedControlsCard(
-                    appState = appState,
-                    currentMode = currentOperationMode,
-                    onSelectMode = onSelectMode,
-                    onPauseForDuration = onPauseForDuration,
-                    isDark = isDark,
-                    modifier = Modifier.padding(bottom = 12.dp)
-                )
-
-                // Realistic Vintage Pull-Cord Light Switch Theme Toggle Card
-                VintagePullLightToggle(
-                    currentTheme = appState.themeMode,
-                    onThemeSelected = onSelectTheme,
-                    isDark = isDark,
-                    onBulbPositioned = { bulbScreenPosition = it },
-                    modifier = Modifier.padding(bottom = 16.dp)
-                )
-
-                // System & Background Permissions Section (DND, Battery Saver, Autostart)
-                SystemPermissionsSection(
-                    hasPolicyAccess = hasNotificationPolicyAccess,
-                    isBatteryOptIgnored = isBatteryOptimizationIgnored,
-                    onRequestPolicyAccess = onRequestPolicyAccess,
-                    onRequestBatteryOptimization = onRequestBatteryOptimization,
-                    onRequestAutostart = onRequestAutostart,
-                    isDark = isDark,
-                    modifier = Modifier.padding(bottom = 6.dp)
-                )
-
-                // Developer Story & Philosophy Footer
-                DeveloperStoryFooter(
-                    isDark = isDark,
-                    modifier = Modifier.padding(bottom = 32.dp)
-                )
-            }
-
-            // Full-Screen Theme Wave Transition (Emits from bulb across whole screen in Light mode / Absorbed back into bulb in Dark mode)
-            FullScreenThemeWaveOverlay(
-                isDark = isDark,
-                bulbScreenPosition = bulbScreenPosition
-            )
-
-            // Info Modal Bottom Sheet
-            if (showInfoSheet) {
-                ModalBottomSheet(
-                    onDismissRequest = { showInfoSheet = false },
-                    sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-                    containerColor = if (isDark) Color(0xFF141520) else Color(0xFFFAFAFC),
-                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-                    dragHandle = null
-                ) {
-                    InfoBottomSheetContent(onClose = { showInfoSheet = false })
+                // Info Modal Bottom Sheet
+                if (showInfoSheet) {
+                    ModalBottomSheet(
+                        onDismissRequest = { showInfoSheet = false },
+                        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                        containerColor = if (isDark) Color(0xFF141520) else Color(0xFFFAFAFC),
+                        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                        dragHandle = null
+                    ) {
+                        InfoBottomSheetContent(onClose = { showInfoSheet = false })
+                    }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SosLocateCard(
+    sosState: SosLocateState,
+    onOpenSos: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val colors = AwayAssistTheme.colors
+
+    GroupedListCard(modifier = modifier) {
+        GroupedListRow(
+            title = "SOS Locate Protocol",
+            subtitle = when {
+                sosState.isSessionActive -> "🚨 Active ${sosState.sessionState.name} session running"
+                sosState.isSosEnabled -> "Active (SHA-256 Protected)"
+                sosState.isOnboarded -> "Disabled"
+                else -> "Offline SMS & Hardware Emergency Triggers"
+            },
+            leadingIcon = {
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (sosState.isSessionActive) RingState.copy(alpha = 0.18f)
+                            else if (sosState.isSosEnabled) colors.accent.copy(alpha = 0.18f)
+                            else colors.textSecondary.copy(alpha = 0.15f)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (sosState.isSessionActive) Icons.Default.LocationOn else Icons.Default.Shield,
+                        contentDescription = null,
+                        tint = if (sosState.isSessionActive) RingState else if (sosState.isSosEnabled) colors.accent else colors.textSecondary,
+                        modifier = Modifier.size(15.dp)
+                    )
+                }
+            },
+            trailingContent = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = if (!sosState.isOnboarded) "Set Up" else if (sosState.isSosEnabled) "Active" else "Manage",
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp
+                        ),
+                        color = if (sosState.isSessionActive) RingState else if (sosState.isSosEnabled) colors.accent else colors.textSecondary
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+                        contentDescription = null,
+                        tint = colors.textSecondary,
+                        modifier = Modifier.size(11.dp)
+                    )
+                }
+            },
+            onClick = onOpenSos
+        )
     }
 }
 

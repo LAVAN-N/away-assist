@@ -145,6 +145,51 @@ class MainActivity : ComponentActivity() {
                         scope.launch {
                             preferences.setThemeMode(mode)
                         }
+                    },
+                    onToggleSosEnabled = { enabled ->
+                        scope.launch {
+                            preferences.setSosEnabled(enabled)
+                        }
+                    },
+                    onCompleteSosOnboarding = { emergencyNumber, prefix ->
+                        scope.launch {
+                            preferences.completeSosOnboarding(true, emergencyNumber, prefix)
+                        }
+                    },
+                    onUpdateSosPrefix = { prefix ->
+                        scope.launch {
+                            preferences.setSosPrefix(prefix)
+                        }
+                    },
+                    onUpdateSosEmergencyNumber = { number ->
+                        scope.launch {
+                            preferences.setEmergencyAlertNumber(number)
+                        }
+                    },
+                    onDismissSosRotationReminder = {
+                        scope.launch {
+                            preferences.setPrefixRotationNeeded(false)
+                        }
+                    },
+                    onUpdateSosTriggers = { sim, shutdown, sms, boot ->
+                        scope.launch {
+                            preferences.setSosTriggers(sim, shutdown, sms, boot)
+                        }
+                    },
+                    onUpdateSosTimeoutHours = { hours ->
+                        scope.launch {
+                            preferences.setAutoTimeoutHours(hours)
+                        }
+                    },
+                    onUpdateSosTraceInterval = { mins ->
+                        scope.launch {
+                            preferences.setTraceIntervalMins(mins)
+                        }
+                    },
+                    onStopSosActiveSession = {
+                        scope.launch {
+                            preferences.stopSosSession()
+                        }
                     }
                 )
             }
