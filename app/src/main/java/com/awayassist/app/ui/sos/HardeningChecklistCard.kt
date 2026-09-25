@@ -1,6 +1,9 @@
 package com.awayassist.app.ui.sos
 
 import android.app.KeyguardManager
+import android.app.Notification
+import android.app.NotificationManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -24,6 +27,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -33,19 +37,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.awayassist.app.service.NotificationHelper
 import com.awayassist.app.ui.components.AppleButtonStyle
 import com.awayassist.app.ui.components.AppleStyleButton
 import com.awayassist.app.ui.components.GroupedListCard
 import com.awayassist.app.ui.theme.AwayAssistTheme
 import com.awayassist.app.ui.theme.RingState
-
-import android.app.Notification
-import android.app.NotificationManager
-import androidx.compose.runtime.DisposableEffect
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import com.awayassist.app.service.NotificationHelper
 
 private fun checkIsLockScreenNotificationHidden(context: Context): Boolean {
     val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return false
@@ -81,6 +81,54 @@ private fun checkIsLockScreenNotificationHidden(context: Context): Boolean {
     return false
 }
 
+private fun checkIsQuickSettingsRestricted(context: Context): Boolean {
+    try {
+        val cr = context.contentResolver
+        // Xiaomi / POCO / MIUI / HyperOS
+        val expandableUnderKeyguard = Settings.Secure.getInt(cr, "expandable_under_keyguard", -1)
+        if (expandableUnderKeyguard == 0) return true
+        val controlCenterUnderKeyguard = Settings.Secure.getInt(cr, "control_center_expandable_under_keyguard", -1)
+        if (controlCenterUnderKeyguard == 0) return true
+    } catch (_: Exception) {}
+    return false
+}
+
+private fun openLockScreenQuickSettings(context: Context) {
+    val intents = listOf(
+        // Xiaomi / POCO / Redmi (Status Bar / Control Center on Lock Screen)
+        Intent().setComponent(ComponentName("com.android.settings", "com.android.settings.Settings\$StatusBarSettingsActivity")),
+        Intent().setComponent(ComponentName("com.android.settings", "com.android.settings.Settings\$LockScreenSettingsActivity")),
+        // Samsung (Secure Lock Settings / Lock Network & Security)
+        Intent("com.samsung.settings.SECURE_LOCK_SETTINGS"),
+        Intent("android.settings.LOCKSCREEN_SETTINGS"),
+        Intent().setComponent(ComponentName("com.android.settings", "com.android.settings.Settings\$LockScreenSettingsActivity")),
+        // Oppo / Realme / ColorOS
+        Intent().setComponent(ComponentName("com.coloros.notificationmanager", "com.coloros.notificationmanager.NotificationCenterSettingsActivity")),
+        // Vivo / iQOO
+        Intent().setComponent(ComponentName("com.android.settings", "com.android.settings.Settings\$LockScreenSettingsActivity")),
+        // Standard Android Settings
+        Intent("android.settings.NOTIFICATION_SETTINGS"),
+        Intent(Settings.ACTION_SECURITY_SETTINGS),
+        Intent(Settings.ACTION_SETTINGS)
+    )
+
+    for (intent in intents) {
+        try {
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            if (intent.resolveActivity(context.packageManager) != null) {
+                context.startActivity(intent)
+                return
+            }
+        } catch (_: Exception) {}
+    }
+
+    try {
+        context.startActivity(Intent(Settings.ACTION_SETTINGS).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        })
+    } catch (_: Exception) {}
+}
+
 @Composable
 fun HardeningChecklistCard(
     modifier: Modifier = Modifier
@@ -94,6 +142,7 @@ fun HardeningChecklistCard(
 
     var isDeviceSecure by remember { mutableStateOf(keyguardManager?.isDeviceSecure ?: false) }
     var isLockNotificationHidden by remember { mutableStateOf(checkIsLockScreenNotificationHidden(context)) }
+    var isQuickSettingsRestricted by remember { mutableStateOf(checkIsQuickSettingsRestricted(context)) }
     var hasAdbPermission by remember { mutableStateOf(sosLocateController.hasWriteSecureSettingsPermission()) }
 
     DisposableEffect(lifecycleOwner) {
@@ -101,6 +150,7 @@ fun HardeningChecklistCard(
             if (event == Lifecycle.Event.ON_RESUME) {
                 isDeviceSecure = keyguardManager?.isDeviceSecure ?: false
                 isLockNotificationHidden = checkIsLockScreenNotificationHidden(context)
+                isQuickSettingsRestricted = checkIsQuickSettingsRestricted(context)
                 hasAdbPermission = sosLocateController.hasWriteSecureSettingsPermission()
             }
         }
@@ -233,31 +283,30 @@ fun HardeningChecklistCard(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Item 3: Remote Location Switching (ADB Permission)
-            val sosLocateController = remember { com.awayassist.app.util.SosLocateController(context) }
-            val hasAdbPermission = remember { sosLocateController.hasWriteSecureSettingsPermission() }
+            // Item 3: Remote Location Switching (ADB / Shizuku)
+            val hasAdb = hasAdbPermission
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    imageVector = if (hasAdbPermission) Icons.Default.CheckCircle else Icons.Default.Warning,
+                    imageVector = if (hasAdb) Icons.Default.CheckCircle else Icons.Default.Warning,
                     contentDescription = null,
-                    tint = if (hasAdbPermission) RingState else AwayAssistTheme.colors.accent,
+                    tint = if (hasAdb) RingState else AwayAssistTheme.colors.accent,
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(10.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = if (hasAdbPermission) "Remote Location Switching: Enabled" else "Remote Location Switching: Optional",
+                        text = if (hasAdb) "Remote Location Switching: Enabled" else "Remote Location Switching: Optional",
                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                         color = AwayAssistTheme.colors.textPrimary
                     )
                     Text(
-                        text = if (hasAdbPermission) {
+                        text = if (hasAdb) {
                             "App can automatically turn ON location when emergency SMS arrives and turn it OFF after fix."
                         } else {
-                            "Only needed if you keep phone location OFF. Tap 'Guide' for step-by-step setup."
+                            "Only needed if you keep phone location OFF. Tap 'Guide' for 1-tap Shizuku or PC setup."
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = AwayAssistTheme.colors.textSecondary
@@ -265,7 +314,7 @@ fun HardeningChecklistCard(
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 AppleStyleButton(
-                    text = if (hasAdbPermission) "Status" else "Guide",
+                    text = if (hasAdb) "Status" else "Guide",
                     onClick = { showAdbGuideSheet = true },
                     style = AppleButtonStyle.SECONDARY
                 )
@@ -273,30 +322,40 @@ fun HardeningChecklistCard(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Item 4: Quick Settings Restriction Advisory
+            // Item 4: Restrict Quick Settings on Lock Screen
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    imageVector = Icons.Default.Shield,
+                    imageVector = if (isQuickSettingsRestricted) Icons.Default.CheckCircle else Icons.Default.Shield,
                     contentDescription = null,
-                    tint = AwayAssistTheme.colors.textSecondary,
+                    tint = if (isQuickSettingsRestricted) RingState else AwayAssistTheme.colors.textSecondary,
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(10.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Restrict Quick Settings on Lock Screen",
+                        text = if (isQuickSettingsRestricted) "Quick Settings: Restricted on Lock" else "Restrict Quick Settings on Lock",
                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                         color = AwayAssistTheme.colors.textPrimary
                     )
                     Text(
-                        text = "On OEM skins (Samsung, Xiaomi, etc.), restrict pulling down Quick Settings or toggling Airplane mode while locked.",
+                        text = if (isQuickSettingsRestricted) {
+                            "Quick Settings cannot be pulled down while locked, preventing unauthorized Airplane Mode toggle."
+                        } else {
+                            "Disallow pulling down Notification Shade / Control Center while locked so a thief cannot toggle Airplane Mode."
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         color = AwayAssistTheme.colors.textSecondary
                     )
                 }
+                Spacer(modifier = Modifier.width(8.dp))
+                AppleStyleButton(
+                    text = "Configure",
+                    onClick = { openLockScreenQuickSettings(context) },
+                    style = AppleButtonStyle.SECONDARY
+                )
             }
         }
     }
