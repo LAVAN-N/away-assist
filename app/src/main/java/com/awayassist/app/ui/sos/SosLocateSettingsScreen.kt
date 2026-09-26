@@ -731,17 +731,17 @@ fun SosLocateSettingsScreen(
                         color = AwayAssistTheme.colors.textPrimary
                     )
                     Text(
-                        text = "• Primary Objective: Standard tracking apps rely on an active internet connection and location services. If your phone is lost while offline or location was turned OFF, Away Assist acts as the emergency fallback.",
+                        text = "• Primary Objective: Standard tracking apps rely on an active internet connection and location services. If your phone is lost while offline, or location / mobile data was turned OFF, Away Assist acts as the emergency fallback.",
                         style = MaterialTheme.typography.bodySmall,
                         color = AwayAssistTheme.colors.textSecondary
                     )
                     Text(
-                        text = "• SMS Synergy: When triggered, Away Assist can turn location ON automatically and send live GPS coordinates and Google Maps links via SMS to your trusted emergency contact.",
+                        text = "• SMS Synergy: When triggered via emergency SMS, Away Assist automatically turns Location and Mobile Data ON — reviving Google Find My Device and sending live GPS Google Maps links directly to your emergency contact.",
                         style = MaterialTheme.typography.bodySmall,
                         color = AwayAssistTheme.colors.textSecondary
                     )
                     Text(
-                        text = "• Total Protection: Together, Away Assist and Find My Device ensure your device can be found whether it is online, offline, or location was disabled.",
+                        text = "• Total Protection: Together, Away Assist and Find My Device ensure your device can always be tracked and recovered, even when mobile data and location were completely switched off.",
                         style = MaterialTheme.typography.bodySmall,
                         color = AwayAssistTheme.colors.textSecondary
                     )

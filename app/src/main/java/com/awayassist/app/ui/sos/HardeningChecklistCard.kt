@@ -330,8 +330,8 @@ fun RemoteLocationSwitchingCard(
     }
 
     GroupedListCard(
-        header = "Remote Location Switching",
-        footer = "Away Assist SOS works as usual if phone location is already ON. In unexpected cases where location was turned OFF when the device is lost, this setting comes into play to automatically toggle it ON.",
+        header = "Remote Location & Data Switching",
+        footer = "Away Assist SOS works as usual if phone location and mobile data are already ON. In unexpected cases where location or mobile data was turned OFF when the device is lost, this setting comes into play to automatically toggle them ON.",
         modifier = modifier
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -354,9 +354,9 @@ fun RemoteLocationSwitchingCard(
                     )
                     Text(
                         text = if (hasAdbPermission) {
-                            "Location auto-toggle is active. If location is ever OFF when phone is lost, Away Assist will turn it ON via SMS."
+                            "Location & data auto-toggle is active. If location or mobile data is ever OFF when phone is lost, Away Assist will turn them ON via SMS to revive GPS and Google Find My Device."
                         } else {
-                            "Away Assist SOS works as usual if location is ON. If location is OFF when phone is lost, this setting comes into play to enable it remotely. Tap 'Guide' for setup."
+                            "Away Assist SOS works as usual if location is ON. If location or mobile data is OFF when phone is lost, this setting comes into play to enable them remotely. Tap 'Guide' for setup."
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = AwayAssistTheme.colors.textSecondary

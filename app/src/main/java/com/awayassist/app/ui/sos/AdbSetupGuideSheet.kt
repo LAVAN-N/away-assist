@@ -122,7 +122,7 @@ fun AdbSetupGuideSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Remote Location Switching Setup",
+                    text = "Remote Location & Data Setup",
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = AwayAssistTheme.colors.textPrimary
                 )
@@ -162,7 +162,7 @@ fun AdbSetupGuideSheet(
                         )
                         Spacer(modifier = Modifier.height(3.dp))
                         Text(
-                            text = "No setup is needed if you keep your phone's Location toggle ON! On modern Android, leaving location ON consumes 0% battery when idle.\n\nThis 1-time setup is only needed if you prefer keeping your phone's location switch OFF manually at all times.",
+                            text = "No setup is needed if you keep your phone's Location and Mobile Data ON! On modern Android, leaving location ON consumes 0% battery when idle.\n\nThis 1-time setup empowers Away Assist to auto-enable Location and Mobile Data via emergency SMS if they were ever turned OFF when the device is lost.",
                             style = MaterialTheme.typography.bodySmall,
                             color = AwayAssistTheme.colors.textSecondary,
                             lineHeight = 18.sp

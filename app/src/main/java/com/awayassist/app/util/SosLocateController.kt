@@ -169,36 +169,161 @@ class SosLocateController(private val context: Context) {
     }
 
     fun enableSystemLocation(): Boolean {
-        if (!hasWriteSecureSettingsPermission()) return false
+        var success = false
+        if (hasWriteSecureSettingsPermission()) {
+            try {
+                @Suppress("DEPRECATION")
+                Settings.Secure.putInt(
+                    context.contentResolver,
+                    Settings.Secure.LOCATION_MODE,
+                    Settings.Secure.LOCATION_MODE_HIGH_ACCURACY
+                )
+                Log.d(TAG, "Successfully enabled system master location switch via WRITE_SECURE_SETTINGS.")
+                success = true
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to enable system location", e)
+            }
+        }
+        if (isShizukuPermissionGranted()) {
+            try {
+                val newProcessMethod = rikka.shizuku.Shizuku::class.java.getDeclaredMethod(
+                    "newProcess",
+                    Array<String>::class.java,
+                    Array<String>::class.java,
+                    String::class.java
+                )
+                newProcessMethod.isAccessible = true
+                val process = newProcessMethod.invoke(
+                    null,
+                    arrayOf("settings", "put", "secure", "location_mode", "3"),
+                    null,
+                    null
+                ) as java.lang.Process
+                process.waitFor()
+                success = true
+            } catch (_: Throwable) {}
+        }
+        return success
+    }
+
+    fun disableSystemLocation(): Boolean {
+        var success = false
+        if (hasWriteSecureSettingsPermission()) {
+            try {
+                @Suppress("DEPRECATION")
+                Settings.Secure.putInt(
+                    context.contentResolver,
+                    Settings.Secure.LOCATION_MODE,
+                    Settings.Secure.LOCATION_MODE_OFF
+                )
+                Log.d(TAG, "Successfully disabled system master location switch via WRITE_SECURE_SETTINGS.")
+                success = true
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to disable system location", e)
+            }
+        }
+        if (isShizukuPermissionGranted()) {
+            try {
+                val newProcessMethod = rikka.shizuku.Shizuku::class.java.getDeclaredMethod(
+                    "newProcess",
+                    Array<String>::class.java,
+                    Array<String>::class.java,
+                    String::class.java
+                )
+                newProcessMethod.isAccessible = true
+                val process = newProcessMethod.invoke(
+                    null,
+                    arrayOf("settings", "put", "secure", "location_mode", "0"),
+                    null,
+                    null
+                ) as java.lang.Process
+                process.waitFor()
+                success = true
+            } catch (_: Throwable) {}
+        }
+        return success
+    }
+
+    fun isMobileDataEnabled(): Boolean {
         return try {
-            @Suppress("DEPRECATION")
-            Settings.Secure.putInt(
-                context.contentResolver,
-                Settings.Secure.LOCATION_MODE,
-                Settings.Secure.LOCATION_MODE_HIGH_ACCURACY
-            )
-            Log.d(TAG, "Successfully enabled system master location switch via WRITE_SECURE_SETTINGS.")
-            true
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val tm = context.getSystemService(Context.TELEPHONY_SERVICE) as? android.telephony.TelephonyManager
+                tm?.isDataEnabled ?: (Settings.Global.getInt(context.contentResolver, "mobile_data", 0) == 1)
+            } else {
+                Settings.Global.getInt(context.contentResolver, "mobile_data", 0) == 1
+            }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to enable system location", e)
             false
         }
     }
 
-    fun disableSystemLocation(): Boolean {
-        if (!hasWriteSecureSettingsPermission()) return false
-        return try {
-            Settings.Secure.putInt(
-                context.contentResolver,
-                Settings.Secure.LOCATION_MODE,
-                Settings.Secure.LOCATION_MODE_OFF
-            )
-            Log.d(TAG, "Successfully disabled system master location switch via WRITE_SECURE_SETTINGS.")
-            true
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to disable system location", e)
-            false
+    fun enableMobileData(): Boolean {
+        var success = false
+        if (hasWriteSecureSettingsPermission()) {
+            try {
+                Settings.Global.putInt(context.contentResolver, "mobile_data", 1)
+                Log.d(TAG, "Successfully enabled mobile data via WRITE_SECURE_SETTINGS.")
+                success = true
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to enable mobile data via ContentResolver", e)
+            }
         }
+        if (isShizukuPermissionGranted()) {
+            try {
+                val newProcessMethod = rikka.shizuku.Shizuku::class.java.getDeclaredMethod(
+                    "newProcess",
+                    Array<String>::class.java,
+                    Array<String>::class.java,
+                    String::class.java
+                )
+                newProcessMethod.isAccessible = true
+                val process = newProcessMethod.invoke(
+                    null,
+                    arrayOf("svc", "data", "enable"),
+                    null,
+                    null
+                ) as java.lang.Process
+                process.waitFor()
+                success = true
+                Log.d(TAG, "Executed 'svc data enable' via Shizuku")
+            } catch (e: Throwable) {
+                Log.w(TAG, "Failed to enable data via Shizuku", e)
+            }
+        }
+        return success
+    }
+
+    fun disableMobileData(): Boolean {
+        var success = false
+        if (hasWriteSecureSettingsPermission()) {
+            try {
+                Settings.Global.putInt(context.contentResolver, "mobile_data", 0)
+                Log.d(TAG, "Successfully disabled mobile data via WRITE_SECURE_SETTINGS.")
+                success = true
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to disable mobile data via ContentResolver", e)
+            }
+        }
+        if (isShizukuPermissionGranted()) {
+            try {
+                val newProcessMethod = rikka.shizuku.Shizuku::class.java.getDeclaredMethod(
+                    "newProcess",
+                    Array<String>::class.java,
+                    Array<String>::class.java,
+                    String::class.java
+                )
+                newProcessMethod.isAccessible = true
+                val process = newProcessMethod.invoke(
+                    null,
+                    arrayOf("svc", "data", "disable"),
+                    null,
+                    null
+                ) as java.lang.Process
+                process.waitFor()
+                success = true
+            } catch (_: Throwable) {}
+        }
+        return success
     }
 
     fun isLocationEnabled(): Boolean {
@@ -221,11 +346,17 @@ class SosLocateController(private val context: Context) {
         val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val batteryLevel = getBatteryPercentage()
         val wasLocationOff = !isLocationEnabled()
-        var toggledOn = false
+        val wasDataOff = !isMobileDataEnabled()
+        var toggledLocOn = false
 
-        if (wasLocationOff && hasWriteSecureSettingsPermission()) {
-            toggledOn = enableSystemLocation()
-            if (toggledOn) {
+        if (hasWriteSecureSettingsPermission() || isShizukuPermissionGranted()) {
+            if (wasLocationOff) {
+                toggledLocOn = enableSystemLocation()
+            }
+            if (wasDataOff) {
+                enableMobileData()
+            }
+            if (toggledLocOn || wasDataOff) {
                 delay(1200L)
             }
         }
@@ -234,7 +365,7 @@ class SosLocateController(private val context: Context) {
         val location = acquireLocation(8_000L)
 
         // Turn location back OFF immediately if we turned it on for a single fix
-        if (toggledOn) {
+        if (toggledLocOn) {
             disableSystemLocation()
         }
 
@@ -256,26 +387,28 @@ class SosLocateController(private val context: Context) {
     }
 
     private suspend fun handleTrack(senderNumber: String, autoTimeoutHours: Int) {
-        if (!isLocationEnabled() && hasWriteSecureSettingsPermission()) {
-            enableSystemLocation()
+        if (hasWriteSecureSettingsPermission() || isShizukuPermissionGranted()) {
+            if (!isLocationEnabled()) enableSystemLocation()
+            if (!isMobileDataEnabled()) enableMobileData()
         }
         preferences.startSosSession(SosSessionState.TRACK, senderNumber)
         val isLocOn = isLocationEnabled()
         val note = if (!isLocOn) " (Note: Location is OFF; grant WRITE_SECURE_SETTINGS via ADB to allow remote ON)" else ""
-        val message = "Away Assist: Location turned on$note. Use Find My Device or Maps to view. Reply STOP with your prefix to turn off, or it will auto-stop after ${autoTimeoutHours}h."
+        val message = "Away Assist: Location & Mobile Data enabled$note. Use Google Find My Device or Maps to view. Reply STOP with your prefix to turn off, or it will auto-stop after ${autoTimeoutHours}h."
         sendSms(senderNumber, message)
         preferences.recordSosTrigger("TRACK started from $senderNumber")
     }
 
     private suspend fun handleTrace(senderNumber: String, intervalMins: Int, autoTimeoutHours: Int) {
-        if (!isLocationEnabled() && hasWriteSecureSettingsPermission()) {
-            enableSystemLocation()
+        if (hasWriteSecureSettingsPermission() || isShizukuPermissionGranted()) {
+            if (!isLocationEnabled()) enableSystemLocation()
+            if (!isMobileDataEnabled()) enableMobileData()
             delay(1200L)
         }
         preferences.startSosSession(SosSessionState.TRACE, senderNumber, intervalMins)
         val isLocOn = isLocationEnabled()
         val note = if (!isLocOn) " (Location is OFF; grant ADB permission to allow remote ON)" else ""
-        val ackMessage = "Away Assist: Tracing active$note. Sending updates every ${intervalMins}m. Reply STOP with your prefix to cancel, or it will auto-stop after ${autoTimeoutHours}h."
+        val ackMessage = "Away Assist: Tracing active$note. Location & Data enabled. Sending updates every ${intervalMins}m. Reply STOP with your prefix to cancel, or it will auto-stop after ${autoTimeoutHours}h."
         sendSms(senderNumber, ackMessage)
         preferences.recordSosTrigger("TRACE started from $senderNumber")
 
@@ -285,7 +418,7 @@ class SosLocateController(private val context: Context) {
 
     private suspend fun handleStop(senderNumber: String) {
         preferences.stopSosSession()
-        if (hasWriteSecureSettingsPermission()) {
+        if (hasWriteSecureSettingsPermission() || isShizukuPermissionGranted()) {
             disableSystemLocation()
         }
         val message = "Away Assist: Tracking stopped, location turned off."
@@ -307,16 +440,22 @@ class SosLocateController(private val context: Context) {
         val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val batteryLevel = getBatteryPercentage()
         val wasLocationOff = !isLocationEnabled()
-        var toggledOn = false
+        val wasDataOff = !isMobileDataEnabled()
+        var toggledLocOn = false
 
-        if (wasLocationOff && hasWriteSecureSettingsPermission()) {
-            toggledOn = enableSystemLocation()
-            if (toggledOn) delay(1200L)
+        if (hasWriteSecureSettingsPermission() || isShizukuPermissionGranted()) {
+            if (wasLocationOff) {
+                toggledLocOn = enableSystemLocation()
+            }
+            if (wasDataOff) {
+                enableMobileData()
+            }
+            if (toggledLocOn || wasDataOff) delay(1200L)
         }
 
         val location = acquireLocation(8_000L) ?: getLastKnownLocation()
 
-        if (toggledOn) {
+        if (toggledLocOn) {
             disableSystemLocation()
         }
 
