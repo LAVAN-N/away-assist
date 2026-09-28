@@ -143,24 +143,28 @@ class SosLocateController(private val context: Context) {
         }
     }
 
-    fun grantWriteSecureSettingsViaShizuku(): Boolean {
+    private fun runShizukuCommand(command: Array<String>): Boolean {
         return try {
-            if (!isShizukuAvailable()) return false
-            val newProcessMethod = rikka.shizuku.Shizuku::class.java.getDeclaredMethod(
+            val method = rikka.shizuku.Shizuku::class.java.getDeclaredMethod(
                 "newProcess",
                 Array<String>::class.java,
                 Array<String>::class.java,
                 String::class.java
             )
-            newProcessMethod.isAccessible = true
-            val process = newProcessMethod.invoke(
-                null,
-                arrayOf("pm", "grant", context.packageName, Manifest.permission.WRITE_SECURE_SETTINGS),
-                null,
-                null
-            ) as java.lang.Process
+            method.isAccessible = true
+            val process = method.invoke(null, command, null, null) as java.lang.Process
             val exitCode = process.waitFor()
-            Log.d(TAG, "Shizuku pm grant exitCode: $exitCode")
+            exitCode == 0
+        } catch (e: Throwable) {
+            Log.w(TAG, "Failed running Shizuku command: ${command.joinToString(" ")}", e)
+            false
+        }
+    }
+
+    fun grantWriteSecureSettingsViaShizuku(): Boolean {
+        return try {
+            if (!isShizukuAvailable()) return false
+            runShizukuCommand(arrayOf("pm", "grant", context.packageName, Manifest.permission.WRITE_SECURE_SETTINGS))
             hasWriteSecureSettingsPermission()
         } catch (e: Throwable) {
             Log.e(TAG, "Failed to grant permission via Shizuku", e)
@@ -185,23 +189,9 @@ class SosLocateController(private val context: Context) {
             }
         }
         if (isShizukuPermissionGranted()) {
-            try {
-                val newProcessMethod = rikka.shizuku.Shizuku::class.java.getDeclaredMethod(
-                    "newProcess",
-                    Array<String>::class.java,
-                    Array<String>::class.java,
-                    String::class.java
-                )
-                newProcessMethod.isAccessible = true
-                val process = newProcessMethod.invoke(
-                    null,
-                    arrayOf("settings", "put", "secure", "location_mode", "3"),
-                    null,
-                    null
-                ) as java.lang.Process
-                process.waitFor()
+            if (runShizukuCommand(arrayOf("settings", "put", "secure", "location_mode", "3"))) {
                 success = true
-            } catch (_: Throwable) {}
+            }
         }
         return success
     }
@@ -223,23 +213,9 @@ class SosLocateController(private val context: Context) {
             }
         }
         if (isShizukuPermissionGranted()) {
-            try {
-                val newProcessMethod = rikka.shizuku.Shizuku::class.java.getDeclaredMethod(
-                    "newProcess",
-                    Array<String>::class.java,
-                    Array<String>::class.java,
-                    String::class.java
-                )
-                newProcessMethod.isAccessible = true
-                val process = newProcessMethod.invoke(
-                    null,
-                    arrayOf("settings", "put", "secure", "location_mode", "0"),
-                    null,
-                    null
-                ) as java.lang.Process
-                process.waitFor()
+            if (runShizukuCommand(arrayOf("settings", "put", "secure", "location_mode", "0"))) {
                 success = true
-            } catch (_: Throwable) {}
+            }
         }
         return success
     }
@@ -269,25 +245,9 @@ class SosLocateController(private val context: Context) {
             }
         }
         if (isShizukuPermissionGranted()) {
-            try {
-                val newProcessMethod = rikka.shizuku.Shizuku::class.java.getDeclaredMethod(
-                    "newProcess",
-                    Array<String>::class.java,
-                    Array<String>::class.java,
-                    String::class.java
-                )
-                newProcessMethod.isAccessible = true
-                val process = newProcessMethod.invoke(
-                    null,
-                    arrayOf("svc", "data", "enable"),
-                    null,
-                    null
-                ) as java.lang.Process
-                process.waitFor()
+            if (runShizukuCommand(arrayOf("svc", "data", "enable"))) {
                 success = true
                 Log.d(TAG, "Executed 'svc data enable' via Shizuku")
-            } catch (e: Throwable) {
-                Log.w(TAG, "Failed to enable data via Shizuku", e)
             }
         }
         return success
@@ -305,23 +265,9 @@ class SosLocateController(private val context: Context) {
             }
         }
         if (isShizukuPermissionGranted()) {
-            try {
-                val newProcessMethod = rikka.shizuku.Shizuku::class.java.getDeclaredMethod(
-                    "newProcess",
-                    Array<String>::class.java,
-                    Array<String>::class.java,
-                    String::class.java
-                )
-                newProcessMethod.isAccessible = true
-                val process = newProcessMethod.invoke(
-                    null,
-                    arrayOf("svc", "data", "disable"),
-                    null,
-                    null
-                ) as java.lang.Process
-                process.waitFor()
+            if (runShizukuCommand(arrayOf("svc", "data", "disable"))) {
                 success = true
-            } catch (_: Throwable) {}
+            }
         }
         return success
     }

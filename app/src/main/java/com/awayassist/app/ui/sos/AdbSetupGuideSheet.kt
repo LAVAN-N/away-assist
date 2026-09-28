@@ -71,36 +71,74 @@ fun AdbSetupGuideSheet(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     val controller = remember { SosLocateController(context) }
     var isGranted by remember { mutableStateOf(controller.hasWriteSecureSettingsPermission()) }
     var selectedMethodTab by remember { mutableIntStateOf(0) } // 0 = Shizuku (Phone only), 1 = Computer (ADB)
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
+    var isShizukuRunning by remember { mutableStateOf(controller.isShizukuAvailable()) }
+    var isShizukuAuthorized by remember { mutableStateOf(controller.isShizukuPermissionGranted()) }
+
+    fun refreshShizukuState() {
+        val available = controller.isShizukuAvailable()
+        isShizukuRunning = available
+        isShizukuAuthorized = if (available) controller.isShizukuPermissionGranted() else false
+        isGranted = controller.hasWriteSecureSettingsPermission()
+    }
+
+    val binderReceivedListener = remember {
+        rikka.shizuku.Shizuku.OnBinderReceivedListener {
+            isShizukuRunning = true
+            isShizukuAuthorized = controller.isShizukuPermissionGranted()
+            isGranted = controller.hasWriteSecureSettingsPermission()
+        }
+    }
+    val binderDeadListener = remember {
+        rikka.shizuku.Shizuku.OnBinderDeadListener {
+            isShizukuRunning = false
+            isShizukuAuthorized = false
+        }
+    }
+
     val shizukuPermissionListener = remember {
         rikka.shizuku.Shizuku.OnRequestPermissionResultListener { _, grantResult ->
             if (grantResult == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                isShizukuAuthorized = true
                 val ok = controller.grantWriteSecureSettingsViaShizuku()
                 isGranted = ok
                 if (ok) {
                     Toast.makeText(context, "Permission granted via Shizuku!", Toast.LENGTH_SHORT).show()
                 }
+            } else {
+                Toast.makeText(context, "Shizuku permission denied.", Toast.LENGTH_SHORT).show()
             }
         }
     }
 
-    androidx.compose.runtime.DisposableEffect(Unit) {
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                refreshShizukuState()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+
         try {
+            rikka.shizuku.Shizuku.addBinderReceivedListenerSticky(binderReceivedListener)
+            rikka.shizuku.Shizuku.addBinderDeadListener(binderDeadListener)
             rikka.shizuku.Shizuku.addRequestPermissionResultListener(shizukuPermissionListener)
         } catch (e: Exception) {}
+
         onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
             try {
+                rikka.shizuku.Shizuku.removeBinderReceivedListener(binderReceivedListener)
+                rikka.shizuku.Shizuku.removeBinderDeadListener(binderDeadListener)
                 rikka.shizuku.Shizuku.removeRequestPermissionResultListener(shizukuPermissionListener)
             } catch (e: Exception) {}
         }
     }
-
-    val isShizukuRunning = remember { controller.isShizukuAvailable() }
-    val isShizukuAuthorized = remember(isShizukuRunning) { controller.isShizukuPermissionGranted() }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -343,23 +381,44 @@ fun AdbSetupGuideSheet(
                 )
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Step 1: Install Shizuku
+                // Step 1: Install or Open Shizuku
+                val isShizukuInstalled = remember {
+                    try {
+                        context.packageManager.getPackageInfo("moe.shizuku.privileged.api", 0) != null
+                    } catch (_: Exception) {
+                        false
+                    }
+                }
+
                 GuideStepItem(
                     stepNumber = "1",
-                    title = "Install Free Shizuku App",
-                    description = "Download the official, free Shizuku app from the Google Play Store on this phone.",
-                    actionLabel = "Open Shizuku in Play Store",
+                    title = if (isShizukuInstalled) "Shizuku App Installed" else "Install Free Shizuku App",
+                    description = if (isShizukuInstalled) {
+                        "Shizuku is installed on this device. Open it to verify the service status."
+                    } else {
+                        "Download the official, free Shizuku app from the Google Play Store on this phone."
+                    },
+                    actionLabel = if (isShizukuInstalled) "Open Shizuku App" else "Open in Play Store",
                     onAction = {
-                        try {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=moe.shizuku.privileged.api")).apply {
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        if (isShizukuInstalled) {
+                            val launchIntent = context.packageManager.getLaunchIntentForPackage("moe.shizuku.privileged.api")
+                            if (launchIntent != null) {
+                                context.startActivity(launchIntent)
+                            } else {
+                                Toast.makeText(context, "Could not open Shizuku", Toast.LENGTH_SHORT).show()
                             }
-                            context.startActivity(intent)
-                        } catch (e: Exception) {
-                            val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=moe.shizuku.privileged.api")).apply {
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        } else {
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=moe.shizuku.privileged.api")).apply {
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=moe.shizuku.privileged.api")).apply {
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                                context.startActivity(webIntent)
                             }
-                            context.startActivity(webIntent)
                         }
                     }
                 )
@@ -370,8 +429,8 @@ fun AdbSetupGuideSheet(
                 GuideStepItem(
                     stepNumber = "2",
                     title = "Start Shizuku via Wireless Debugging",
-                    description = "1. Enable 'Developer Options' & toggle 'Wireless Debugging' ON.\n2. Open Shizuku, tap 'Pairing' (enter 6-digit code in the notification).\n3. Return to Shizuku and tap 'Start'.",
-                    actionLabel = "Open Developer Options",
+                    description = "1. Enable 'Developer Options' & toggle 'Wireless Debugging' ON.\n2. In Shizuku, tap 'Pairing' (enter 6-digit code in notification).\n3. In Shizuku, tap 'Start'.",
+                    actionLabel = "Developer Options",
                     onAction = {
                         try {
                             context.startActivity(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).apply {
@@ -386,15 +445,36 @@ fun AdbSetupGuideSheet(
                 Spacer(modifier = Modifier.height(14.dp))
 
                 // Step 3: Direct 1-Tap Grant inside Away Assist
+                val step3Label = when {
+                    isGranted -> "Permission Granted ✓"
+                    !isShizukuRunning -> "Start Shizuku"
+                    !isShizukuAuthorized -> "Authorize Shizuku"
+                    else -> "Grant with Shizuku"
+                }
+
+                val step3Desc = when {
+                    isGranted -> "WRITE_SECURE_SETTINGS permission is active. Remote switching is fully operational."
+                    !isShizukuRunning -> "Shizuku service is not yet running. Open Shizuku, tap 'Start' under Wireless Debugging, then return here."
+                    !isShizukuAuthorized -> "Shizuku service is running! Tap 'Authorize Shizuku' to allow Away Assist."
+                    else -> "Shizuku is ready! Tap below to grant WRITE_SECURE_SETTINGS in 1 tap."
+                }
+
                 GuideStepItem(
                     stepNumber = "3",
                     title = "Grant Permission in 1-Tap",
-                    description = "Once Shizuku is started, tap the button below. Away Assist will directly communicate with Shizuku to grant the permission automatically—no shell or terminal app needed!",
-                    actionLabel = if (!isGranted) "Grant with Shizuku" else "Permission Granted ✓",
+                    description = step3Desc,
+                    actionLabel = step3Label,
                     onAction = {
+                        refreshShizukuState()
                         if (!isGranted) {
                             if (!controller.isShizukuAvailable()) {
-                                Toast.makeText(context, "Shizuku is not running. Please open Shizuku and tap 'Start'.", Toast.LENGTH_LONG).show()
+                                val launchIntent = context.packageManager.getLaunchIntentForPackage("moe.shizuku.privileged.api")
+                                if (launchIntent != null) {
+                                    context.startActivity(launchIntent)
+                                    Toast.makeText(context, "Tap 'Start' in Shizuku and return here.", Toast.LENGTH_LONG).show()
+                                } else {
+                                    Toast.makeText(context, "Shizuku is not running. Please open Shizuku and tap 'Start'.", Toast.LENGTH_LONG).show()
+                                }
                             } else if (!controller.isShizukuPermissionGranted()) {
                                 try {
                                     rikka.shizuku.Shizuku.requestPermission(1001)
