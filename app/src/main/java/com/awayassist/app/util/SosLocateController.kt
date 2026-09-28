@@ -143,7 +143,7 @@ class SosLocateController(private val context: Context) {
         }
     }
 
-    private fun runShizukuCommand(command: Array<String>): Boolean {
+    private fun runShizukuCommand(command: Array<String>): Pair<Int, String> {
         return try {
             val method = rikka.shizuku.Shizuku::class.java.getDeclaredMethod(
                 "newProcess",
@@ -153,23 +153,42 @@ class SosLocateController(private val context: Context) {
             )
             method.isAccessible = true
             val process = method.invoke(null, command, null, null) as java.lang.Process
+            val outText = process.inputStream.bufferedReader().readText()
+            val errText = process.errorStream.bufferedReader().readText()
             val exitCode = process.waitFor()
-            exitCode == 0
+            val output = (outText + "\n" + errText).trim()
+            Log.d(TAG, "Shizuku '${command.joinToString(" ")}' exit: $exitCode, out: $output")
+            Pair(exitCode, output)
         } catch (e: Throwable) {
             Log.w(TAG, "Failed running Shizuku command: ${command.joinToString(" ")}", e)
-            false
+            Pair(-1, e.message ?: "Exception")
         }
     }
 
-    fun grantWriteSecureSettingsViaShizuku(): Boolean {
-        return try {
-            if (!isShizukuAvailable()) return false
-            runShizukuCommand(arrayOf("pm", "grant", context.packageName, Manifest.permission.WRITE_SECURE_SETTINGS))
-            hasWriteSecureSettingsPermission()
-        } catch (e: Throwable) {
-            Log.e(TAG, "Failed to grant permission via Shizuku", e)
-            false
+    fun grantWriteSecureSettingsViaShizuku(): Pair<Boolean, String> {
+        if (!isShizukuAvailable()) return Pair(false, "Shizuku service is not running.")
+        if (!isShizukuPermissionGranted()) return Pair(false, "Shizuku permission not authorized.")
+
+        val pkg = context.packageName
+        val perm = Manifest.permission.WRITE_SECURE_SETTINGS
+
+        // Attempt 1: sh -c "pm grant ..."
+        var res = runShizukuCommand(arrayOf("sh", "-c", "pm grant $pkg $perm"))
+
+        // Attempt 2: cmd package grant ...
+        if (!hasWriteSecureSettingsPermission()) {
+            val res2 = runShizukuCommand(arrayOf("cmd", "package", "grant", pkg, perm))
+            if (res2.second.isNotBlank()) res = res2
         }
+
+        // Attempt 3: pm grant ...
+        if (!hasWriteSecureSettingsPermission()) {
+            val res3 = runShizukuCommand(arrayOf("pm", "grant", pkg, perm))
+            if (res3.second.isNotBlank()) res = res3
+        }
+
+        val granted = hasWriteSecureSettingsPermission()
+        return Pair(granted, res.second)
     }
 
     fun enableSystemLocation(): Boolean {
@@ -189,7 +208,7 @@ class SosLocateController(private val context: Context) {
             }
         }
         if (isShizukuPermissionGranted()) {
-            if (runShizukuCommand(arrayOf("settings", "put", "secure", "location_mode", "3"))) {
+            if (runShizukuCommand(arrayOf("sh", "-c", "settings put secure location_mode 3")).first == 0) {
                 success = true
             }
         }
@@ -213,7 +232,7 @@ class SosLocateController(private val context: Context) {
             }
         }
         if (isShizukuPermissionGranted()) {
-            if (runShizukuCommand(arrayOf("settings", "put", "secure", "location_mode", "0"))) {
+            if (runShizukuCommand(arrayOf("sh", "-c", "settings put secure location_mode 0")).first == 0) {
                 success = true
             }
         }
@@ -245,7 +264,7 @@ class SosLocateController(private val context: Context) {
             }
         }
         if (isShizukuPermissionGranted()) {
-            if (runShizukuCommand(arrayOf("svc", "data", "enable"))) {
+            if (runShizukuCommand(arrayOf("sh", "-c", "svc data enable")).first == 0) {
                 success = true
                 Log.d(TAG, "Executed 'svc data enable' via Shizuku")
             }
@@ -265,7 +284,7 @@ class SosLocateController(private val context: Context) {
             }
         }
         if (isShizukuPermissionGranted()) {
-            if (runShizukuCommand(arrayOf("svc", "data", "disable"))) {
+            if (runShizukuCommand(arrayOf("sh", "-c", "svc data disable")).first == 0) {
                 success = true
             }
         }

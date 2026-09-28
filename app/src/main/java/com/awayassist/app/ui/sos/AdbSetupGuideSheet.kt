@@ -105,13 +105,19 @@ fun AdbSetupGuideSheet(
         rikka.shizuku.Shizuku.OnRequestPermissionResultListener { _, grantResult ->
             if (grantResult == android.content.pm.PackageManager.PERMISSION_GRANTED) {
                 isShizukuAuthorized = true
-                val ok = controller.grantWriteSecureSettingsViaShizuku()
+                val (ok, errorMsg) = controller.grantWriteSecureSettingsViaShizuku()
                 isGranted = ok
                 if (ok) {
-                    Toast.makeText(context, "Permission granted via Shizuku!", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Permission granted via Shizuku! ✓", Toast.LENGTH_SHORT).show()
+                } else {
+                    if (errorMsg.contains("SecurityException", ignoreCase = true) || errorMsg.contains("security", ignoreCase = true)) {
+                        Toast.makeText(context, "Xiaomi/ColorOS: Enable 'USB debugging (Security settings)' in Developer Options.", Toast.LENGTH_LONG).show()
+                    } else {
+                        Toast.makeText(context, "Grant failed: $errorMsg", Toast.LENGTH_LONG).show()
+                    }
                 }
             } else {
-                Toast.makeText(context, "Shizuku permission denied.", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Shizuku authorization was denied.", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -482,12 +488,16 @@ fun AdbSetupGuideSheet(
                                     Toast.makeText(context, "Failed to request Shizuku permission", Toast.LENGTH_SHORT).show()
                                 }
                             } else {
-                                val success = controller.grantWriteSecureSettingsViaShizuku()
+                                val (success, errorMsg) = controller.grantWriteSecureSettingsViaShizuku()
                                 isGranted = success
                                 if (success) {
-                                    Toast.makeText(context, "Successfully granted via Shizuku!", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "Permission granted via Shizuku! ✓", Toast.LENGTH_SHORT).show()
                                 } else {
-                                    Toast.makeText(context, "Grant failed. Please check Shizuku status.", Toast.LENGTH_SHORT).show()
+                                    if (errorMsg.contains("SecurityException", ignoreCase = true) || errorMsg.contains("security", ignoreCase = true)) {
+                                        Toast.makeText(context, "Xiaomi/ColorOS: Enable 'USB debugging (Security settings)' in Developer Options.", Toast.LENGTH_LONG).show()
+                                    } else {
+                                        Toast.makeText(context, "Grant failed: $errorMsg", Toast.LENGTH_LONG).show()
+                                    }
                                 }
                             }
                         }
