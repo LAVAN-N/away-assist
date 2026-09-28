@@ -7,6 +7,11 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
 import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -75,6 +80,7 @@ fun AdbSetupGuideSheet(
     val controller = remember { SosLocateController(context) }
     var isGranted by remember { mutableStateOf(controller.hasWriteSecureSettingsPermission()) }
     var selectedMethodTab by remember { mutableIntStateOf(0) } // 0 = Shizuku (Phone only), 1 = Computer (ADB)
+    var showGuidesWhenGranted by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     var isShizukuRunning by remember { mutableStateOf(controller.isShizukuAvailable()) }
@@ -181,103 +187,190 @@ fun AdbSetupGuideSheet(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Non-tech user callout note
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(SquircleLarge)
-                    .background(AwayAssistTheme.colors.accent.copy(alpha = 0.10f))
-                    .border(1.dp, AwayAssistTheme.colors.accent.copy(alpha = 0.30f), SquircleLarge)
-                    .padding(14.dp)
-            ) {
-                Row(verticalAlignment = Alignment.Top) {
-                    Icon(
-                        imageVector = Icons.Default.Info,
-                        contentDescription = null,
-                        tint = AwayAssistTheme.colors.accent,
-                        modifier = Modifier.size(20.dp).padding(top = 2.dp)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
+            if (isGranted) {
+                // Active State Summary Box (Clean & shaded)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(SquircleLarge)
+                        .background(RingState.copy(alpha = 0.12f))
+                        .border(1.dp, RingState.copy(alpha = 0.4f), SquircleLarge)
+                        .padding(16.dp)
+                ) {
                     Column {
-                        Text(
-                            text = "Do I really need this setup?",
-                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                            color = AwayAssistTheme.colors.textPrimary
-                        )
-                        Spacer(modifier = Modifier.height(3.dp))
-                        Text(
-                            text = "No setup is needed if you keep your phone's Location and Mobile Data ON! On modern Android, leaving location ON consumes 0% battery when idle.\n\nThis 1-time setup empowers Away Assist to auto-enable Location and Mobile Data via emergency SMS if they were ever turned OFF when the device is lost.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = AwayAssistTheme.colors.textSecondary,
-                            lineHeight = 18.sp
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                tint = RingState,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = "Auto-Switching: Active",
+                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = AwayAssistTheme.colors.textPrimary
+                                )
+                                Text(
+                                    text = "Permission is active and ready.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = AwayAssistTheme.colors.textSecondary
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = RingState,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "GPS auto-activation on #FIND & #TRACK SMS",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = AwayAssistTheme.colors.textPrimary
+                                )
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = RingState,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Mobile Data auto-activation for Google Find My Device",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = AwayAssistTheme.colors.textPrimary
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        AppleStyleButton(
+                            text = if (showGuidesWhenGranted) "Hide Setup Instructions" else "View Setup Instructions",
+                            onClick = { showGuidesWhenGranted = !showGuidesWhenGranted },
+                            style = AppleButtonStyle.SECONDARY,
+                            modifier = Modifier.fillMaxWidth()
                         )
                     }
                 }
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Live Permission Status Card
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(SquircleLarge)
-                    .background(if (isGranted) RingState.copy(alpha = 0.12f) else AwayAssistTheme.colors.cardSurface)
-                    .border(
-                        1.dp,
-                        if (isGranted) RingState.copy(alpha = 0.4f) else AwayAssistTheme.colors.cardSurface,
-                        SquircleLarge
-                    )
-                    .padding(14.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+            } else {
+                // Non-tech user callout note
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(SquircleLarge)
+                        .background(AwayAssistTheme.colors.accent.copy(alpha = 0.10f))
+                        .border(1.dp, AwayAssistTheme.colors.accent.copy(alpha = 0.30f), SquircleLarge)
+                        .padding(14.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    Row(verticalAlignment = Alignment.Top) {
                         Icon(
-                            imageVector = if (isGranted) Icons.Default.CheckCircle else Icons.Default.Info,
+                            imageVector = Icons.Default.Info,
                             contentDescription = null,
-                            tint = if (isGranted) RingState else AwayAssistTheme.colors.textSecondary,
-                            modifier = Modifier.size(22.dp)
+                            tint = AwayAssistTheme.colors.accent,
+                            modifier = Modifier.size(20.dp).padding(top = 2.dp)
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
                             Text(
-                                text = if (isGranted) "Permission Active" else "Permission Not Granted",
+                                text = "Do I really need this setup?",
                                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                                 color = AwayAssistTheme.colors.textPrimary
                             )
+                            Spacer(modifier = Modifier.height(3.dp))
                             Text(
-                                text = if (isGranted) "Remote switching is ready" else "Follow Shizuku or PC guide below",
+                                text = "No setup is needed if you keep your phone's Location and Mobile Data ON! On modern Android, leaving location ON consumes 0% battery when idle.\n\nThis 1-time setup empowers Away Assist to auto-enable Location and Mobile Data via emergency SMS if they were ever turned OFF when the device is lost.",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = AwayAssistTheme.colors.textSecondary
+                                color = AwayAssistTheme.colors.textSecondary,
+                                lineHeight = 18.sp
                             )
                         }
                     }
-                    AppleStyleButton(
-                        text = "Check",
-                        onClick = {
-                            isGranted = controller.hasWriteSecureSettingsPermission()
-                            if (isGranted) {
-                                Toast.makeText(context, "Permission active!", Toast.LENGTH_SHORT).show()
-                            } else {
-                                Toast.makeText(context, "Not yet detected", Toast.LENGTH_SHORT).show()
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Live Permission Status Card
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(SquircleLarge)
+                        .background(AwayAssistTheme.colors.cardSurface)
+                        .border(
+                            1.dp,
+                            AwayAssistTheme.colors.cardSurface,
+                            SquircleLarge
+                        )
+                        .padding(14.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
+                                tint = AwayAssistTheme.colors.textSecondary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = "Permission Not Granted",
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = AwayAssistTheme.colors.textPrimary
+                                )
+                                Text(
+                                    text = "Follow Shizuku or PC guide below",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = AwayAssistTheme.colors.textSecondary
+                                )
                             }
-                        },
-                        style = AppleButtonStyle.SECONDARY
-                    )
+                        }
+                        AppleStyleButton(
+                            text = "Check",
+                            onClick = {
+                                isGranted = controller.hasWriteSecureSettingsPermission()
+                                if (isGranted) {
+                                    Toast.makeText(context, "Permission active!", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    Toast.makeText(context, "Not yet detected", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            style = AppleButtonStyle.SECONDARY
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            // Expandable / visible setup guides when not granted or user requests to view
+            AnimatedVisibility(
+                visible = !isGranted || showGuidesWhenGranted,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                Column {
+                    Spacer(modifier = Modifier.height(16.dp))
 
-            // Method Selector (Shizuku vs PC ADB)
-            Row(
+                    // Method Selector (Shizuku vs PC ADB)
+                    Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(44.dp)
@@ -617,8 +710,10 @@ fun AdbSetupGuideSheet(
                     }
                 }
             }
+        }
+    }
 
-            Spacer(modifier = Modifier.height(24.dp))
+    Spacer(modifier = Modifier.height(24.dp))
 
             AppleStyleButton(
                 text = "Done",

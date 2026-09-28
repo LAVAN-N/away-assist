@@ -330,8 +330,8 @@ fun RemoteLocationSwitchingCard(
     }
 
     GroupedListCard(
-        header = "Remote Location & Data Switching",
-        footer = "Away Assist SOS works as usual if phone location and mobile data are already ON. In unexpected cases where location or mobile data was turned OFF when the device is lost, this setting comes into play to automatically toggle them ON.",
+        header = "Remote Location & Data",
+        footer = if (hasAdbPermission) null else "Optional: Allows turning Location & Data ON via SMS if they were off.",
         modifier = modifier
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -348,15 +348,15 @@ fun RemoteLocationSwitchingCard(
                 Spacer(modifier = Modifier.width(10.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = if (hasAdbPermission) "Remote Switching: Enabled" else "Remote Switching: Optional",
+                        text = if (hasAdbPermission) "Auto-Switching: Active" else "Auto-Switching: Optional",
                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                         color = AwayAssistTheme.colors.textPrimary
                     )
                     Text(
                         text = if (hasAdbPermission) {
-                            "Location & data auto-toggle is active. If location or mobile data is ever OFF when phone is lost, Away Assist will turn them ON via SMS to revive GPS and Google Find My Device."
+                            "GPS & Mobile Data auto-toggle ready."
                         } else {
-                            "Away Assist SOS works as usual if location is ON. If location or mobile data is OFF when phone is lost, this setting comes into play to enable them remotely. Tap 'Guide' for setup."
+                            "Auto-toggle GPS & Data via SMS."
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = AwayAssistTheme.colors.textSecondary
@@ -364,7 +364,7 @@ fun RemoteLocationSwitchingCard(
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 AppleStyleButton(
-                    text = if (hasAdbPermission) "Status" else "Guide",
+                    text = if (hasAdbPermission) "Status" else "Setup",
                     onClick = { showAdbGuideSheet = true },
                     style = AppleButtonStyle.SECONDARY
                 )
