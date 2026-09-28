@@ -451,18 +451,13 @@ fun AdbSetupGuideSheet(
                 Spacer(modifier = Modifier.height(14.dp))
 
                 // Step 3: Direct 1-Tap Grant inside Away Assist
-                val step3Label = when {
-                    isGranted -> "Permission Granted ✓"
-                    !isShizukuRunning -> "Start Shizuku"
-                    !isShizukuAuthorized -> "Authorize Shizuku"
-                    else -> "Grant with Shizuku"
-                }
+                val step3Label = if (isGranted) "Permission Granted ✓" else "Grant with Shizuku"
 
                 val step3Desc = when {
                     isGranted -> "WRITE_SECURE_SETTINGS permission is active. Remote switching is fully operational."
-                    !isShizukuRunning -> "Shizuku service is not yet running. Open Shizuku, tap 'Start' under Wireless Debugging, then return here."
-                    !isShizukuAuthorized -> "Shizuku service is running! Tap 'Authorize Shizuku' to allow Away Assist."
-                    else -> "Shizuku is ready! Tap below to grant WRITE_SECURE_SETTINGS in 1 tap."
+                    isShizukuAuthorized -> "Shizuku is running and authorized! Tap below to grant WRITE_SECURE_SETTINGS in 1 tap."
+                    isShizukuRunning -> "Shizuku service is running. Tap below to authorize and grant permission."
+                    else -> "Ensure Shizuku is running (Step 2), then tap below to grant the permission in 1 tap."
                 }
 
                 GuideStepItem(
