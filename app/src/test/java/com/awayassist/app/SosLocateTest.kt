@@ -28,14 +28,30 @@ class SosLocateTest {
 
     @Test
     fun testCommandParsing() {
-        // We test parsing through SosLocateController dummy parser or simulated logic
         val controller = SosLocateControllerMock()
 
-        // Valid commands
+        // Space separated
         val findCmd = controller.parseMessage("MYSECRET FIND")
         assertNotNull(findCmd)
         assertEquals("MYSECRET", findCmd?.prefixCandidate)
         assertEquals(SosLocateController.SosCommand.FIND, findCmd?.command)
+
+        // Attached hashtag/symbol prefix
+        val hashFind = controller.parseMessage("#FIND")
+        assertNotNull(hashFind)
+        assertEquals("#", hashFind?.prefixCandidate)
+        assertEquals(SosLocateController.SosCommand.FIND, hashFind?.command)
+
+        val hashSpaceFind = controller.parseMessage("# FIND")
+        assertNotNull(hashSpaceFind)
+        assertEquals("#", hashSpaceFind?.prefixCandidate)
+        assertEquals(SosLocateController.SosCommand.FIND, hashSpaceFind?.command)
+
+        // Plain command without prefix
+        val plainFind = controller.parseMessage("find")
+        assertNotNull(plainFind)
+        assertEquals("", plainFind?.prefixCandidate)
+        assertEquals(SosLocateController.SosCommand.FIND, plainFind?.command)
 
         val trackCmd = controller.parseMessage("SECRET PASSKEY TRACK")
         assertNotNull(trackCmd)
@@ -73,7 +89,10 @@ class SosLocateTest {
         assertFalse(controller.verifyPrefix("WRONG_PREFIX", storedHash))
         assertFalse(controller.verifyPrefix("awayassist_alpha", storedHash)) // Case-sensitive passkey
         assertFalse(controller.verifyPrefix("", storedHash))
-        assertFalse(controller.verifyPrefix("AWAYASSIST_ALPHA", ""))
+
+        // When no prefix is stored, any command (empty candidate) is accepted
+        assertTrue(controller.verifyPrefix("", ""))
+        assertTrue(controller.verifyPrefix("ANYTHING", ""))
     }
 
     private class SosLocateControllerMock {
@@ -81,23 +100,23 @@ class SosLocateTest {
             val trimmed = body.trim()
             if (trimmed.isEmpty()) return null
 
-            val lastSpaceIndex = trimmed.lastIndexOf(' ')
-            if (lastSpaceIndex <= 0) return null
-
-            val prefixCandidate = trimmed.substring(0, lastSpaceIndex).trim()
-            val commandStr = trimmed.substring(lastSpaceIndex + 1).trim().uppercase()
-
-            val command = try {
-                SosLocateController.SosCommand.valueOf(commandStr)
-            } catch (e: IllegalArgumentException) {
-                return null
+            for (cmd in SosLocateController.SosCommand.values()) {
+                val cmdName = cmd.name
+                if (trimmed.equals(cmdName, ignoreCase = true)) {
+                    return SosLocateController.ParsedCommand(prefixCandidate = "", command = cmd)
+                }
+                if (trimmed.endsWith(cmdName, ignoreCase = true)) {
+                    val candidate = trimmed.substring(0, trimmed.length - cmdName.length).trim()
+                    return SosLocateController.ParsedCommand(prefixCandidate = candidate, command = cmd)
+                }
             }
 
-            return SosLocateController.ParsedCommand(prefixCandidate = prefixCandidate, command = command)
+            return null
         }
 
         fun verifyPrefix(candidate: String, storedSha256: String): Boolean {
-            if (candidate.isBlank() || storedSha256.isBlank()) return false
+            if (storedSha256.isBlank()) return true
+            if (candidate.isBlank()) return false
             val candidateHash = computeSha256(candidate.trim())
             return java.security.MessageDigest.isEqual(
                 candidateHash.toByteArray(Charsets.UTF_8),

@@ -57,23 +57,24 @@ class SosLocateController(private val context: Context) {
         val trimmed = body.trim()
         if (trimmed.isEmpty()) return null
 
-        val lastSpaceIndex = trimmed.lastIndexOf(' ')
-        if (lastSpaceIndex <= 0) return null
-
-        val prefixCandidate = trimmed.substring(0, lastSpaceIndex).trim()
-        val commandStr = trimmed.substring(lastSpaceIndex + 1).trim().uppercase(Locale.ROOT)
-
-        val command = try {
-            SosCommand.valueOf(commandStr)
-        } catch (e: IllegalArgumentException) {
-            return null
+        for (cmd in SosCommand.values()) {
+            val cmdName = cmd.name
+            if (trimmed.equals(cmdName, ignoreCase = true)) {
+                return ParsedCommand(prefixCandidate = "", command = cmd)
+            }
+            if (trimmed.endsWith(cmdName, ignoreCase = true)) {
+                val candidate = trimmed.substring(0, trimmed.length - cmdName.length).trim()
+                return ParsedCommand(prefixCandidate = candidate, command = cmd)
+            }
         }
 
-        return ParsedCommand(prefixCandidate = prefixCandidate, command = command)
+        return null
     }
 
     fun verifyPrefix(candidate: String, storedSha256: String): Boolean {
-        if (candidate.isBlank() || storedSha256.isBlank()) return false
+        // If no prefix is configured yet, allow commands without prefix
+        if (storedSha256.isBlank()) return true
+        if (candidate.isBlank()) return false
         val candidateHash = computeSha256(candidate.trim())
         return MessageDigest.isEqual(
             candidateHash.toByteArray(Charsets.UTF_8),
@@ -92,14 +93,16 @@ class SosLocateController(private val context: Context) {
 
         val parsed = parseMessage(messageBody) ?: return@withContext false
         if (!verifyPrefix(parsed.prefixCandidate, sosState.prefixSha256)) {
-            Log.d(TAG, "Prefix SHA-256 verification failed for incoming SMS command.")
+            Log.d(TAG, "Prefix SHA-256 verification failed for incoming SMS command: '$messageBody'")
             return@withContext false
         }
 
         Log.d(TAG, "Authenticated SMS command: ${parsed.command} from $senderNumber")
 
         // Prompt user to rotate prefix after any successful authentication
-        preferences.setPrefixRotationNeeded(true)
+        if (sosState.prefixSha256.isNotBlank()) {
+            preferences.setPrefixRotationNeeded(true)
+        }
 
         when (parsed.command) {
             SosCommand.FIND -> {
@@ -153,10 +156,38 @@ class SosLocateController(private val context: Context) {
             )
             method.isAccessible = true
             val process = method.invoke(null, command, null, null) as java.lang.Process
-            val outText = process.inputStream.bufferedReader().readText()
-            val errText = process.errorStream.bufferedReader().readText()
-            val exitCode = process.waitFor()
-            val output = (outText + "\n" + errText).trim()
+
+            val outputFuture = java.util.concurrent.CompletableFuture.supplyAsync {
+                try {
+                    val out = process.inputStream.bufferedReader().readText()
+                    val err = process.errorStream.bufferedReader().readText()
+                    (out + "\n" + err).trim()
+                } catch (e: Exception) {
+                    ""
+                }
+            }
+
+            var exitCode = -1
+            val exitFuture = java.util.concurrent.CompletableFuture.supplyAsync {
+                try {
+                    process.waitFor()
+                } catch (e: Exception) {
+                    -1
+                }
+            }
+
+            try {
+                exitCode = exitFuture.get(2, java.util.concurrent.TimeUnit.SECONDS)
+            } catch (e: Exception) {
+                process.destroy()
+            }
+
+            val output = try {
+                outputFuture.get(500, java.util.concurrent.TimeUnit.MILLISECONDS)
+            } catch (e: Exception) {
+                ""
+            }
+
             Log.d(TAG, "Shizuku '${command.joinToString(" ")}' exit: $exitCode, out: $output")
             Pair(exitCode, output)
         } catch (e: Throwable) {
@@ -207,7 +238,7 @@ class SosLocateController(private val context: Context) {
                 Log.e(TAG, "Failed to enable system location", e)
             }
         }
-        if (isShizukuPermissionGranted()) {
+        if (!success && isShizukuPermissionGranted()) {
             if (runShizukuCommand(arrayOf("sh", "-c", "settings put secure location_mode 3")).first == 0) {
                 success = true
             }
@@ -231,7 +262,7 @@ class SosLocateController(private val context: Context) {
                 Log.e(TAG, "Failed to disable system location", e)
             }
         }
-        if (isShizukuPermissionGranted()) {
+        if (!success && isShizukuPermissionGranted()) {
             if (runShizukuCommand(arrayOf("sh", "-c", "settings put secure location_mode 0")).first == 0) {
                 success = true
             }
@@ -263,7 +294,7 @@ class SosLocateController(private val context: Context) {
                 Log.w(TAG, "Failed to enable mobile data via ContentResolver", e)
             }
         }
-        if (isShizukuPermissionGranted()) {
+        if (!success && isShizukuPermissionGranted()) {
             if (runShizukuCommand(arrayOf("sh", "-c", "svc data enable")).first == 0) {
                 success = true
                 Log.d(TAG, "Executed 'svc data enable' via Shizuku")
@@ -283,7 +314,7 @@ class SosLocateController(private val context: Context) {
                 Log.w(TAG, "Failed to disable mobile data via ContentResolver", e)
             }
         }
-        if (isShizukuPermissionGranted()) {
+        if (!success && isShizukuPermissionGranted()) {
             if (runShizukuCommand(arrayOf("sh", "-c", "svc data disable")).first == 0) {
                 success = true
             }
@@ -314,24 +345,37 @@ class SosLocateController(private val context: Context) {
         val wasDataOff = !isMobileDataEnabled()
         var toggledLocOn = false
 
-        if (hasWriteSecureSettingsPermission() || isShizukuPermissionGranted()) {
-            if (wasLocationOff) {
-                toggledLocOn = enableSystemLocation()
+        try {
+            if (hasWriteSecureSettingsPermission() || isShizukuPermissionGranted()) {
+                if (wasLocationOff) {
+                    toggledLocOn = enableSystemLocation()
+                }
+                if (wasDataOff) {
+                    enableMobileData()
+                }
+                if (toggledLocOn || wasDataOff) {
+                    delay(1200L)
+                }
             }
-            if (wasDataOff) {
-                enableMobileData()
-            }
-            if (toggledLocOn || wasDataOff) {
-                delay(1200L)
-            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in auto-toggling location/data", e)
         }
 
         val isLocOn = isLocationEnabled()
-        val location = acquireLocation(8_000L)
+        val location = try {
+            acquireLocation(6_000L)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error acquiring location", e)
+            null
+        }
 
         // Turn location back OFF immediately if we turned it on for a single fix
         if (toggledLocOn) {
-            disableSystemLocation()
+            try {
+                disableSystemLocation()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error disabling location in handleFind", e)
+            }
         }
 
         val message = if (location != null) {
