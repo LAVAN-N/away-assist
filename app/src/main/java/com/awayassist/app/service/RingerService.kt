@@ -183,21 +183,37 @@ class RingerService : Service() {
         }
     }
 
+    private var currentSessionState: com.awayassist.app.data.SosSessionState = com.awayassist.app.data.SosSessionState.NONE
+    private var currentTraceInterval: Int = 0
+
     private fun manageSosSessionJob(sosState: com.awayassist.app.data.SosLocateState) {
-        if (!sosState.isSessionActive) {
+        if (sosState.sessionState != com.awayassist.app.data.SosSessionState.TRACE) {
             sosSessionJob?.cancel()
             sosSessionJob = null
+            currentSessionState = sosState.sessionState
+            currentTraceInterval = 0
             return
         }
 
-        if (sosSessionJob == null || sosSessionJob?.isActive != true) {
-            sosSessionJob = serviceScope.launch {
-                val intervalMinutes = sosState.traceIntervalMins.coerceAtLeast(1)
-                val intervalMs = intervalMinutes * 60_000L
-                while (isActive) {
-                    kotlinx.coroutines.delay(intervalMs)
-                    sosLocateController.checkSessionTimeoutAndExecuteTraceTick()
-                }
+        // If already actively running TRACE with the exact same interval, maintain current tick cycle
+        if (currentSessionState == com.awayassist.app.data.SosSessionState.TRACE &&
+            currentTraceInterval == sosState.traceIntervalMins &&
+            sosSessionJob?.isActive == true
+        ) {
+            return
+        }
+
+        // Cleanly cancel previous job and launch new TRACE loop
+        sosSessionJob?.cancel()
+        currentSessionState = com.awayassist.app.data.SosSessionState.TRACE
+        currentTraceInterval = sosState.traceIntervalMins
+
+        sosSessionJob = serviceScope.launch {
+            val intervalMinutes = sosState.traceIntervalMins.coerceAtLeast(1)
+            val intervalMs = intervalMinutes * 60_000L
+            while (isActive) {
+                kotlinx.coroutines.delay(intervalMs)
+                sosLocateController.checkSessionTimeoutAndExecuteTraceTick()
             }
         }
     }

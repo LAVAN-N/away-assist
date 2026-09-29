@@ -232,16 +232,21 @@ class SosLocateController(private val context: Context) {
                     Settings.Secure.LOCATION_MODE,
                     Settings.Secure.LOCATION_MODE_HIGH_ACCURACY
                 )
+                @Suppress("DEPRECATION")
+                Settings.Secure.putString(
+                    context.contentResolver,
+                    Settings.Secure.LOCATION_PROVIDERS_ALLOWED,
+                    "+gps,+network"
+                )
                 Log.d(TAG, "Successfully enabled system master location switch via WRITE_SECURE_SETTINGS.")
                 success = true
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to enable system location", e)
+                Log.e(TAG, "Failed to enable system location via ContentResolver", e)
             }
         }
-        if (!success && isShizukuPermissionGranted()) {
-            if (runShizukuCommand(arrayOf("sh", "-c", "settings put secure location_mode 3")).first == 0) {
-                success = true
-            }
+        if (isShizukuPermissionGranted()) {
+            runShizukuCommand(arrayOf("sh", "-c", "cmd location set-location-enabled true && settings put secure location_mode 3 && settings put secure location_providers_allowed +gps,+network"))
+            success = true
         }
         return success
     }
@@ -256,16 +261,21 @@ class SosLocateController(private val context: Context) {
                     Settings.Secure.LOCATION_MODE,
                     Settings.Secure.LOCATION_MODE_OFF
                 )
+                @Suppress("DEPRECATION")
+                Settings.Secure.putString(
+                    context.contentResolver,
+                    Settings.Secure.LOCATION_PROVIDERS_ALLOWED,
+                    "-gps,-network"
+                )
                 Log.d(TAG, "Successfully disabled system master location switch via WRITE_SECURE_SETTINGS.")
                 success = true
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to disable system location", e)
+                Log.e(TAG, "Failed to disable system location via ContentResolver", e)
             }
         }
-        if (!success && isShizukuPermissionGranted()) {
-            if (runShizukuCommand(arrayOf("sh", "-c", "settings put secure location_mode 0")).first == 0) {
-                success = true
-            }
+        if (isShizukuPermissionGranted()) {
+            runShizukuCommand(arrayOf("sh", "-c", "cmd location set-location-enabled false && settings put secure location_mode 0 && settings put secure location_providers_allowed -gps,-network"))
+            success = true
         }
         return success
     }
@@ -288,16 +298,20 @@ class SosLocateController(private val context: Context) {
         if (hasWriteSecureSettingsPermission()) {
             try {
                 Settings.Global.putInt(context.contentResolver, "mobile_data", 1)
-                Log.d(TAG, "Successfully enabled mobile data via WRITE_SECURE_SETTINGS.")
+                Settings.Global.putInt(context.contentResolver, "mobile_data0", 1)
+                Settings.Global.putInt(context.contentResolver, "mobile_data1", 1)
+                Log.d(TAG, "Set mobile_data flags in Settings.Global via WRITE_SECURE_SETTINGS.")
                 success = true
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to enable mobile data via ContentResolver", e)
             }
         }
-        if (!success && isShizukuPermissionGranted()) {
-            if (runShizukuCommand(arrayOf("sh", "-c", "svc data enable")).first == 0) {
+        // Always execute direct telephony modem commands via Shizuku if available
+        if (isShizukuPermissionGranted()) {
+            val cmd = runShizukuCommand(arrayOf("sh", "-c", "svc data enable && cmd telephony set-data-enabled true && cmd phone set-data-enabled true && settings put global mobile_data 1"))
+            if (cmd.first == 0) {
                 success = true
-                Log.d(TAG, "Executed 'svc data enable' via Shizuku")
+                Log.d(TAG, "Executed cellular mobile data enable commands via Shizuku")
             }
         }
         return success
@@ -308,16 +322,17 @@ class SosLocateController(private val context: Context) {
         if (hasWriteSecureSettingsPermission()) {
             try {
                 Settings.Global.putInt(context.contentResolver, "mobile_data", 0)
-                Log.d(TAG, "Successfully disabled mobile data via WRITE_SECURE_SETTINGS.")
+                Settings.Global.putInt(context.contentResolver, "mobile_data0", 0)
+                Settings.Global.putInt(context.contentResolver, "mobile_data1", 0)
+                Log.d(TAG, "Disabled mobile_data flags in Settings.Global via WRITE_SECURE_SETTINGS.")
                 success = true
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to disable mobile data via ContentResolver", e)
             }
         }
-        if (!success && isShizukuPermissionGranted()) {
-            if (runShizukuCommand(arrayOf("sh", "-c", "svc data disable")).first == 0) {
-                success = true
-            }
+        if (isShizukuPermissionGranted()) {
+            runShizukuCommand(arrayOf("sh", "-c", "svc data disable && cmd telephony set-data-enabled false && cmd phone set-data-enabled false && settings put global mobile_data 0"))
+            success = true
         }
         return success
     }
@@ -361,15 +376,10 @@ class SosLocateController(private val context: Context) {
             Log.e(TAG, "Error in auto-toggling location/data", e)
         }
 
-        val isLocOn = isLocationEnabled()
-        val location = try {
-            acquireLocation(6_000L)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error acquiring location", e)
-            null
-        }
+        // Generous 15s timeout with multi-provider + cached fallbacks to guarantee a valid location URL
+        val locationResult = getBestAvailableLocation(timeoutMs = 15_000L, quickAttempt = true)
 
-        // Turn location back OFF immediately if we turned it on for a single fix
+        // Turn location back OFF immediately if we turned it on for this single fix
         if (toggledLocOn) {
             try {
                 disableSystemLocation()
@@ -378,64 +388,49 @@ class SosLocateController(private val context: Context) {
             }
         }
 
-        val message = if (location != null) {
-            preferences.saveLastKnownLocation(
-                latitude = location.latitude,
-                longitude = location.longitude,
-                accuracy = if (location.hasAccuracy()) location.accuracy else 0f,
-                timestamp = System.currentTimeMillis()
-            )
-            val accuracyStr = if (location.hasAccuracy()) "Accuracy: ~${location.accuracy.toInt()}m" else "Accuracy: unknown"
-            "Away Assist: Location fix at $timeStr.\n" +
-            "https://maps.google.com/?q=${location.latitude},${location.longitude}\n" +
-            "$accuracyStr | Battery: $batteryLevel%"
-        } else {
-            val appState = preferences.getAppState()
-            val sosState = appState.sosLocateState
-            if (sosState.lastKnownLatitude != 0.0 && sosState.lastKnownLongitude != 0.0) {
-                val cachedTime = SimpleDateFormat("MMM d, HH:mm", Locale.getDefault()).format(Date(sosState.lastKnownLocationTime))
-                val accStr = if (sosState.lastKnownAccuracy > 0f) "Accuracy: ~${sosState.lastKnownAccuracy.toInt()}m | " else ""
-                "Away Assist: Location at $timeStr (cached from $cachedTime).\n" +
-                "https://maps.google.com/?q=${sosState.lastKnownLatitude},${sosState.lastKnownLongitude}\n" +
-                "$accStr Battery: $batteryLevel%"
-            } else if (!isLocOn) {
-                "Away Assist: Location fix unavailable (Location toggle is OFF; grant WRITE_SECURE_SETTINGS via ADB for remote switching) at $timeStr.\nBattery: $batteryLevel%"
-            } else {
-                "Away Assist: Location fix unavailable at $timeStr (GPS fix timed out).\nBattery: $batteryLevel%"
-            }
-        }
+        val message = "Away Assist FIND: Location at $timeStr\n" +
+            "${locationResult.text}\n" +
+            "Battery: $batteryLevel%"
 
         sendSms(senderNumber, message)
         preferences.recordSosTrigger("FIND command from $senderNumber")
     }
 
     private suspend fun handleTrack(senderNumber: String, autoTimeoutHours: Int) {
+        val prevSession = preferences.getAppState().sosLocateState.sessionState
         if (hasWriteSecureSettingsPermission() || isShizukuPermissionGranted()) {
             if (!isLocationEnabled()) enableSystemLocation()
             if (!isMobileDataEnabled()) enableMobileData()
         }
         preferences.startSosSession(SosSessionState.TRACK, senderNumber)
         val isLocOn = isLocationEnabled()
-        val note = if (!isLocOn) " (Note: Location is OFF; grant WRITE_SECURE_SETTINGS via ADB to allow remote ON)" else ""
-        val message = "Away Assist: Location & Mobile Data enabled$note. Use Google Find My Device or Maps to view. Reply STOP with your prefix to turn off, or it will auto-stop after ${autoTimeoutHours}h."
+        val switchDesc = when (prevSession) {
+            SosSessionState.TRACE -> "Switched from TRACE to continuous TRACK mode. "
+            SosSessionState.TRACK -> "Continuous TRACK mode refreshed. "
+            else -> ""
+        }
+        val note = if (!isLocOn) " (Location toggle is OFF; grant WRITE_SECURE_SETTINGS via ADB for remote ON)" else ""
+        val message = "Away Assist: ${switchDesc}Location & Mobile Data enabled$note. Use Google Find My Device or Maps to view. Reply STOP to turn off, or auto-stops after ${autoTimeoutHours}h."
         sendSms(senderNumber, message)
         preferences.recordSosTrigger("TRACK started from $senderNumber")
     }
 
     private suspend fun handleTrace(senderNumber: String, intervalMins: Int, autoTimeoutHours: Int) {
+        val prevSession = preferences.getAppState().sosLocateState.sessionState
         if (hasWriteSecureSettingsPermission() || isShizukuPermissionGranted()) {
-            if (!isLocationEnabled()) enableSystemLocation()
             if (!isMobileDataEnabled()) enableMobileData()
-            delay(1200L)
         }
         preferences.startSosSession(SosSessionState.TRACE, senderNumber, intervalMins)
-        val isLocOn = isLocationEnabled()
-        val note = if (!isLocOn) " (Location is OFF; grant ADB permission to allow remote ON)" else ""
-        val ackMessage = "Away Assist: Tracing active$note. Location & Data enabled. Sending updates every ${intervalMins}m. Reply STOP with your prefix to cancel, or it will auto-stop after ${autoTimeoutHours}h."
+        val switchDesc = when (prevSession) {
+            SosSessionState.TRACK -> "Switched from TRACK to periodic TRACE mode (${intervalMins}m intervals). "
+            SosSessionState.TRACE -> "TRACE mode interval updated to ${intervalMins}m. "
+            else -> ""
+        }
+        val ackMessage = "Away Assist: ${switchDesc}Sending location updates every ${intervalMins}m (Location turns on before each fix and turns off immediately after). Reply STOP to cancel, or auto-stops after ${autoTimeoutHours}h."
         sendSms(senderNumber, ackMessage)
         preferences.recordSosTrigger("TRACE started from $senderNumber")
 
-        // Send initial fix immediately
+        // Send initial fix immediately (turns ON location, acquires, sends SMS, and turns OFF location)
         sendTraceFix(senderNumber)
     }
 
@@ -463,7 +458,7 @@ class SosLocateController(private val context: Context) {
         val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val batteryLevel = getBatteryPercentage()
 
-        val locationResult = getBestAvailableLocation(timeoutMs = 5_000L, quickAttempt = true)
+        val locationResult = getBestAvailableLocation(timeoutMs = 8_000L, quickAttempt = true)
 
         val message = "[Away Assist SOS] Alert: SIM card removed at $timeStr!\n" +
             "Location: ${locationResult.text}\n" +
@@ -512,7 +507,7 @@ class SosLocateController(private val context: Context) {
         val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val batteryLevel = getBatteryPercentage()
 
-        val locationResult = getBestAvailableLocation(timeoutMs = 3_000L, quickAttempt = true)
+        val locationResult = getBestAvailableLocation(timeoutMs = 5_000L, quickAttempt = true)
 
         val message = "[Away Assist SOS] Alert: Device powered on at $timeStr.\n" +
             "Location: ${locationResult.text}\n" +
@@ -551,7 +546,34 @@ class SosLocateController(private val context: Context) {
     private suspend fun sendTraceFix(targetNumber: String) {
         val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val batteryLevel = getBatteryPercentage()
-        val locationResult = getBestAvailableLocation(timeoutMs = 6_000L, quickAttempt = true)
+        var toggledLocOn = false
+
+        try {
+            if (hasWriteSecureSettingsPermission() || isShizukuPermissionGranted()) {
+                if (!isLocationEnabled()) {
+                    toggledLocOn = enableSystemLocation()
+                }
+                if (!isMobileDataEnabled()) {
+                    enableMobileData()
+                }
+                if (toggledLocOn) {
+                    delay(1200L)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error toggling location in sendTraceFix", e)
+        }
+
+        val locationResult = getBestAvailableLocation(timeoutMs = 15_000L, quickAttempt = true)
+
+        // TRACE requirement: Always turn location OFF immediately after sending each periodic update!
+        if (hasWriteSecureSettingsPermission() || isShizukuPermissionGranted()) {
+            try {
+                disableSystemLocation()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error disabling location after trace fix", e)
+            }
+        }
 
         val message = "Away Assist TRACE: Location at $timeStr\n" +
             "${locationResult.text}\n" +
@@ -566,25 +588,16 @@ class SosLocateController(private val context: Context) {
     )
 
     private suspend fun getBestAvailableLocation(
-        timeoutMs: Long = 4_000L,
+        timeoutMs: Long = 15_000L,
         quickAttempt: Boolean = true
     ): FormattedLocation {
         var location: Location? = null
-        if (quickAttempt && hasLocationPermission() && (isLocationEnabled() || hasWriteSecureSettingsPermission() || isShizukuPermissionGranted())) {
-            var toggledLoc = false
-            if (!isLocationEnabled() && (hasWriteSecureSettingsPermission() || isShizukuPermissionGranted())) {
-                toggledLoc = enableSystemLocation()
-                if (toggledLoc) delay(500L)
-            }
+        if (quickAttempt && hasLocationPermission()) {
             location = try {
                 acquireLocation(timeoutMs)
             } catch (e: Exception) {
+                Log.w(TAG, "Error acquiring location in getBestAvailableLocation", e)
                 null
-            }
-            if (toggledLoc) {
-                try {
-                    disableSystemLocation()
-                } catch (_: Exception) {}
             }
         }
 
@@ -619,18 +632,61 @@ class SosLocateController(private val context: Context) {
         }
 
         return FormattedLocation(
-            text = "Location unavailable",
+            text = "Location unavailable (GPS/Network fix not acquired)",
             location = null
         )
     }
 
     @SuppressLint("MissingPermission")
-    private suspend fun acquireLocation(timeoutMs: Long = 8_000L): Location? = withContext(Dispatchers.IO) {
+    private suspend fun acquireLocation(timeoutMs: Long = 15_000L): Location? = withContext(Dispatchers.IO) {
         if (!hasLocationPermission() || locationManager == null) return@withContext null
-        if (!isLocationEnabled()) return@withContext getLastKnownLocation()
 
-        val lastKnown = getLastKnownLocation()
+        // 1. If we have a very fresh location (< 10s old), return immediately
+        val initialBest = getLastKnownLocation()
+        if (initialBest != null && (System.currentTimeMillis() - initialBest.time) < 10_000L) {
+            return@withContext initialBest
+        }
 
+        // 2. Try modern Android R+ LocationManager.getCurrentLocation if available
+        var modernLocation: Location? = null
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                modernLocation = withTimeoutOrNull(timeoutMs) {
+                    suspendCancellableCoroutine { continuation ->
+                        val cancellationSignal = android.os.CancellationSignal()
+                        continuation.invokeOnCancellation { cancellationSignal.cancel() }
+                        try {
+                            val provider = when {
+                                locationManager.isProviderEnabled("fused") -> "fused"
+                                locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) -> LocationManager.GPS_PROVIDER
+                                locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER) -> LocationManager.NETWORK_PROVIDER
+                                else -> LocationManager.PASSIVE_PROVIDER
+                            }
+                            locationManager.getCurrentLocation(
+                                provider,
+                                cancellationSignal,
+                                context.mainExecutor
+                            ) { loc ->
+                                if (continuation.isActive) {
+                                    continuation.resume(loc)
+                                }
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "getCurrentLocation failed, falling back to listener", e)
+                            if (continuation.isActive) continuation.resume(null)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Error in modern getCurrentLocation", e)
+            }
+        }
+
+        if (modernLocation != null) {
+            return@withContext modernLocation
+        }
+
+        // 3. Fallback to active multi-provider LocationListener with full timeout
         val freshLocation = withTimeoutOrNull(timeoutMs) {
             suspendCancellableCoroutine { continuation ->
                 val listener = object : LocationListener {
@@ -653,28 +709,25 @@ class SosLocateController(private val context: Context) {
 
                 var registered = false
                 try {
-                    val hasGps = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
-                    val hasNetwork = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+                    val providers = listOf(
+                        "fused",
+                        LocationManager.GPS_PROVIDER,
+                        LocationManager.NETWORK_PROVIDER
+                    )
 
-                    if (hasGps) {
-                        locationManager.requestLocationUpdates(
-                            LocationManager.GPS_PROVIDER,
-                            0L,
-                            0f,
-                            listener,
-                            Looper.getMainLooper()
-                        )
-                        registered = true
-                    }
-                    if (hasNetwork) {
-                        locationManager.requestLocationUpdates(
-                            LocationManager.NETWORK_PROVIDER,
-                            0L,
-                            0f,
-                            listener,
-                            Looper.getMainLooper()
-                        )
-                        registered = true
+                    for (p in providers) {
+                        if (locationManager.isProviderEnabled(p)) {
+                            try {
+                                locationManager.requestLocationUpdates(
+                                    p,
+                                    0L,
+                                    0f,
+                                    listener,
+                                    Looper.getMainLooper()
+                                )
+                                registered = true
+                            } catch (_: Exception) {}
+                        }
                     }
 
                     if (!registered) {
@@ -702,7 +755,7 @@ class SosLocateController(private val context: Context) {
             }
         }
 
-        return@withContext freshLocation ?: lastKnown
+        return@withContext freshLocation ?: getLastKnownLocation() ?: initialBest
     }
 
     @SuppressLint("MissingPermission")
