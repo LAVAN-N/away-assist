@@ -171,10 +171,9 @@ fun MainScreen(
     }
 
     val targetAmbientColor = when {
-        !appState.isEnabled -> colors.textSecondary
-        !hasNotificationPolicyAccess -> colors.error
         currentOperationMode == OperationMode.FORCE_RING -> colors.ringState
         currentOperationMode == OperationMode.PAUSE -> colors.warning
+        !hasNotificationPolicyAccess && currentOperationMode == OperationMode.AUTO -> colors.error
         appState.currentMode == RingerState.RING -> colors.ringState
         else -> colors.accentSilent
     }
@@ -535,10 +534,9 @@ private fun EditorialHeader(
         val infoInteractionSource = remember { MutableInteractionSource() }
 
         val badgeText = when {
-            !isEnabled -> if (isSosActive) "SOS" else "OFF"
-            !hasPolicyAccess -> "Setup"
             currentMode == OperationMode.FORCE_RING -> "Ring"
             currentMode == OperationMode.PAUSE -> "Paused"
+            !hasPolicyAccess && currentMode == OperationMode.AUTO -> "Setup"
             else -> "Auto"
         }
 
@@ -622,15 +620,6 @@ private fun CompactStatusCard(
     val colors = AwayAssistTheme.colors
 
     val (statusColor, statusTitle, statusSubtitle, statusIcon) = when {
-        !appState.isEnabled -> {
-            Quad(
-                colors.textSecondary,
-                "Ringer Automation Off",
-                if (appState.sosLocateState.isSosEnabled) "Lock/unlock switching disabled • SOS Locate active"
-                else "Lock/unlock switching disabled • Ringer unchanged",
-                Icons.Default.Tune
-            )
-        }
         currentMode == OperationMode.FORCE_RING -> {
             Quad(
                 colors.ringState,
@@ -638,6 +627,17 @@ private fun CompactStatusCard(
                 if (appState.sosLocateState.isSosEnabled) "Ringer switching disabled • Continuous ring • SOS Locate active"
                 else "Ringer switching disabled • Continuous audible ring",
                 Icons.Default.NotificationsActive
+            )
+        }
+        currentMode == OperationMode.PAUSE -> {
+            val expiryTime = if (appState.pauseUntilTimestamp > 0L) {
+                SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(appState.pauseUntilTimestamp))
+            } else ""
+            Quad(
+                colors.warning,
+                "Paused ($countdownText)",
+                "Automation paused • Resumes at $expiryTime",
+                Icons.Default.PauseCircle
             )
         }
         !hasPolicyAccess && currentMode == OperationMode.AUTO -> {
