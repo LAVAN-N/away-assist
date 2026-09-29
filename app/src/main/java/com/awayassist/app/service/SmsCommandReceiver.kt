@@ -27,21 +27,27 @@ class SmsCommandReceiver : BroadcastReceiver() {
         // Group by sender in case multipart messages arrive
         val messagesBySender = messages.groupBy { it.displayOriginatingAddress ?: it.originatingAddress }
 
-        val pendingResult = goAsync()
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val controller = SosLocateController(context.applicationContext)
-                for ((sender, parts) in messagesBySender) {
-                    if (sender.isNullOrBlank()) continue
-                    val fullBody = parts.joinToString("") { it.displayMessageBody ?: it.messageBody ?: "" }
-                    if (fullBody.isNotBlank()) {
-                        controller.handleSmsCommand(sender, fullBody)
+        for ((sender, parts) in messagesBySender) {
+            if (sender.isNullOrBlank()) continue
+            val fullBody = parts.joinToString("") { it.displayMessageBody ?: it.messageBody ?: "" }
+            if (fullBody.isNotBlank()) {
+                Log.d(TAG, "Dispatching SMS command from $sender to RingerService: $fullBody")
+                try {
+                    RingerService.executeSmsCommand(context.applicationContext, sender, fullBody)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed starting RingerService for SMS command, falling back to async receiver", e)
+                    val pendingResult = goAsync()
+                    CoroutineScope(Dispatchers.IO).launch {
+                        try {
+                            val controller = SosLocateController(context.applicationContext)
+                            controller.handleSmsCommand(sender, fullBody)
+                        } catch (err: Exception) {
+                            Log.e(TAG, "Error processing incoming SMS command fallback", err)
+                        } finally {
+                            pendingResult.finish()
+                        }
                     }
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error processing incoming SMS command", e)
-            } finally {
-                pendingResult.finish()
             }
         }
     }

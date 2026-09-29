@@ -58,6 +58,19 @@ class RingerService : Service() {
                 context.startService(intent)
             }
         }
+
+        fun executeSmsCommand(context: Context, sender: String, body: String) {
+            val intent = Intent(context, RingerService::class.java).apply {
+                action = NotificationHelper.ACTION_EXECUTE_SMS_COMMAND
+                putExtra(NotificationHelper.EXTRA_SMS_SENDER, sender)
+                putExtra(NotificationHelper.EXTRA_SMS_BODY, body)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
+        }
     }
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -121,6 +134,28 @@ class RingerService : Service() {
             }
             NotificationHelper.ACTION_RESUME -> {
                 handleResume()
+            }
+            NotificationHelper.ACTION_EXECUTE_SMS_COMMAND -> {
+                val sender = intent?.getStringExtra(NotificationHelper.EXTRA_SMS_SENDER) ?: ""
+                val body = intent?.getStringExtra(NotificationHelper.EXTRA_SMS_BODY) ?: ""
+                if (sender.isNotBlank() && body.isNotBlank()) {
+                    serviceScope.launch(Dispatchers.IO) {
+                        val pm = getSystemService(Context.POWER_SERVICE) as? PowerManager
+                        val wakeLock = pm?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "AwayAssist:SosLocateWakeLock")
+                        wakeLock?.acquire(45_000L)
+                        try {
+                            sosLocateController.handleSmsCommand(sender, body)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error executing SMS command in RingerService", e)
+                        } finally {
+                            if (wakeLock?.isHeld == true) {
+                                try {
+                                    wakeLock.release()
+                                } catch (_: Exception) {}
+                            }
+                        }
+                    }
+                }
             }
         }
 

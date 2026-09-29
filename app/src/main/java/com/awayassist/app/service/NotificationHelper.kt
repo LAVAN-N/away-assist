@@ -31,6 +31,9 @@ class NotificationHelper(private val context: Context) {
         const val ACTION_RESUME = "com.awayassist.app.ACTION_RESUME"
         const val ACTION_START = "com.awayassist.app.ACTION_START"
         const val ACTION_STOP = "com.awayassist.app.ACTION_STOP"
+        const val ACTION_EXECUTE_SMS_COMMAND = "com.awayassist.app.ACTION_EXECUTE_SMS_COMMAND"
+        const val EXTRA_SMS_SENDER = "com.awayassist.app.EXTRA_SMS_SENDER"
+        const val EXTRA_SMS_BODY = "com.awayassist.app.EXTRA_SMS_BODY"
         const val EXTRA_PAUSE_DURATION_MS = "com.awayassist.app.EXTRA_PAUSE_DURATION_MS"
 
         const val DEFAULT_PAUSE_DURATION_MS = 10 * 60_000L // 10 minutes default

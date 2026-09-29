@@ -356,6 +356,9 @@ class SosLocateController(private val context: Context) {
     }
 
     private suspend fun handleFind(senderNumber: String) {
+        // Dispatch immediate acknowledgement SMS before waiting for GPS satellite fix
+        sendSms(senderNumber, "Away Assist: Locating device... Please wait for GPS fix.")
+
         val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val batteryLevel = getBatteryPercentage()
         val wasLocationOff = !isLocationEnabled()
@@ -692,18 +695,16 @@ class SosLocateController(private val context: Context) {
                 var registered = false
                 for (p in providers) {
                     try {
-                        if (locationManager.isProviderEnabled(p)) {
-                            locationManager.requestLocationUpdates(
-                                p,
-                                0L,
-                                0f,
-                                listener,
-                                Looper.getMainLooper()
-                            )
-                            registered = true
-                        }
+                        locationManager.requestLocationUpdates(
+                            p,
+                            0L,
+                            0f,
+                            listener,
+                            Looper.getMainLooper()
+                        )
+                        registered = true
                     } catch (e: Exception) {
-                        Log.w(TAG, "Could not register listener for $p", e)
+                        Log.w(TAG, "Could not register listener for $p: ${e.message}")
                     }
                 }
 
@@ -711,23 +712,21 @@ class SosLocateController(private val context: Context) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                     for (p in providers) {
                         try {
-                            if (locationManager.isProviderEnabled(p)) {
-                                locationManager.getCurrentLocation(
-                                    p,
-                                    null,
-                                    context.mainExecutor
-                                ) { loc ->
-                                    if (loc != null) {
-                                        synchronized(listener) {
-                                            Log.d(TAG, "getCurrentLocation fix from $p: ${loc.latitude}, ${loc.longitude}, acc=${loc.accuracy}m")
-                                            if (bestLocation == null || (loc.hasAccuracy() && loc.accuracy < (bestLocation?.accuracy ?: Float.MAX_VALUE))) {
-                                                bestLocation = loc
-                                            }
-                                            if (loc.hasAccuracy() && loc.accuracy <= 15f && !resumed && continuation.isActive) {
-                                                resumed = true
-                                                try { locationManager.removeUpdates(listener) } catch (_: Exception) {}
-                                                continuation.resume(loc)
-                                            }
+                            locationManager.getCurrentLocation(
+                                p,
+                                null,
+                                context.mainExecutor
+                            ) { loc ->
+                                if (loc != null) {
+                                    synchronized(listener) {
+                                        Log.d(TAG, "getCurrentLocation fix from $p: ${loc.latitude}, ${loc.longitude}, acc=${loc.accuracy}m")
+                                        if (bestLocation == null || (loc.hasAccuracy() && loc.accuracy < (bestLocation?.accuracy ?: Float.MAX_VALUE))) {
+                                            bestLocation = loc
+                                        }
+                                        if (loc.hasAccuracy() && loc.accuracy <= 15f && !resumed && continuation.isActive) {
+                                            resumed = true
+                                            try { locationManager.removeUpdates(listener) } catch (_: Exception) {}
+                                            continuation.resume(loc)
                                         }
                                     }
                                 }
