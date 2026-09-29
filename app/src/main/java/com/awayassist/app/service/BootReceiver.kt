@@ -29,8 +29,8 @@ class BootReceiver : BroadcastReceiver() {
                 val preferences = AwayAssistPreferences.getInstance(context.applicationContext)
                 val appState = preferences.getAppState()
 
-                // If core ringer service should be active, restart it
-                if (appState.isEnabled) {
+                // If core ringer service or SOS locate should be active, restart it
+                if (appState.isEnabled || appState.sosLocateState.isSosEnabled) {
                     RingerService.startService(context.applicationContext)
                 }
 

@@ -82,6 +82,7 @@ import com.awayassist.app.data.RingerState
 import com.awayassist.app.data.ThemeMode
 import com.awayassist.app.ui.components.AppleButtonStyle
 import com.awayassist.app.ui.components.AppleStyleButton
+import com.awayassist.app.ui.components.AppleStyleSwitch
 import com.awayassist.app.ui.components.FullScreenThemeWaveOverlay
 import com.awayassist.app.ui.components.GroupedListCard
 import com.awayassist.app.ui.components.GroupedListRow
@@ -137,6 +138,7 @@ fun MainScreen(
     isBatteryOptimizationIgnored: Boolean,
     onSelectMode: (OperationMode) -> Unit,
     onPauseForDuration: (Long) -> Unit,
+    onToggleRingerAutomation: (Boolean) -> Unit = {},
     onRequestPolicyAccess: () -> Unit,
     onRequestBatteryOptimization: () -> Unit,
     onRequestAutostart: () -> Unit,
@@ -169,10 +171,10 @@ fun MainScreen(
     }
 
     val targetAmbientColor = when {
+        !appState.isEnabled -> colors.textSecondary
         !hasNotificationPolicyAccess -> colors.error
         currentOperationMode == OperationMode.FORCE_RING -> colors.ringState
         currentOperationMode == OperationMode.PAUSE -> colors.warning
-        !appState.isEnabled -> colors.textSecondary
         appState.currentMode == RingerState.RING -> colors.ringState
         else -> colors.accentSilent
     }
@@ -237,6 +239,8 @@ fun MainScreen(
                     EditorialHeader(
                         currentMode = currentOperationMode,
                         hasPolicyAccess = hasNotificationPolicyAccess,
+                        isEnabled = appState.isEnabled,
+                        isSosActive = appState.sosLocateState.isSosEnabled,
                         statusColor = animatedAmbientColor,
                         isDark = isDark,
                         onInfoClick = { showInfoSheet = true }
@@ -293,9 +297,9 @@ fun MainScreen(
                         }
                     }
 
-                    // Missing Permission Card
+                    // Missing Permission Card (Only shown when ringer switching is active)
                     AnimatedVisibility(
-                        visible = !hasNotificationPolicyAccess,
+                        visible = appState.isEnabled && !hasNotificationPolicyAccess,
                         enter = fadeIn(),
                         exit = fadeOut()
                     ) {
@@ -317,20 +321,27 @@ fun MainScreen(
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
 
-                    // 2-Tile Rules Grid (Screen Locked vs Screen Unlocked)
-                    CompactRulesGrid(
-                        modifier = Modifier.padding(bottom = 12.dp)
-                    )
-
-                    // Unified Single-Toggle Controls Card
+                    // Unified Single-Toggle Controls Card with Master Automation Switch
                     UnifiedControlsCard(
                         appState = appState,
                         currentMode = currentOperationMode,
+                        onToggleRingerAutomation = onToggleRingerAutomation,
                         onSelectMode = onSelectMode,
                         onPauseForDuration = onPauseForDuration,
                         isDark = isDark,
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
+
+                    // 2-Tile Rules Grid (Screen Locked vs Screen Unlocked) - Visible when ringer automation is enabled
+                    AnimatedVisibility(
+                        visible = appState.isEnabled,
+                        enter = fadeIn(spring()) + expandVertically(spring()),
+                        exit = fadeOut(spring()) + shrinkVertically(spring())
+                    ) {
+                        CompactRulesGrid(
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        )
+                    }
 
                     // Realistic Vintage Pull-Cord Light Switch Theme Toggle Card
                     VintagePullLightToggle(
@@ -358,6 +369,7 @@ fun MainScreen(
                     SystemPermissionsSection(
                         hasPolicyAccess = hasNotificationPolicyAccess,
                         isBatteryOptIgnored = isBatteryOptimizationIgnored,
+                        isRingerEnabled = appState.isEnabled,
                         onRequestPolicyAccess = onRequestPolicyAccess,
                         onRequestBatteryOptimization = onRequestBatteryOptimization,
                         onRequestAutostart = onRequestAutostart,
@@ -472,6 +484,8 @@ private fun SosLocateCard(
 private fun EditorialHeader(
     currentMode: OperationMode,
     hasPolicyAccess: Boolean,
+    isEnabled: Boolean,
+    isSosActive: Boolean,
     statusColor: Color,
     isDark: Boolean,
     onInfoClick: () -> Unit
@@ -522,6 +536,7 @@ private fun EditorialHeader(
         val infoInteractionSource = remember { MutableInteractionSource() }
 
         val badgeText = when {
+            !isEnabled -> if (isSosActive) "SOS" else "OFF"
             !hasPolicyAccess -> "Setup"
             currentMode == OperationMode.FORCE_RING -> "Ring"
             currentMode == OperationMode.PAUSE -> "Paused"
@@ -553,7 +568,7 @@ private fun EditorialHeader(
                 Box(
                     modifier = Modifier
                         .size(6.dp)
-                        .alpha(if (hasPolicyAccess) beaconAlpha else 1f)
+                        .alpha(if (hasPolicyAccess || !isEnabled) beaconAlpha else 1f)
                         .clip(CircleShape)
                         .background(statusColor)
                 )
@@ -608,6 +623,15 @@ private fun CompactStatusCard(
     val colors = AwayAssistTheme.colors
 
     val (statusColor, statusTitle, statusSubtitle, statusIcon) = when {
+        !appState.isEnabled -> {
+            Quad(
+                colors.textSecondary,
+                "Ringer Automation Off",
+                if (appState.sosLocateState.isSosEnabled) "Lock/unlock switching disabled • SOS Locate active"
+                else "Lock/unlock switching disabled • Ringer unchanged",
+                Icons.Default.Tune
+            )
+        }
         !hasPolicyAccess -> {
             Quad(
                 colors.error,
@@ -732,7 +756,7 @@ private fun CompactStatusCard(
             }
 
             // Instant Resume Button if in Force Ring or Pause mode
-            if (hasPolicyAccess && currentMode != OperationMode.AUTO) {
+            if (appState.isEnabled && hasPolicyAccess && currentMode != OperationMode.AUTO) {
                 Spacer(modifier = Modifier.height(12.dp))
                 AppleStyleButton(
                     text = "Resume Auto Mode",
@@ -848,13 +872,14 @@ private val PAUSE_OPTIONS = listOf(
 
 /**
  * Unified Single-Toggle Controls Card:
- * Auto, Ring, and Pause in a single multi-state segmented toggle.
- * When Pause is chosen, only then the custom duration section appears.
+ * Features a Master Switch for Automated Ringer Switching (Mute on unlock, Ring on lock).
+ * When enabled, provides Auto, Ring, and Pause in a liquid segmented toggle.
  */
 @Composable
 private fun UnifiedControlsCard(
     appState: AppState,
     currentMode: OperationMode,
+    onToggleRingerAutomation: (Boolean) -> Unit,
     onSelectMode: (OperationMode) -> Unit,
     onPauseForDuration: (Long) -> Unit,
     isDark: Boolean,
@@ -875,200 +900,254 @@ private fun UnifiedControlsCard(
                 .fillMaxWidth()
                 .padding(horizontal = 14.dp, vertical = 12.dp)
         ) {
-            // Mode Header Label
+            // Master Switch Row: Automated Ringer Switching
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    text = "Operational Mode",
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.5.sp
-                    ),
-                    color = colors.textPrimary
-                )
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 12.dp)
+                ) {
+                    Text(
+                        text = "Automated Ringer Switching",
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.5.sp
+                        ),
+                        color = colors.textPrimary
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = if (appState.isEnabled) {
+                            "Mute on unlock • Ring on lock"
+                        } else {
+                            "Disabled • Phone ringer state will not be changed"
+                        },
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.5.sp),
+                        color = colors.textSecondary
+                    )
+                }
 
-                Text(
-                    text = when (currentMode) {
-                        OperationMode.AUTO -> "Dynamic Lock/Unlock"
-                        OperationMode.FORCE_RING -> "Always Ring"
-                        OperationMode.PAUSE -> "Paused"
-                    },
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 11.5.sp
-                    ),
-                    color = when (currentMode) {
-                        OperationMode.AUTO -> colors.accentSilent
-                        OperationMode.FORCE_RING -> colors.ringState
-                        OperationMode.PAUSE -> colors.warning
-                    }
+                AppleStyleSwitch(
+                    checked = appState.isEnabled,
+                    onCheckedChange = onToggleRingerAutomation,
+                    activeColor = colors.accentSilent
                 )
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Unified 3-Way Mode Selector (Auto | Ring | Pause)
-            LiquidModeSelector(
-                selectedMode = currentMode,
-                onModeSelected = { mode ->
-                    onSelectMode(mode)
-                    if (mode == OperationMode.PAUSE) {
-                        val duration = when {
-                            selectedOption == null -> appState.customPauseDurationMs
-                            selectedOption?.id == "custom" -> appState.customPauseDurationMs
-                            else -> selectedOption!!.durationMs
-                        }
-                        onPauseForDuration(duration)
-                    }
-                },
-                isDark = isDark
-            )
-
-            // Dynamic Custom Pause Section (Only appears when PAUSE is active)
+            // Mode Selector and Controls (Only displayed when ringer automation is active)
             AnimatedVisibility(
-                visible = currentMode == OperationMode.PAUSE,
+                visible = appState.isEnabled,
                 enter = fadeIn(spring()) + expandVertically(spring()),
                 exit = fadeOut(spring()) + shrinkVertically(spring())
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 12.dp)
-                        .clip(SquircleMedium)
-                        .background(colors.warning.copy(alpha = if (isDark) 0.09f else 0.06f))
-                        .border(
-                            width = 0.8.dp,
-                            color = colors.warning.copy(alpha = 0.30f),
-                            shape = SquircleMedium
-                        )
-                        .padding(12.dp)
-                ) {
+                Column {
+                    Spacer(modifier = Modifier.height(14.dp))
+                    HorizontalDivider(
+                        color = if (isDark) Color(0x18FFFFFF) else Color(0x12000000),
+                        thickness = 0.6.dp
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Mode Header Label
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Tune,
-                                contentDescription = null,
-                                tint = colors.warning,
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "Pause Duration",
-                                style = MaterialTheme.typography.labelMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp
-                                ),
-                                color = colors.warning
-                            )
-                        }
+                        Text(
+                            text = "Operational Mode",
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 13.5.sp
+                            ),
+                            color = colors.textPrimary
+                        )
 
-                        val expiryTime = remember(appState.pauseUntilTimestamp) {
-                            if (appState.pauseUntilTimestamp > 0L) {
-                                SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(appState.pauseUntilTimestamp))
-                            } else ""
-                        }
-                        if (expiryTime.isNotEmpty()) {
-                            Text(
-                                text = "Resumes at $expiryTime",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 11.sp
-                                ),
-                                color = colors.warning
-                            )
-                        }
+                        Text(
+                            text = when (currentMode) {
+                                OperationMode.AUTO -> "Dynamic Lock/Unlock"
+                                OperationMode.FORCE_RING -> "Always Ring"
+                                OperationMode.PAUSE -> "Paused"
+                            },
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 11.5.sp
+                            ),
+                            color = when (currentMode) {
+                                OperationMode.AUTO -> colors.accentSilent
+                                OperationMode.FORCE_RING -> colors.ringState
+                                OperationMode.PAUSE -> colors.warning
+                            }
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // Preset Chips Row (10m, 15m, 30m, 1h, Custom)
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(SquircleMedium)
-                            .background(if (isDark) Color(0x22FFFFFF) else Color(0x14000000))
-                            .padding(3.dp),
-                        horizontalArrangement = Arrangement.spacedBy(3.dp)
-                    ) {
-                        PAUSE_OPTIONS.forEach { option ->
-                            val isSelected = selectedOption == option
-                            val itemBg by animateColorAsState(
-                                targetValue = if (isSelected) {
-                                    if (isDark) Color(0x50FFFFFF) else Color(0xC8FFFFFF)
-                                } else Color.Transparent,
-                                animationSpec = spring(),
-                                label = "pauseChipBg"
-                            )
-                            val itemText by animateColorAsState(
-                                targetValue = if (isSelected) {
-                                    if (isDark) Color.White else colors.warning
-                                } else colors.textSecondary,
-                                animationSpec = spring(),
-                                label = "pauseChipText"
-                            )
+                    // Unified 3-Way Mode Selector (Auto | Ring | Pause)
+                    LiquidModeSelector(
+                        selectedMode = currentMode,
+                        onModeSelected = { mode ->
+                            onSelectMode(mode)
+                            if (mode == OperationMode.PAUSE) {
+                                val duration = when {
+                                    selectedOption == null -> appState.customPauseDurationMs
+                                    selectedOption?.id == "custom" -> appState.customPauseDurationMs
+                                    else -> selectedOption!!.durationMs
+                                }
+                                onPauseForDuration(duration)
+                            }
+                        },
+                        isDark = isDark
+                    )
 
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(30.dp)
-                                    .clip(SquircleMedium)
-                                    .background(itemBg)
-                                    .then(
-                                        if (isSelected) {
-                                            Modifier.border(
-                                                width = 0.8.dp,
-                                                color = if (isDark) Color(0x60FFFFFF) else Color(0x90FFFFFF),
-                                                shape = SquircleMedium
-                                            )
-                                        } else Modifier
-                                    )
-                                    .clickable(
-                                        interactionSource = remember { MutableInteractionSource() },
-                                        indication = null,
-                                        onClick = {
-                                            selectedOption = option
-                                            val newDuration = if (option.id == "custom") {
-                                                appState.customPauseDurationMs
-                                            } else {
-                                                option.durationMs
-                                            }
-                                            onPauseForDuration(newDuration)
-                                        }
-                                    ),
-                                contentAlignment = Alignment.Center
+                    // Dynamic Custom Pause Section (Only appears when PAUSE is active)
+                    AnimatedVisibility(
+                        visible = currentMode == OperationMode.PAUSE,
+                        enter = fadeIn(spring()) + expandVertically(spring()),
+                        exit = fadeOut(spring()) + shrinkVertically(spring())
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 12.dp)
+                                .clip(SquircleMedium)
+                                .background(colors.warning.copy(alpha = if (isDark) 0.09f else 0.06f))
+                                .border(
+                                    width = 0.8.dp,
+                                    color = colors.warning.copy(alpha = 0.30f),
+                                    shape = SquircleMedium
+                                )
+                                .padding(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text(
-                                    text = option.label,
-                                    style = MaterialTheme.typography.labelMedium.copy(
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                        fontSize = 11.5.sp
-                                    ),
-                                    color = itemText
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Tune,
+                                        contentDescription = null,
+                                        tint = colors.warning,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "Pause Duration",
+                                        style = MaterialTheme.typography.labelMedium.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 12.sp
+                                        ),
+                                        color = colors.warning
+                                    )
+                                }
+
+                                val expiryTime = remember(appState.pauseUntilTimestamp) {
+                                    if (appState.pauseUntilTimestamp > 0L) {
+                                        SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(appState.pauseUntilTimestamp))
+                                    } else ""
+                                }
+                                if (expiryTime.isNotEmpty()) {
+                                    Text(
+                                        text = "Resumes at $expiryTime",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontSize = 11.sp
+                                        ),
+                                        color = colors.warning
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // Preset Chips Row (10m, 15m, 30m, 1h, Custom)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(SquircleMedium)
+                                    .background(if (isDark) Color(0x22FFFFFF) else Color(0x14000000))
+                                    .padding(3.dp),
+                                horizontalArrangement = Arrangement.spacedBy(3.dp)
+                            ) {
+                                PAUSE_OPTIONS.forEach { option ->
+                                    val isSelected = selectedOption == option
+                                    val itemBg by animateColorAsState(
+                                        targetValue = if (isSelected) {
+                                            if (isDark) Color(0x50FFFFFF) else Color(0xC8FFFFFF)
+                                        } else Color.Transparent,
+                                        animationSpec = spring(),
+                                        label = "pauseChipBg"
+                                    )
+                                    val itemText by animateColorAsState(
+                                        targetValue = if (isSelected) {
+                                            if (isDark) Color.White else colors.warning
+                                        } else colors.textSecondary,
+                                        animationSpec = spring(),
+                                        label = "pauseChipText"
+                                    )
+
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(30.dp)
+                                            .clip(SquircleMedium)
+                                            .background(itemBg)
+                                            .then(
+                                                if (isSelected) {
+                                                    Modifier.border(
+                                                        width = 0.8.dp,
+                                                        color = if (isDark) Color(0x60FFFFFF) else Color(0x90FFFFFF),
+                                                        shape = SquircleMedium
+                                                    )
+                                                } else Modifier
+                                            )
+                                            .clickable(
+                                                interactionSource = remember { MutableInteractionSource() },
+                                                indication = null,
+                                                onClick = {
+                                                    selectedOption = option
+                                                    val newDuration = if (option.id == "custom") {
+                                                        appState.customPauseDurationMs
+                                                    } else {
+                                                        option.durationMs
+                                                    }
+                                                    onPauseForDuration(newDuration)
+                                                }
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = option.label,
+                                            style = MaterialTheme.typography.labelMedium.copy(
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                                fontSize = 11.5.sp
+                                            ),
+                                            color = itemText
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Custom Real-Time Clock Picker (When "Custom" chip is selected)
+                            if (selectedOption?.id == "custom") {
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                LiquidClockPicker(
+                                    initialTargetTimestamp = if (appState.pauseUntilTimestamp > System.currentTimeMillis()) {
+                                        appState.pauseUntilTimestamp
+                                    } else {
+                                        System.currentTimeMillis() + appState.customPauseDurationMs
+                                    },
+                                    onDurationChanged = onPauseForDuration,
+                                    isDark = isDark
                                 )
                             }
                         }
-                    }
-
-                    // Custom Real-Time Clock Picker (When "Custom" chip is selected)
-                    if (selectedOption?.id == "custom") {
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        LiquidClockPicker(
-                            initialTargetTimestamp = if (appState.pauseUntilTimestamp > System.currentTimeMillis()) {
-                                appState.pauseUntilTimestamp
-                            } else {
-                                System.currentTimeMillis() + appState.customPauseDurationMs
-                            },
-                            onDurationChanged = onPauseForDuration,
-                            isDark = isDark
-                        )
                     }
                 }
             }
@@ -1136,6 +1215,7 @@ private fun CompactPermissionCard(
 private fun SystemPermissionsSection(
     hasPolicyAccess: Boolean,
     isBatteryOptIgnored: Boolean,
+    isRingerEnabled: Boolean,
     onRequestPolicyAccess: () -> Unit,
     onRequestBatteryOptimization: () -> Unit,
     onRequestAutostart: () -> Unit,
@@ -1180,23 +1260,37 @@ private fun SystemPermissionsSection(
         // Card 1: Do Not Disturb Access
         GroupedListCard(modifier = Modifier.padding(bottom = 10.dp)) {
             Column(modifier = Modifier.fillMaxWidth()) {
+                val dndSubtitle = when {
+                    hasPolicyAccess -> "Access granted"
+                    !isRingerEnabled -> "Optional (Automation disabled)"
+                    else -> "Action required"
+                }
+                val dndTint = when {
+                    hasPolicyAccess -> colors.ringState
+                    !isRingerEnabled -> colors.textSecondary
+                    else -> colors.error
+                }
+                val dndStatusText = when {
+                    hasPolicyAccess -> "Granted"
+                    !isRingerEnabled -> "Optional"
+                    else -> "Grant"
+                }
+
                 GroupedListRow(
                     title = "Do Not Disturb Access",
-                    subtitle = if (hasPolicyAccess) "Access granted" else "Action required",
+                    subtitle = dndSubtitle,
                     leadingIcon = {
                         Box(
                             modifier = Modifier
                                 .size(28.dp)
                                 .clip(CircleShape)
-                                .background(
-                                    if (hasPolicyAccess) colors.ringState.copy(alpha = 0.15f) else colors.error.copy(alpha = 0.15f)
-                                ),
+                                .background(dndTint.copy(alpha = 0.15f)),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Shield,
                                 contentDescription = null,
-                                tint = if (hasPolicyAccess) colors.ringState else colors.error,
+                                tint = dndTint,
                                 modifier = Modifier.size(15.dp)
                             )
                         }
@@ -1204,12 +1298,12 @@ private fun SystemPermissionsSection(
                     trailingContent = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                text = if (hasPolicyAccess) "Granted" else "Grant",
+                                text = dndStatusText,
                                 style = MaterialTheme.typography.bodyMedium.copy(
                                     fontWeight = FontWeight.SemiBold,
                                     fontSize = 13.sp
                                 ),
-                                color = if (hasPolicyAccess) colors.ringState else colors.error
+                                color = dndTint
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Icon(
