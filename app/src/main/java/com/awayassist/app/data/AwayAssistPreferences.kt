@@ -4,8 +4,10 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -55,7 +57,11 @@ data class SosLocateState(
     val traceIntervalMins: Int = 5,
     val lastTriggeredTimestamp: Long = 0L,
     val lastTriggerDesc: String = "",
-    val isOnboarded: Boolean = false
+    val isOnboarded: Boolean = false,
+    val lastKnownLatitude: Double = 0.0,
+    val lastKnownLongitude: Double = 0.0,
+    val lastKnownAccuracy: Float = 0f,
+    val lastKnownLocationTime: Long = 0L
 ) {
     val isSessionActive: Boolean
         get() = sessionState != SosSessionState.NONE
@@ -123,6 +129,10 @@ class AwayAssistPreferences(private val context: Context) {
         val KEY_SOS_LAST_TRIGGERED_TIMESTAMP = longPreferencesKey("sos_last_triggered_timestamp")
         val KEY_SOS_LAST_TRIGGER_DESC = stringPreferencesKey("sos_last_trigger_desc")
         val KEY_SOS_IS_ONBOARDED = booleanPreferencesKey("sos_is_onboarded")
+        val KEY_SOS_LAST_KNOWN_LATITUDE = doublePreferencesKey("sos_last_known_latitude")
+        val KEY_SOS_LAST_KNOWN_LONGITUDE = doublePreferencesKey("sos_last_known_longitude")
+        val KEY_SOS_LAST_KNOWN_ACCURACY = floatPreferencesKey("sos_last_known_accuracy")
+        val KEY_SOS_LAST_KNOWN_LOC_TIME = longPreferencesKey("sos_last_known_loc_time")
 
         @Volatile
         private var INSTANCE: AwayAssistPreferences? = null
@@ -194,7 +204,11 @@ class AwayAssistPreferences(private val context: Context) {
                 traceIntervalMins = preferences[KEY_SOS_TRACE_INTERVAL_MINS] ?: 5,
                 lastTriggeredTimestamp = preferences[KEY_SOS_LAST_TRIGGERED_TIMESTAMP] ?: 0L,
                 lastTriggerDesc = preferences[KEY_SOS_LAST_TRIGGER_DESC] ?: "",
-                isOnboarded = preferences[KEY_SOS_IS_ONBOARDED] ?: false
+                isOnboarded = preferences[KEY_SOS_IS_ONBOARDED] ?: false,
+                lastKnownLatitude = preferences[KEY_SOS_LAST_KNOWN_LATITUDE] ?: 0.0,
+                lastKnownLongitude = preferences[KEY_SOS_LAST_KNOWN_LONGITUDE] ?: 0.0,
+                lastKnownAccuracy = preferences[KEY_SOS_LAST_KNOWN_ACCURACY] ?: 0f,
+                lastKnownLocationTime = preferences[KEY_SOS_LAST_KNOWN_LOC_TIME] ?: 0L
             )
 
             AppState(
@@ -387,6 +401,21 @@ class AwayAssistPreferences(private val context: Context) {
         dataStore.edit { preferences ->
             preferences[KEY_SOS_LAST_TRIGGERED_TIMESTAMP] = timestamp
             preferences[KEY_SOS_LAST_TRIGGER_DESC] = desc
+        }
+    }
+
+    suspend fun saveLastKnownLocation(
+        latitude: Double,
+        longitude: Double,
+        accuracy: Float,
+        timestamp: Long = System.currentTimeMillis()
+    ) {
+        if (latitude == 0.0 && longitude == 0.0) return
+        dataStore.edit { preferences ->
+            preferences[KEY_SOS_LAST_KNOWN_LATITUDE] = latitude
+            preferences[KEY_SOS_LAST_KNOWN_LONGITUDE] = longitude
+            preferences[KEY_SOS_LAST_KNOWN_ACCURACY] = accuracy
+            preferences[KEY_SOS_LAST_KNOWN_LOC_TIME] = timestamp
         }
     }
 }

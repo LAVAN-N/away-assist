@@ -379,12 +379,26 @@ class SosLocateController(private val context: Context) {
         }
 
         val message = if (location != null) {
+            preferences.saveLastKnownLocation(
+                latitude = location.latitude,
+                longitude = location.longitude,
+                accuracy = if (location.hasAccuracy()) location.accuracy else 0f,
+                timestamp = System.currentTimeMillis()
+            )
             val accuracyStr = if (location.hasAccuracy()) "Accuracy: ~${location.accuracy.toInt()}m" else "Accuracy: unknown"
             "Away Assist: Location fix at $timeStr.\n" +
             "https://maps.google.com/?q=${location.latitude},${location.longitude}\n" +
             "$accuracyStr | Battery: $batteryLevel%"
         } else {
-            if (!isLocOn) {
+            val appState = preferences.getAppState()
+            val sosState = appState.sosLocateState
+            if (sosState.lastKnownLatitude != 0.0 && sosState.lastKnownLongitude != 0.0) {
+                val cachedTime = SimpleDateFormat("MMM d, HH:mm", Locale.getDefault()).format(Date(sosState.lastKnownLocationTime))
+                val accStr = if (sosState.lastKnownAccuracy > 0f) "Accuracy: ~${sosState.lastKnownAccuracy.toInt()}m | " else ""
+                "Away Assist: Location at $timeStr (cached from $cachedTime).\n" +
+                "https://maps.google.com/?q=${sosState.lastKnownLatitude},${sosState.lastKnownLongitude}\n" +
+                "$accStr Battery: $batteryLevel%"
+            } else if (!isLocOn) {
                 "Away Assist: Location fix unavailable (Location toggle is OFF; grant WRITE_SECURE_SETTINGS via ADB for remote switching) at $timeStr.\nBattery: $batteryLevel%"
             } else {
                 "Away Assist: Location fix unavailable at $timeStr (GPS fix timed out).\nBattery: $batteryLevel%"
@@ -448,38 +462,15 @@ class SosLocateController(private val context: Context) {
 
         val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val batteryLevel = getBatteryPercentage()
-        val wasLocationOff = !isLocationEnabled()
-        val wasDataOff = !isMobileDataEnabled()
-        var toggledLocOn = false
 
-        if (hasWriteSecureSettingsPermission() || isShizukuPermissionGranted()) {
-            if (wasLocationOff) {
-                toggledLocOn = enableSystemLocation()
-            }
-            if (wasDataOff) {
-                enableMobileData()
-            }
-            if (toggledLocOn || wasDataOff) delay(1200L)
-        }
+        val locationResult = getBestAvailableLocation(timeoutMs = 5_000L, quickAttempt = true)
 
-        val location = acquireLocation(8_000L) ?: getLastKnownLocation()
-
-        if (toggledLocOn) {
-            disableSystemLocation()
-        }
-
-        val locationText = if (location != null) {
-            "https://maps.google.com/?q=${location.latitude},${location.longitude} (~${location.accuracy.toInt()}m)"
-        } else {
-            "Location unavailable"
-        }
-
-        val message = "[Away Assist SOS] Alert: SIM card state changed at $timeStr!\n" +
-            "Location: $locationText\n" +
+        val message = "[Away Assist SOS] Alert: SIM card removed at $timeStr!\n" +
+            "Location: ${locationResult.text}\n" +
             "Battery: $batteryLevel%"
 
         sendSms(targetNumber, message)
-        preferences.recordSosTrigger("SIM state change detected")
+        preferences.recordSosTrigger("SIM removal detected")
     }
 
     suspend fun handleShutdown() = withContext(Dispatchers.IO) {
@@ -495,16 +486,12 @@ class SosLocateController(private val context: Context) {
 
         val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val batteryLevel = getBatteryPercentage()
-        val lastKnown = getLastKnownLocation()
 
-        val locationText = if (lastKnown != null) {
-            "https://maps.google.com/?q=${lastKnown.latitude},${lastKnown.longitude} (~${lastKnown.accuracy.toInt()}m)"
-        } else {
-            "Location unavailable"
-        }
+        // Quick 1.5s best-effort location attempt before shutdown kills processes
+        val locationResult = getBestAvailableLocation(timeoutMs = 1_500L, quickAttempt = true)
 
         val message = "[Away Assist SOS] Alert: Device powering off at $timeStr.\n" +
-            "Last location: $locationText\n" +
+            "Last location: ${locationResult.text}\n" +
             "Battery: $batteryLevel%"
 
         sendSms(targetNumber, message)
@@ -525,7 +512,10 @@ class SosLocateController(private val context: Context) {
         val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val batteryLevel = getBatteryPercentage()
 
+        val locationResult = getBestAvailableLocation(timeoutMs = 3_000L, quickAttempt = true)
+
         val message = "[Away Assist SOS] Alert: Device powered on at $timeStr.\n" +
+            "Location: ${locationResult.text}\n" +
             "Battery: $batteryLevel%"
 
         sendSms(targetNumber, message)
@@ -561,17 +551,77 @@ class SosLocateController(private val context: Context) {
     private suspend fun sendTraceFix(targetNumber: String) {
         val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val batteryLevel = getBatteryPercentage()
-        val location = acquireLocation(8_000L) ?: getLastKnownLocation()
+        val locationResult = getBestAvailableLocation(timeoutMs = 6_000L, quickAttempt = true)
 
-        val message = if (location != null) {
-            "Away Assist TRACE: Location at $timeStr\n" +
-            "https://maps.google.com/?q=${location.latitude},${location.longitude}\n" +
-            "Accuracy: ~${location.accuracy.toInt()}m | Battery: $batteryLevel%"
-        } else {
-            "Away Assist TRACE: Location update unavailable at $timeStr.\nBattery: $batteryLevel%"
-        }
+        val message = "Away Assist TRACE: Location at $timeStr\n" +
+            "${locationResult.text}\n" +
+            "Battery: $batteryLevel%"
 
         sendSms(targetNumber, message)
+    }
+
+    data class FormattedLocation(
+        val text: String,
+        val location: Location? = null
+    )
+
+    private suspend fun getBestAvailableLocation(
+        timeoutMs: Long = 4_000L,
+        quickAttempt: Boolean = true
+    ): FormattedLocation {
+        var location: Location? = null
+        if (quickAttempt && hasLocationPermission() && (isLocationEnabled() || hasWriteSecureSettingsPermission() || isShizukuPermissionGranted())) {
+            var toggledLoc = false
+            if (!isLocationEnabled() && (hasWriteSecureSettingsPermission() || isShizukuPermissionGranted())) {
+                toggledLoc = enableSystemLocation()
+                if (toggledLoc) delay(500L)
+            }
+            location = try {
+                acquireLocation(timeoutMs)
+            } catch (e: Exception) {
+                null
+            }
+            if (toggledLoc) {
+                try {
+                    disableSystemLocation()
+                } catch (_: Exception) {}
+            }
+        }
+
+        if (location == null) {
+            location = getLastKnownLocation()
+        }
+
+        if (location != null) {
+            preferences.saveLastKnownLocation(
+                latitude = location.latitude,
+                longitude = location.longitude,
+                accuracy = if (location.hasAccuracy()) location.accuracy else 0f,
+                timestamp = System.currentTimeMillis()
+            )
+            val accuracyStr = if (location.hasAccuracy()) " (~${location.accuracy.toInt()}m)" else ""
+            return FormattedLocation(
+                text = "https://maps.google.com/?q=${location.latitude},${location.longitude}$accuracyStr",
+                location = location
+            )
+        }
+
+        // Fallback to persisted location in DataStore
+        val appState = preferences.getAppState()
+        val sosState = appState.sosLocateState
+        if (sosState.lastKnownLatitude != 0.0 && sosState.lastKnownLongitude != 0.0) {
+            val timeAgoStr = SimpleDateFormat("MMM d, HH:mm", Locale.getDefault()).format(Date(sosState.lastKnownLocationTime))
+            val accStr = if (sosState.lastKnownAccuracy > 0f) " (~${sosState.lastKnownAccuracy.toInt()}m)" else ""
+            return FormattedLocation(
+                text = "https://maps.google.com/?q=${sosState.lastKnownLatitude},${sosState.lastKnownLongitude}$accStr (cached from $timeAgoStr)",
+                location = null
+            )
+        }
+
+        return FormattedLocation(
+            text = "Location unavailable",
+            location = null
+        )
     }
 
     @SuppressLint("MissingPermission")
@@ -661,19 +711,20 @@ class SosLocateController(private val context: Context) {
         val providers = listOf(
             LocationManager.GPS_PROVIDER,
             LocationManager.NETWORK_PROVIDER,
-            LocationManager.PASSIVE_PROVIDER
+            LocationManager.PASSIVE_PROVIDER,
+            "fused"
         )
         var bestLocation: Location? = null
         for (provider in providers) {
             try {
-                if (locationManager.isProviderEnabled(provider)) {
-                    val loc = locationManager.getLastKnownLocation(provider)
-                    if (loc != null && (bestLocation == null || loc.accuracy < bestLocation.accuracy)) {
+                val loc = locationManager.getLastKnownLocation(provider)
+                if (loc != null) {
+                    if (bestLocation == null || loc.accuracy < bestLocation.accuracy) {
                         bestLocation = loc
                     }
                 }
             } catch (e: Exception) {
-                Log.w(TAG, "Error checking provider $provider", e)
+                // Ignore provider error
             }
         }
         return bestLocation
