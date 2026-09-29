@@ -20,8 +20,10 @@ import androidx.core.content.ContextCompat
 import com.awayassist.app.data.AwayAssistPreferences
 import com.awayassist.app.data.SosSessionState
 import com.awayassist.app.data.computeSha256
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -359,6 +361,7 @@ class SosLocateController(private val context: Context) {
         val wasLocationOff = !isLocationEnabled()
         val wasDataOff = !isMobileDataEnabled()
         var toggledLocOn = false
+        var toggledDataOn = false
 
         try {
             if (hasWriteSecureSettingsPermission() || isShizukuPermissionGranted()) {
@@ -366,9 +369,9 @@ class SosLocateController(private val context: Context) {
                     toggledLocOn = enableSystemLocation()
                 }
                 if (wasDataOff) {
-                    enableMobileData()
+                    toggledDataOn = enableMobileData()
                 }
-                if (toggledLocOn || wasDataOff) {
+                if (toggledLocOn || toggledDataOn) {
                     delay(1200L)
                 }
             }
@@ -376,15 +379,22 @@ class SosLocateController(private val context: Context) {
             Log.e(TAG, "Error in auto-toggling location/data", e)
         }
 
-        // Generous 15s timeout with multi-provider + cached fallbacks to guarantee a valid location URL
-        val locationResult = getBestAvailableLocation(timeoutMs = 15_000L, quickAttempt = true)
+        // Parallel acquisition with 12s total window (returns in 1-4s if Network/Cell fix is available)
+        val locationResult = getBestAvailableLocation(timeoutMs = 12_000L, quickAttempt = true)
 
-        // Turn location back OFF immediately if we turned it on for this single fix
+        // Turn location and data back OFF immediately if we turned them on for this single fix
         if (toggledLocOn) {
             try {
                 disableSystemLocation()
             } catch (e: Exception) {
                 Log.e(TAG, "Error disabling location in handleFind", e)
+            }
+        }
+        if (toggledDataOn) {
+            try {
+                disableMobileData()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error disabling mobile data in handleFind", e)
             }
         }
 
@@ -564,7 +574,7 @@ class SosLocateController(private val context: Context) {
             Log.e(TAG, "Error toggling location in sendTraceFix", e)
         }
 
-        val locationResult = getBestAvailableLocation(timeoutMs = 15_000L, quickAttempt = true)
+        val locationResult = getBestAvailableLocation(timeoutMs = 12_000L, quickAttempt = true)
 
         // TRACE requirement: Always turn location OFF immediately after sending each periodic update!
         if (hasWriteSecureSettingsPermission() || isShizukuPermissionGranted()) {
@@ -588,7 +598,7 @@ class SosLocateController(private val context: Context) {
     )
 
     private suspend fun getBestAvailableLocation(
-        timeoutMs: Long = 15_000L,
+        timeoutMs: Long = 12_000L,
         quickAttempt: Boolean = true
     ): FormattedLocation {
         var location: Location? = null
@@ -638,66 +648,32 @@ class SosLocateController(private val context: Context) {
     }
 
     @SuppressLint("MissingPermission")
-    private suspend fun acquireLocation(timeoutMs: Long = 15_000L): Location? = withContext(Dispatchers.IO) {
+    private suspend fun acquireLocation(timeoutMs: Long = 12_000L): Location? = withContext(Dispatchers.IO) {
         if (!hasLocationPermission() || locationManager == null) return@withContext null
 
-        // 1. If we have a very fresh location (< 10s old), return immediately
-        val initialBest = getLastKnownLocation()
-        if (initialBest != null && (System.currentTimeMillis() - initialBest.time) < 10_000L) {
-            return@withContext initialBest
-        }
+        val lastKnown = getLastKnownLocation()
+        var bestAcquired: Location? = lastKnown
 
-        // 2. Try modern Android R+ LocationManager.getCurrentLocation if available
-        var modernLocation: Location? = null
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            try {
-                modernLocation = withTimeoutOrNull(timeoutMs) {
-                    suspendCancellableCoroutine { continuation ->
-                        val cancellationSignal = android.os.CancellationSignal()
-                        continuation.invokeOnCancellation { cancellationSignal.cancel() }
-                        try {
-                            val provider = when {
-                                locationManager.isProviderEnabled("fused") -> "fused"
-                                locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) -> LocationManager.GPS_PROVIDER
-                                locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER) -> LocationManager.NETWORK_PROVIDER
-                                else -> LocationManager.PASSIVE_PROVIDER
+        val freshLocation = withTimeoutOrNull(timeoutMs) {
+            suspendCancellableCoroutine { continuation ->
+                var resumed = false
+
+                val listener = object : LocationListener {
+                    override fun onLocationChanged(loc: Location) {
+                        synchronized(this) {
+                            if (bestAcquired == null || (loc.hasAccuracy() && loc.accuracy < (bestAcquired?.accuracy ?: Float.MAX_VALUE))) {
+                                bestAcquired = loc
                             }
-                            locationManager.getCurrentLocation(
-                                provider,
-                                cancellationSignal,
-                                context.mainExecutor
-                            ) { loc ->
-                                if (continuation.isActive) {
+                            // If we obtained a fine fix (accuracy <= 30m), finish immediately
+                            if (loc.hasAccuracy() && loc.accuracy <= 30f) {
+                                if (!resumed && continuation.isActive) {
+                                    resumed = true
+                                    try {
+                                        locationManager.removeUpdates(this)
+                                    } catch (_: Exception) {}
                                     continuation.resume(loc)
                                 }
                             }
-                        } catch (e: Exception) {
-                            Log.w(TAG, "getCurrentLocation failed, falling back to listener", e)
-                            if (continuation.isActive) continuation.resume(null)
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "Error in modern getCurrentLocation", e)
-            }
-        }
-
-        if (modernLocation != null) {
-            return@withContext modernLocation
-        }
-
-        // 3. Fallback to active multi-provider LocationListener with full timeout
-        val freshLocation = withTimeoutOrNull(timeoutMs) {
-            suspendCancellableCoroutine { continuation ->
-                val listener = object : LocationListener {
-                    override fun onLocationChanged(location: Location) {
-                        try {
-                            locationManager.removeUpdates(this)
-                        } catch (e: Exception) {
-                            Log.w(TAG, "Error removing location updates", e)
-                        }
-                        if (continuation.isActive) {
-                            continuation.resume(location)
                         }
                     }
 
@@ -707,55 +683,80 @@ class SosLocateController(private val context: Context) {
                     override fun onProviderDisabled(provider: String) {}
                 }
 
+                // Register updates on all providers in parallel
+                val providers = listOf(
+                    "fused",
+                    LocationManager.NETWORK_PROVIDER,
+                    LocationManager.GPS_PROVIDER,
+                    LocationManager.PASSIVE_PROVIDER
+                )
+
                 var registered = false
-                try {
-                    val providers = listOf(
-                        "fused",
-                        LocationManager.GPS_PROVIDER,
-                        LocationManager.NETWORK_PROVIDER
-                    )
+                for (p in providers) {
+                    try {
+                        locationManager.requestLocationUpdates(
+                            p,
+                            0L,
+                            0f,
+                            listener,
+                            Looper.getMainLooper()
+                        )
+                        registered = true
+                    } catch (_: Exception) {}
+                }
 
+                // Also trigger getCurrentLocation on R+ across all available providers in parallel
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                     for (p in providers) {
-                        if (locationManager.isProviderEnabled(p)) {
-                            try {
-                                locationManager.requestLocationUpdates(
-                                    p,
-                                    0L,
-                                    0f,
-                                    listener,
-                                    Looper.getMainLooper()
-                                )
-                                registered = true
-                            } catch (_: Exception) {}
-                        }
-                    }
-
-                    if (!registered) {
-                        if (continuation.isActive) {
-                            continuation.resume(null)
-                        }
-                    } else {
-                        continuation.invokeOnCancellation {
-                            try {
-                                locationManager.removeUpdates(listener)
-                            } catch (e: Exception) {
-                                Log.w(TAG, "Error removing location listener on cancellation", e)
+                        try {
+                            locationManager.getCurrentLocation(
+                                p,
+                                null,
+                                context.mainExecutor
+                            ) { loc ->
+                                if (loc != null) {
+                                    synchronized(listener) {
+                                        if (bestAcquired == null || (loc.hasAccuracy() && loc.accuracy < (bestAcquired?.accuracy ?: Float.MAX_VALUE))) {
+                                            bestAcquired = loc
+                                        }
+                                        if (loc.hasAccuracy() && loc.accuracy <= 30f && !resumed && continuation.isActive) {
+                                            resumed = true
+                                            try { locationManager.removeUpdates(listener) } catch (_: Exception) {}
+                                            continuation.resume(loc)
+                                        }
+                                    }
+                                }
                             }
+                        } catch (_: Exception) {}
+                    }
+                }
+
+                // Fast fallback: if we received any Network/Cell/Wi-Fi fix after 4 seconds, don't wait for GPS satellite timeout!
+                CoroutineScope(Dispatchers.IO).launch {
+                    delay(4000L)
+                    synchronized(listener) {
+                        if (!resumed && bestAcquired != null && continuation.isActive) {
+                            resumed = true
+                            try { locationManager.removeUpdates(listener) } catch (_: Exception) {}
+                            continuation.resume(bestAcquired)
                         }
                     }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to request location updates", e)
+                }
+
+                continuation.invokeOnCancellation {
                     try {
                         locationManager.removeUpdates(listener)
-                    } catch (ignored: Exception) {}
-                    if (continuation.isActive) {
-                        continuation.resume(null)
-                    }
+                    } catch (_: Exception) {}
+                }
+
+                if (!registered && bestAcquired != null && !resumed && continuation.isActive) {
+                    resumed = true
+                    continuation.resume(bestAcquired)
                 }
             }
         }
 
-        return@withContext freshLocation ?: getLastKnownLocation() ?: initialBest
+        return@withContext freshLocation ?: bestAcquired ?: getLastKnownLocation()
     }
 
     @SuppressLint("MissingPermission")
