@@ -195,6 +195,12 @@ class RingerService : Service() {
             } else {
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
             }
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if (sosLocateController.hasLocationPermission()) {
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+            } else {
+                0
+            }
         } else {
             0
         }

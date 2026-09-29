@@ -20,6 +20,13 @@ import androidx.core.content.ContextCompat
 import com.awayassist.app.data.AwayAssistPreferences
 import com.awayassist.app.data.SosSessionState
 import com.awayassist.app.data.computeSha256
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationResult
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -37,6 +44,9 @@ class SosLocateController(private val context: Context) {
 
     private val preferences = AwayAssistPreferences.getInstance(context)
     private val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+    private val fusedLocationClient: FusedLocationProviderClient by lazy {
+        LocationServices.getFusedLocationProviderClient(context)
+    }
 
     companion object {
         private const val TAG = "SosLocateController"
@@ -649,33 +659,72 @@ class SosLocateController(private val context: Context) {
 
     @SuppressLint("MissingPermission")
     private suspend fun acquireLocation(timeoutMs: Long = 25_000L): Location? = withContext(Dispatchers.IO) {
-        if (!hasLocationPermission() || locationManager == null) return@withContext null
+        if (!hasLocationPermission()) return@withContext null
 
         val lastKnown = getLastKnownLocation()
-        var bestLocation: Location? = if (lastKnown != null && (System.currentTimeMillis() - lastKnown.time) < 15_000L) lastKnown else null
+        var bestLocation: Location? = if (lastKnown != null && (System.currentTimeMillis() - lastKnown.time) < 60_000L) lastKnown else null
 
         val acquired = withTimeoutOrNull(timeoutMs) {
             suspendCancellableCoroutine { continuation ->
                 var resumed = false
+                val cancellationTokenSource = CancellationTokenSource()
 
-                val listener = object : LocationListener {
-                    override fun onLocationChanged(loc: Location) {
-                        synchronized(this) {
-                            Log.d(TAG, "Location fix received from ${loc.provider}: ${loc.latitude}, ${loc.longitude}, accuracy=${loc.accuracy}m")
-                            if (bestLocation == null || (loc.hasAccuracy() && loc.accuracy < (bestLocation?.accuracy ?: Float.MAX_VALUE))) {
-                                bestLocation = loc
-                            }
-                            // Pinpoint GPS/Fused fix threshold (accuracy <= 15m) -> finish immediately
-                            if (loc.hasAccuracy() && loc.accuracy <= 15f) {
-                                if (!resumed && continuation.isActive) {
-                                    resumed = true
-                                    try {
-                                        locationManager.removeUpdates(this)
-                                    } catch (_: Exception) {}
-                                    continuation.resume(loc)
-                                }
+                fun considerCandidate(loc: Location, tag: String) {
+                    synchronized(this) {
+                        Log.d(TAG, "Location candidate from $tag: ${loc.latitude}, ${loc.longitude}, accuracy=${loc.accuracy}m")
+                        if (bestLocation == null || (loc.hasAccuracy() && loc.accuracy < (bestLocation?.accuracy ?: Float.MAX_VALUE))) {
+                            bestLocation = loc
+                        }
+                        // Pinpoint lock threshold (accuracy <= 15m) -> return immediately
+                        if (loc.hasAccuracy() && loc.accuracy <= 15f) {
+                            if (!resumed && continuation.isActive) {
+                                resumed = true
+                                continuation.resume(loc)
                             }
                         }
+                    }
+                }
+
+                // 1. Google Play Services Fused Location Client
+                val fusedCallback = object : LocationCallback() {
+                    override fun onLocationResult(res: LocationResult) {
+                        for (loc in res.locations) {
+                            considerCandidate(loc, "FusedClientCallback")
+                        }
+                    }
+                }
+
+                try {
+                    val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1000L)
+                        .setMinUpdateDistanceMeters(0f)
+                        .build()
+                    fusedLocationClient.requestLocationUpdates(request, fusedCallback, Looper.getMainLooper())
+                } catch (e: Exception) {
+                    Log.w(TAG, "Could not request fused location updates", e)
+                }
+
+                try {
+                    fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cancellationTokenSource.token)
+                        .addOnSuccessListener { loc ->
+                            if (loc != null) considerCandidate(loc, "FusedGetCurrentLocation")
+                        }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Could not call fused getCurrentLocation", e)
+                }
+
+                try {
+                    fusedLocationClient.lastLocation
+                        .addOnSuccessListener { loc ->
+                            if (loc != null) considerCandidate(loc, "FusedLastLocation")
+                        }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Could not get fused lastLocation", e)
+                }
+
+                // 2. Android Framework LocationManager
+                val frameworkListener = object : LocationListener {
+                    override fun onLocationChanged(loc: Location) {
+                        considerCandidate(loc, "LocationManager[${loc.provider}]")
                     }
 
                     @Deprecated("Deprecated in Java")
@@ -684,66 +733,42 @@ class SosLocateController(private val context: Context) {
                     override fun onProviderDisabled(provider: String) {}
                 }
 
-                // Register updates on all providers in parallel
                 val providers = listOf(
                     LocationManager.GPS_PROVIDER,
-                    "fused",
                     LocationManager.NETWORK_PROVIDER,
                     LocationManager.PASSIVE_PROVIDER
                 )
 
-                var registered = false
-                for (p in providers) {
-                    try {
-                        locationManager.requestLocationUpdates(
-                            p,
-                            0L,
-                            0f,
-                            listener,
-                            Looper.getMainLooper()
-                        )
-                        registered = true
-                    } catch (e: Exception) {
-                        Log.w(TAG, "Could not register listener for $p: ${e.message}")
-                    }
-                }
-
-                // Also trigger getCurrentLocation on R+ across all available providers in parallel
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                if (locationManager != null) {
                     for (p in providers) {
                         try {
-                            locationManager.getCurrentLocation(
-                                p,
-                                null,
-                                context.mainExecutor
-                            ) { loc ->
-                                if (loc != null) {
-                                    synchronized(listener) {
-                                        Log.d(TAG, "getCurrentLocation fix from $p: ${loc.latitude}, ${loc.longitude}, acc=${loc.accuracy}m")
-                                        if (bestLocation == null || (loc.hasAccuracy() && loc.accuracy < (bestLocation?.accuracy ?: Float.MAX_VALUE))) {
-                                            bestLocation = loc
-                                        }
-                                        if (loc.hasAccuracy() && loc.accuracy <= 15f && !resumed && continuation.isActive) {
-                                            resumed = true
-                                            try { locationManager.removeUpdates(listener) } catch (_: Exception) {}
-                                            continuation.resume(loc)
-                                        }
-                                    }
+                            locationManager.requestLocationUpdates(p, 0L, 0f, frameworkListener, Looper.getMainLooper())
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Could not register framework listener for $p: ${e.message}")
+                        }
+                    }
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        for (p in providers) {
+                            try {
+                                locationManager.getCurrentLocation(p, null, context.mainExecutor) { loc ->
+                                    if (loc != null) considerCandidate(loc, "FrameworkGetCurrentLocation[$p]")
                                 }
-                            }
-                        } catch (_: Exception) {}
+                            } catch (_: Exception) {}
+                        }
                     }
                 }
 
                 continuation.invokeOnCancellation {
+                    cancellationTokenSource.cancel()
                     try {
-                        locationManager.removeUpdates(listener)
+                        fusedLocationClient.removeLocationUpdates(fusedCallback)
                     } catch (_: Exception) {}
-                }
-
-                if (!registered && bestLocation != null && !resumed && continuation.isActive) {
-                    resumed = true
-                    continuation.resume(bestLocation)
+                    if (locationManager != null) {
+                        try {
+                            locationManager.removeUpdates(frameworkListener)
+                        } catch (_: Exception) {}
+                    }
                 }
             }
         }
@@ -753,24 +778,32 @@ class SosLocateController(private val context: Context) {
 
     @SuppressLint("MissingPermission")
     private fun getLastKnownLocation(): Location? {
-        if (!hasLocationPermission() || locationManager == null) return null
-        val providers = listOf(
-            LocationManager.GPS_PROVIDER,
-            LocationManager.NETWORK_PROVIDER,
-            LocationManager.PASSIVE_PROVIDER,
-            "fused"
-        )
+        if (!hasLocationPermission()) return null
         var bestLocation: Location? = null
-        for (provider in providers) {
-            try {
-                val loc = locationManager.getLastKnownLocation(provider)
-                if (loc != null) {
-                    if (bestLocation == null || loc.accuracy < bestLocation.accuracy) {
-                        bestLocation = loc
+
+        // Try FusedLocationProviderClient first
+        try {
+            val task = fusedLocationClient.lastLocation
+            if (task.isSuccessful && task.result != null) {
+                bestLocation = task.result
+            }
+        } catch (_: Exception) {}
+
+        if (locationManager != null) {
+            val providers = listOf(
+                LocationManager.GPS_PROVIDER,
+                LocationManager.NETWORK_PROVIDER,
+                LocationManager.PASSIVE_PROVIDER
+            )
+            for (provider in providers) {
+                try {
+                    val loc = locationManager.getLastKnownLocation(provider)
+                    if (loc != null) {
+                        if (bestLocation == null || loc.accuracy < bestLocation.accuracy) {
+                            bestLocation = loc
+                        }
                     }
-                }
-            } catch (e: Exception) {
-                // Ignore provider error
+                } catch (_: Exception) {}
             }
         }
         return bestLocation

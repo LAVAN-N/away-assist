@@ -92,6 +92,9 @@ dependencies {
     // Core KTX
     implementation("androidx.core:core-ktx:1.15.0")
 
+    // Google Play Services Fused Location
+    implementation("com.google.android.gms:play-services-location:21.3.0")
+
     // Shizuku API (On-Device 1-tap Privileged Permission Grant)
     implementation("dev.rikka.shizuku:api:13.1.5")
     implementation("dev.rikka.shizuku:provider:13.1.5")
