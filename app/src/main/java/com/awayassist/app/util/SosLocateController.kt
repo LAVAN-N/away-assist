@@ -361,7 +361,6 @@ class SosLocateController(private val context: Context) {
         val wasLocationOff = !isLocationEnabled()
         val wasDataOff = !isMobileDataEnabled()
         var toggledLocOn = false
-        var toggledDataOn = false
 
         try {
             if (hasWriteSecureSettingsPermission() || isShizukuPermissionGranted()) {
@@ -369,9 +368,9 @@ class SosLocateController(private val context: Context) {
                     toggledLocOn = enableSystemLocation()
                 }
                 if (wasDataOff) {
-                    toggledDataOn = enableMobileData()
+                    enableMobileData()
                 }
-                if (toggledLocOn || toggledDataOn) {
+                if (toggledLocOn || wasDataOff) {
                     delay(1200L)
                 }
             }
@@ -379,22 +378,16 @@ class SosLocateController(private val context: Context) {
             Log.e(TAG, "Error in auto-toggling location/data", e)
         }
 
-        // Parallel acquisition with 12s total window (returns in 1-4s if Network/Cell fix is available)
-        val locationResult = getBestAvailableLocation(timeoutMs = 12_000L, quickAttempt = true)
+        // Dedicated high-accuracy acquisition window (up to 25s, returns immediately on pinpoint <=15m GPS lock)
+        val locationResult = getBestAvailableLocation(timeoutMs = 25_000L, quickAttempt = true)
 
-        // Turn location and data back OFF immediately if we turned them on for this single fix
+        // Turn location back OFF if we toggled it on for this single fix (Stealth/Battery)
+        // Mobile Data is intentionally KEPT ON so the device stays accessible
         if (toggledLocOn) {
             try {
                 disableSystemLocation()
             } catch (e: Exception) {
                 Log.e(TAG, "Error disabling location in handleFind", e)
-            }
-        }
-        if (toggledDataOn) {
-            try {
-                disableMobileData()
-            } catch (e: Exception) {
-                Log.e(TAG, "Error disabling mobile data in handleFind", e)
             }
         }
 
@@ -436,11 +429,11 @@ class SosLocateController(private val context: Context) {
             SosSessionState.TRACE -> "TRACE mode interval updated to ${intervalMins}m. "
             else -> ""
         }
-        val ackMessage = "Away Assist: ${switchDesc}Sending location updates every ${intervalMins}m (Location turns on before each fix and turns off immediately after). Reply STOP to cancel, or auto-stops after ${autoTimeoutHours}h."
+        val ackMessage = "Away Assist: ${switchDesc}Sending high-accuracy location updates every ${intervalMins}m (Location turns on before each fix and turns off immediately after). Reply STOP to cancel, or auto-stops after ${autoTimeoutHours}h."
         sendSms(senderNumber, ackMessage)
         preferences.recordSosTrigger("TRACE started from $senderNumber")
 
-        // Send initial fix immediately (turns ON location, acquires, sends SMS, and turns OFF location)
+        // Send initial fix immediately (turns ON location, acquires high accuracy, sends SMS, and turns OFF location)
         sendTraceFix(senderNumber)
     }
 
@@ -468,7 +461,7 @@ class SosLocateController(private val context: Context) {
         val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val batteryLevel = getBatteryPercentage()
 
-        val locationResult = getBestAvailableLocation(timeoutMs = 8_000L, quickAttempt = true)
+        val locationResult = getBestAvailableLocation(timeoutMs = 15_000L, quickAttempt = true)
 
         val message = "[Away Assist SOS] Alert: SIM card removed at $timeStr!\n" +
             "Location: ${locationResult.text}\n" +
@@ -517,7 +510,7 @@ class SosLocateController(private val context: Context) {
         val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val batteryLevel = getBatteryPercentage()
 
-        val locationResult = getBestAvailableLocation(timeoutMs = 5_000L, quickAttempt = true)
+        val locationResult = getBestAvailableLocation(timeoutMs = 10_000L, quickAttempt = true)
 
         val message = "[Away Assist SOS] Alert: Device powered on at $timeStr.\n" +
             "Location: ${locationResult.text}\n" +
@@ -574,9 +567,11 @@ class SosLocateController(private val context: Context) {
             Log.e(TAG, "Error toggling location in sendTraceFix", e)
         }
 
-        val locationResult = getBestAvailableLocation(timeoutMs = 12_000L, quickAttempt = true)
+        // High-accuracy location acquisition (25s window, early finish on pinpoint <=15m)
+        val locationResult = getBestAvailableLocation(timeoutMs = 25_000L, quickAttempt = true)
 
         // TRACE requirement: Always turn location OFF immediately after sending each periodic update!
+        // Mobile data is intentionally KEPT ON
         if (hasWriteSecureSettingsPermission() || isShizukuPermissionGranted()) {
             try {
                 disableSystemLocation()
@@ -598,7 +593,7 @@ class SosLocateController(private val context: Context) {
     )
 
     private suspend fun getBestAvailableLocation(
-        timeoutMs: Long = 12_000L,
+        timeoutMs: Long = 25_000L,
         quickAttempt: Boolean = true
     ): FormattedLocation {
         var location: Location? = null
@@ -622,7 +617,9 @@ class SosLocateController(private val context: Context) {
                 accuracy = if (location.hasAccuracy()) location.accuracy else 0f,
                 timestamp = System.currentTimeMillis()
             )
-            val accuracyStr = if (location.hasAccuracy()) " (~${location.accuracy.toInt()}m)" else ""
+            val prov = location.provider
+            val providerStr = if (!prov.isNullOrBlank()) " [${prov.uppercase()}]" else ""
+            val accuracyStr = if (location.hasAccuracy()) " (~${location.accuracy.toInt()}m$providerStr)" else providerStr
             return FormattedLocation(
                 text = "https://maps.google.com/?q=${location.latitude},${location.longitude}$accuracyStr",
                 location = location
@@ -648,24 +645,25 @@ class SosLocateController(private val context: Context) {
     }
 
     @SuppressLint("MissingPermission")
-    private suspend fun acquireLocation(timeoutMs: Long = 12_000L): Location? = withContext(Dispatchers.IO) {
+    private suspend fun acquireLocation(timeoutMs: Long = 25_000L): Location? = withContext(Dispatchers.IO) {
         if (!hasLocationPermission() || locationManager == null) return@withContext null
 
         val lastKnown = getLastKnownLocation()
-        var bestAcquired: Location? = lastKnown
+        var bestLocation: Location? = if (lastKnown != null && (System.currentTimeMillis() - lastKnown.time) < 15_000L) lastKnown else null
 
-        val freshLocation = withTimeoutOrNull(timeoutMs) {
+        val acquired = withTimeoutOrNull(timeoutMs) {
             suspendCancellableCoroutine { continuation ->
                 var resumed = false
 
                 val listener = object : LocationListener {
                     override fun onLocationChanged(loc: Location) {
                         synchronized(this) {
-                            if (bestAcquired == null || (loc.hasAccuracy() && loc.accuracy < (bestAcquired?.accuracy ?: Float.MAX_VALUE))) {
-                                bestAcquired = loc
+                            Log.d(TAG, "Location fix received from ${loc.provider}: ${loc.latitude}, ${loc.longitude}, accuracy=${loc.accuracy}m")
+                            if (bestLocation == null || (loc.hasAccuracy() && loc.accuracy < (bestLocation?.accuracy ?: Float.MAX_VALUE))) {
+                                bestLocation = loc
                             }
-                            // If we obtained a fine fix (accuracy <= 30m), finish immediately
-                            if (loc.hasAccuracy() && loc.accuracy <= 30f) {
+                            // Pinpoint GPS/Fused fix threshold (accuracy <= 15m) -> finish immediately
+                            if (loc.hasAccuracy() && loc.accuracy <= 15f) {
                                 if (!resumed && continuation.isActive) {
                                     resumed = true
                                     try {
@@ -685,61 +683,56 @@ class SosLocateController(private val context: Context) {
 
                 // Register updates on all providers in parallel
                 val providers = listOf(
+                    LocationManager.GPS_PROVIDER,
                     "fused",
                     LocationManager.NETWORK_PROVIDER,
-                    LocationManager.GPS_PROVIDER,
                     LocationManager.PASSIVE_PROVIDER
                 )
 
                 var registered = false
                 for (p in providers) {
                     try {
-                        locationManager.requestLocationUpdates(
-                            p,
-                            0L,
-                            0f,
-                            listener,
-                            Looper.getMainLooper()
-                        )
-                        registered = true
-                    } catch (_: Exception) {}
+                        if (locationManager.isProviderEnabled(p)) {
+                            locationManager.requestLocationUpdates(
+                                p,
+                                0L,
+                                0f,
+                                listener,
+                                Looper.getMainLooper()
+                            )
+                            registered = true
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Could not register listener for $p", e)
+                    }
                 }
 
                 // Also trigger getCurrentLocation on R+ across all available providers in parallel
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                     for (p in providers) {
                         try {
-                            locationManager.getCurrentLocation(
-                                p,
-                                null,
-                                context.mainExecutor
-                            ) { loc ->
-                                if (loc != null) {
-                                    synchronized(listener) {
-                                        if (bestAcquired == null || (loc.hasAccuracy() && loc.accuracy < (bestAcquired?.accuracy ?: Float.MAX_VALUE))) {
-                                            bestAcquired = loc
-                                        }
-                                        if (loc.hasAccuracy() && loc.accuracy <= 30f && !resumed && continuation.isActive) {
-                                            resumed = true
-                                            try { locationManager.removeUpdates(listener) } catch (_: Exception) {}
-                                            continuation.resume(loc)
+                            if (locationManager.isProviderEnabled(p)) {
+                                locationManager.getCurrentLocation(
+                                    p,
+                                    null,
+                                    context.mainExecutor
+                                ) { loc ->
+                                    if (loc != null) {
+                                        synchronized(listener) {
+                                            Log.d(TAG, "getCurrentLocation fix from $p: ${loc.latitude}, ${loc.longitude}, acc=${loc.accuracy}m")
+                                            if (bestLocation == null || (loc.hasAccuracy() && loc.accuracy < (bestLocation?.accuracy ?: Float.MAX_VALUE))) {
+                                                bestLocation = loc
+                                            }
+                                            if (loc.hasAccuracy() && loc.accuracy <= 15f && !resumed && continuation.isActive) {
+                                                resumed = true
+                                                try { locationManager.removeUpdates(listener) } catch (_: Exception) {}
+                                                continuation.resume(loc)
+                                            }
                                         }
                                     }
                                 }
                             }
                         } catch (_: Exception) {}
-                    }
-                }
-
-                // Fast fallback: if we received any Network/Cell/Wi-Fi fix after 4 seconds, don't wait for GPS satellite timeout!
-                CoroutineScope(Dispatchers.IO).launch {
-                    delay(4000L)
-                    synchronized(listener) {
-                        if (!resumed && bestAcquired != null && continuation.isActive) {
-                            resumed = true
-                            try { locationManager.removeUpdates(listener) } catch (_: Exception) {}
-                            continuation.resume(bestAcquired)
-                        }
                     }
                 }
 
@@ -749,14 +742,14 @@ class SosLocateController(private val context: Context) {
                     } catch (_: Exception) {}
                 }
 
-                if (!registered && bestAcquired != null && !resumed && continuation.isActive) {
+                if (!registered && bestLocation != null && !resumed && continuation.isActive) {
                     resumed = true
-                    continuation.resume(bestAcquired)
+                    continuation.resume(bestLocation)
                 }
             }
         }
 
-        return@withContext freshLocation ?: bestAcquired ?: getLastKnownLocation()
+        return@withContext acquired ?: bestLocation ?: getLastKnownLocation()
     }
 
     @SuppressLint("MissingPermission")
