@@ -624,8 +624,7 @@ private fun CompactStatusCard(
             Quad(
                 colors.ringState,
                 "Always Ring",
-                if (appState.sosLocateState.isSosEnabled) "Ringer switching disabled • Continuous ring • SOS Locate active"
-                else "Ringer switching disabled • Continuous audible ring",
+                "Ringer switching disabled • Continuous audible ring",
                 Icons.Default.NotificationsActive
             )
         }
@@ -917,7 +916,7 @@ private fun UnifiedControlsCard(
                     Text(
                         text = when (currentMode) {
                             OperationMode.AUTO -> "Dynamic switching • Ring on lock, mute on unlock"
-                            OperationMode.FORCE_RING -> "Always ring • Disables automated mute-on-unlock (SOS active)"
+                            OperationMode.FORCE_RING -> "Always ring • Disables automated mute-on-unlock"
                             OperationMode.PAUSE -> "Temporarily paused"
                         },
                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.5.sp),
