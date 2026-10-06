@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="banner.png" alt="Away Assist Banner" width="100%" />
-</p>
-
 # Away Assist
 
 <p align="center">
@@ -14,6 +10,10 @@
   <img src="https://img.shields.io/badge/UI-Jetpack%20Compose-green?logo=jetpackcompose" alt="Jetpack Compose" />
   <img src="https://img.shields.io/badge/Internet%20Permission-0%25%20(None)-brightgreen" alt="No Internet" />
   <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" />
+</p>
+
+<p align="center">
+  <img src="banner.png" alt="Away Assist Banner" width="100%" />
 </p>
 
 ---
