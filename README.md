@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="banner.png" alt="Away Assist Banner" width="100%" />
+</p>
+
 # Away Assist
 
 <p align="center">
