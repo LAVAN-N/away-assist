@@ -14,12 +14,14 @@ import com.awayassist.app.data.AppState
 import com.awayassist.app.data.AwayAssistPreferences
 import com.awayassist.app.data.RingerState
 import com.awayassist.app.util.RingerModeController
+import com.awayassist.app.util.SosLocateController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 class RingerService : Service() {
@@ -56,13 +58,28 @@ class RingerService : Service() {
                 context.startService(intent)
             }
         }
+
+        fun executeSmsCommand(context: Context, sender: String, body: String) {
+            val intent = Intent(context, RingerService::class.java).apply {
+                action = NotificationHelper.ACTION_EXECUTE_SMS_COMMAND
+                putExtra(NotificationHelper.EXTRA_SMS_SENDER, sender)
+                putExtra(NotificationHelper.EXTRA_SMS_BODY, body)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
+        }
     }
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var stateObservationJob: Job? = null
+    private var sosSessionJob: Job? = null
 
     private lateinit var preferences: AwayAssistPreferences
     private lateinit var ringerController: RingerModeController
+    private lateinit var sosLocateController: SosLocateController
     private lateinit var notificationHelper: NotificationHelper
     private var screenStateReceiver: ScreenStateReceiver? = null
 
@@ -72,6 +89,7 @@ class RingerService : Service() {
 
         preferences = AwayAssistPreferences.getInstance(this)
         ringerController = RingerModeController(this)
+        sosLocateController = SosLocateController(this)
         notificationHelper = NotificationHelper(this)
 
         registerScreenReceiver()
@@ -117,6 +135,28 @@ class RingerService : Service() {
             NotificationHelper.ACTION_RESUME -> {
                 handleResume()
             }
+            NotificationHelper.ACTION_EXECUTE_SMS_COMMAND -> {
+                val sender = intent?.getStringExtra(NotificationHelper.EXTRA_SMS_SENDER) ?: ""
+                val body = intent?.getStringExtra(NotificationHelper.EXTRA_SMS_BODY) ?: ""
+                if (sender.isNotBlank() && body.isNotBlank()) {
+                    serviceScope.launch(Dispatchers.IO) {
+                        val pm = getSystemService(Context.POWER_SERVICE) as? PowerManager
+                        val wakeLock = pm?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "AwayAssist:SosLocateWakeLock")
+                        wakeLock?.acquire(45_000L)
+                        try {
+                            sosLocateController.handleSmsCommand(sender, body)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error executing SMS command in RingerService", e)
+                        } finally {
+                            if (wakeLock?.isHeld == true) {
+                                try {
+                                    wakeLock.release()
+                                } catch (_: Exception) {}
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         return START_STICKY
@@ -150,7 +190,17 @@ class RingerService : Service() {
     private fun startForegroundNotification() {
         notificationHelper.createNotificationChannel()
         val foregroundServiceType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+            if (sosLocateController.hasLocationPermission()) {
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+            } else {
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+            }
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if (sosLocateController.hasLocationPermission()) {
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+            } else {
+                0
+            }
         } else {
             0
         }
@@ -169,6 +219,42 @@ class RingerService : Service() {
         stateObservationJob = serviceScope.launch {
             preferences.appStateFlow.collectLatest { state ->
                 notificationHelper.updateNotification(state)
+                manageSosSessionJob(state.sosLocateState)
+            }
+        }
+    }
+
+    private var currentSessionState: com.awayassist.app.data.SosSessionState = com.awayassist.app.data.SosSessionState.NONE
+    private var currentTraceInterval: Int = 0
+
+    private fun manageSosSessionJob(sosState: com.awayassist.app.data.SosLocateState) {
+        if (sosState.sessionState != com.awayassist.app.data.SosSessionState.TRACE) {
+            sosSessionJob?.cancel()
+            sosSessionJob = null
+            currentSessionState = sosState.sessionState
+            currentTraceInterval = 0
+            return
+        }
+
+        // If already actively running TRACE with the exact same interval, maintain current tick cycle
+        if (currentSessionState == com.awayassist.app.data.SosSessionState.TRACE &&
+            currentTraceInterval == sosState.traceIntervalMins &&
+            sosSessionJob?.isActive == true
+        ) {
+            return
+        }
+
+        // Cleanly cancel previous job and launch new TRACE loop
+        sosSessionJob?.cancel()
+        currentSessionState = com.awayassist.app.data.SosSessionState.TRACE
+        currentTraceInterval = sosState.traceIntervalMins
+
+        sosSessionJob = serviceScope.launch {
+            val intervalMinutes = sosState.traceIntervalMins.coerceAtLeast(1)
+            val intervalMs = intervalMinutes * 60_000L
+            while (isActive) {
+                kotlinx.coroutines.delay(intervalMs)
+                sosLocateController.checkSessionTimeoutAndExecuteTraceTick()
             }
         }
     }

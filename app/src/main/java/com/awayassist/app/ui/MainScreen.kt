@@ -1,5 +1,6 @@
 package com.awayassist.app.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -37,6 +38,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Notifications
@@ -80,6 +82,7 @@ import com.awayassist.app.data.RingerState
 import com.awayassist.app.data.ThemeMode
 import com.awayassist.app.ui.components.AppleButtonStyle
 import com.awayassist.app.ui.components.AppleStyleButton
+import com.awayassist.app.ui.components.AppleStyleSwitch
 import com.awayassist.app.ui.components.FullScreenThemeWaveOverlay
 import com.awayassist.app.ui.components.GroupedListCard
 import com.awayassist.app.ui.components.GroupedListRow
@@ -87,12 +90,17 @@ import com.awayassist.app.ui.components.LiquidClockPicker
 import com.awayassist.app.ui.components.LiquidMeshBackground
 import com.awayassist.app.ui.components.LiquidModeSelector
 import com.awayassist.app.ui.components.LiquidPillBadge
+import com.awayassist.app.data.SosLocateState
 import com.awayassist.app.ui.components.LiquidPulsingHalo
 import com.awayassist.app.ui.components.LiquidThemeSelector
 import com.awayassist.app.ui.components.OperationMode
 import com.awayassist.app.ui.components.VintagePullLightToggle
 import com.awayassist.app.ui.components.glassmorphic
+import com.awayassist.app.ui.sos.SosLocateChoosePathSheet
+import com.awayassist.app.ui.sos.SosLocateOnboardingFlow
+import com.awayassist.app.ui.sos.SosLocateSettingsScreen
 import com.awayassist.app.ui.theme.AwayAssistTheme
+import com.awayassist.app.ui.theme.RingState
 import com.awayassist.app.ui.theme.SquircleLarge
 import com.awayassist.app.ui.theme.SquircleMedium
 import com.awayassist.app.ui.theme.SquirclePill
@@ -130,16 +138,29 @@ fun MainScreen(
     isBatteryOptimizationIgnored: Boolean,
     onSelectMode: (OperationMode) -> Unit,
     onPauseForDuration: (Long) -> Unit,
+    onToggleRingerAutomation: (Boolean) -> Unit = {},
     onRequestPolicyAccess: () -> Unit,
     onRequestBatteryOptimization: () -> Unit,
     onRequestAutostart: () -> Unit,
-    onSelectTheme: (ThemeMode) -> Unit
+    onSelectTheme: (ThemeMode) -> Unit,
+    onToggleSosEnabled: (Boolean) -> Unit = {},
+    onCompleteSosOnboarding: (emergencyNumber: String, prefix: String) -> Unit = { _, _ -> },
+    onUpdateSosPrefix: (String) -> Unit = {},
+    onUpdateSosEmergencyNumber: (String) -> Unit = {},
+    onDismissSosRotationReminder: () -> Unit = {},
+    onUpdateSosTriggers: (sim: Boolean, shutdown: Boolean, sms: Boolean, boot: Boolean) -> Unit = { _, _, _, _ -> },
+    onUpdateSosTimeoutHours: (Int) -> Unit = {},
+    onUpdateSosTraceInterval: (Int) -> Unit = {},
+    onStopSosActiveSession: () -> Unit = {}
 ) {
     val scrollState = rememberScrollState()
     val colors = AwayAssistTheme.colors
     val isDark = colors.isDark
 
     var showInfoSheet by remember { mutableStateOf(false) }
+    var showSosChoosePathSheet by remember { mutableStateOf(false) }
+    var showSosOnboardingFlow by remember { mutableStateOf(false) }
+    var showSosSettingsScreen by remember { mutableStateOf(false) }
     var bulbScreenPosition by remember { mutableStateOf<Offset?>(null) }
     val countdownText = rememberCountdownFormatted(appState.pauseUntilTimestamp)
 
@@ -150,10 +171,9 @@ fun MainScreen(
     }
 
     val targetAmbientColor = when {
-        !hasNotificationPolicyAccess -> colors.error
         currentOperationMode == OperationMode.FORCE_RING -> colors.ringState
         currentOperationMode == OperationMode.PAUSE -> colors.warning
-        !appState.isEnabled -> colors.textSecondary
+        !hasNotificationPolicyAccess && currentOperationMode == OperationMode.AUTO -> colors.error
         appState.currentMode == RingerState.RING -> colors.ringState
         else -> colors.accentSilent
     }
@@ -164,111 +184,294 @@ fun MainScreen(
         label = "ambientMeshColor"
     )
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        LiquidMeshBackground(
-            activeColor = animatedAmbientColor,
-            isDark = isDark
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(scrollState)
-                    .padding(horizontal = 16.dp, vertical = 10.dp)
-            ) {
-                // Editorial Glass Header
-                EditorialHeader(
-                    currentMode = currentOperationMode,
-                    hasPolicyAccess = hasNotificationPolicyAccess,
-                    statusColor = animatedAmbientColor,
-                    isDark = isDark,
-                    onInfoClick = { showInfoSheet = true }
-                )
+    BackHandler(enabled = showSosSettingsScreen) {
+        showSosSettingsScreen = false
+    }
 
-                // Missing Permission Card
-                AnimatedVisibility(
-                    visible = !hasNotificationPolicyAccess,
-                    enter = fadeIn(),
-                    exit = fadeOut()
+    BackHandler(enabled = showSosOnboardingFlow) {
+        showSosOnboardingFlow = false
+    }
+
+    BackHandler(enabled = showSosChoosePathSheet) {
+        showSosChoosePathSheet = false
+    }
+
+    BackHandler(enabled = showInfoSheet) {
+        showInfoSheet = false
+    }
+
+    if (showSosSettingsScreen) {
+        SosLocateSettingsScreen(
+            sosState = appState.sosLocateState,
+            onBack = { showSosSettingsScreen = false },
+            onToggleSosEnabled = onToggleSosEnabled,
+            onUpdateEmergencyNumber = onUpdateSosEmergencyNumber,
+            onUpdatePrefix = onUpdateSosPrefix,
+            onDismissRotationReminder = onDismissSosRotationReminder,
+            onUpdateTriggers = onUpdateSosTriggers,
+            onUpdateTimeoutHours = onUpdateSosTimeoutHours,
+            onUpdateTraceInterval = onUpdateSosTraceInterval,
+            onStopActiveSession = onStopSosActiveSession
+        )
+    } else if (showSosOnboardingFlow) {
+        SosLocateOnboardingFlow(
+            onDismiss = { showSosOnboardingFlow = false },
+            onComplete = { emergencyNumber, prefix ->
+                onCompleteSosOnboarding(emergencyNumber, prefix)
+                showSosOnboardingFlow = false
+                showSosSettingsScreen = true
+            }
+        )
+    } else {
+        Box(modifier = Modifier.fillMaxSize()) {
+            LiquidMeshBackground(
+                activeColor = animatedAmbientColor,
+                isDark = isDark
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(scrollState)
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
                 ) {
-                    CompactPermissionCard(
-                        onRequestPolicyAccess = onRequestPolicyAccess,
+                    // Editorial Glass Header
+                    EditorialHeader(
+                        currentMode = currentOperationMode,
+                        hasPolicyAccess = hasNotificationPolicyAccess,
+                        isEnabled = appState.isEnabled,
+                        isSosActive = appState.sosLocateState.isSosEnabled,
+                        statusColor = animatedAmbientColor,
+                        isDark = isDark,
+                        onInfoClick = { showInfoSheet = true }
+                    )
+
+                    // Post-use Prefix Rotation Reminder Banner
+                    if (appState.sosLocateState.prefixRotationNeeded) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 12.dp)
+                                .clip(SquircleLarge)
+                                .background(colors.accent.copy(alpha = 0.12f))
+                                .border(1.dp, colors.accent.copy(alpha = 0.35f), SquircleLarge)
+                                .padding(14.dp)
+                        ) {
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Warning,
+                                        contentDescription = null,
+                                        tint = colors.accent,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Security Notice: Passkey Used",
+                                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                        color = colors.textPrimary
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "An emergency SMS command was recently executed. For ongoing safety, rotate your secret passkey prefix.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = colors.textSecondary
+                                )
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    AppleStyleButton(
+                                        text = "Rotate Prefix",
+                                        onClick = { showSosSettingsScreen = true },
+                                        style = AppleButtonStyle.PRIMARY,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    AppleStyleButton(
+                                        text = "Dismiss",
+                                        onClick = onDismissSosRotationReminder,
+                                        style = AppleButtonStyle.SECONDARY,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Missing Permission Card (Only shown when dynamic Auto ringer switching is active)
+                    AnimatedVisibility(
+                        visible = currentOperationMode == OperationMode.AUTO && !hasNotificationPolicyAccess,
+                        enter = fadeIn(),
+                        exit = fadeOut()
+                    ) {
+                        CompactPermissionCard(
+                            onRequestPolicyAccess = onRequestPolicyAccess,
+                            isDark = isDark,
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        )
+                    }
+
+                    // Hero Status Card
+                    CompactStatusCard(
+                        appState = appState,
+                        currentMode = currentOperationMode,
+                        countdownText = countdownText,
+                        hasPolicyAccess = hasNotificationPolicyAccess,
+                        onResumeAuto = { onSelectMode(OperationMode.AUTO) },
                         isDark = isDark,
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
+
+                    // Unified Operational Mode Controls Card (Auto | Ring | Pause)
+                    UnifiedControlsCard(
+                        appState = appState,
+                        currentMode = currentOperationMode,
+                        onSelectMode = onSelectMode,
+                        onPauseForDuration = onPauseForDuration,
+                        isDark = isDark,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+
+                    // 2-Tile Rules Grid (Screen Locked vs Screen Unlocked) - Visible when dynamic Auto mode is selected
+                    AnimatedVisibility(
+                        visible = currentOperationMode == OperationMode.AUTO,
+                        enter = fadeIn(spring()) + expandVertically(spring()),
+                        exit = fadeOut(spring()) + shrinkVertically(spring())
+                    ) {
+                        CompactRulesGrid(
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        )
+                    }
+
+                    // Realistic Vintage Pull-Cord Light Switch Theme Toggle Card
+                    VintagePullLightToggle(
+                        currentTheme = appState.themeMode,
+                        onThemeSelected = onSelectTheme,
+                        isDark = isDark,
+                        onBulbPositioned = { bulbScreenPosition = it },
+                        modifier = Modifier.padding(bottom = 14.dp)
+                    )
+
+                    // SOS Locate Card
+                    SosLocateCard(
+                        sosState = appState.sosLocateState,
+                        onOpenSos = {
+                            if (!appState.sosLocateState.isOnboarded) {
+                                showSosChoosePathSheet = true
+                            } else {
+                                showSosSettingsScreen = true
+                            }
+                        },
+                        modifier = Modifier.padding(bottom = 14.dp)
+                    )
+
+                    // System & Background Permissions Section (DND, Battery Saver, Autostart)
+                    SystemPermissionsSection(
+                        hasPolicyAccess = hasNotificationPolicyAccess,
+                        isBatteryOptIgnored = isBatteryOptimizationIgnored,
+                        isRingerEnabled = appState.isEnabled,
+                        onRequestPolicyAccess = onRequestPolicyAccess,
+                        onRequestBatteryOptimization = onRequestBatteryOptimization,
+                        onRequestAutostart = onRequestAutostart,
+                        isDark = isDark,
+                        modifier = Modifier.padding(bottom = 6.dp)
+                    )
+
+                    // Developer Story & Philosophy Footer
+                    DeveloperStoryFooter(
+                        isDark = isDark,
+                        modifier = Modifier.padding(bottom = 32.dp)
+                    )
                 }
 
-                // Hero Status Card
-                CompactStatusCard(
-                    appState = appState,
-                    currentMode = currentOperationMode,
-                    countdownText = countdownText,
-                    hasPolicyAccess = hasNotificationPolicyAccess,
-                    onResumeAuto = { onSelectMode(OperationMode.AUTO) },
+                // Full-Screen Theme Wave Transition (Emits from bulb across whole screen in Light mode / Absorbed back into bulb in Dark mode)
+                FullScreenThemeWaveOverlay(
                     isDark = isDark,
-                    modifier = Modifier.padding(bottom = 12.dp)
+                    bulbScreenPosition = bulbScreenPosition
                 )
 
-                // 2-Tile Rules Grid (Screen Locked vs Screen Unlocked)
-                CompactRulesGrid(
-                    modifier = Modifier.padding(bottom = 12.dp)
-                )
+                // Choose Your Path Sheet
+                if (showSosChoosePathSheet) {
+                    SosLocateChoosePathSheet(
+                        onDismiss = { showSosChoosePathSheet = false },
+                        onProceedToSetup = {
+                            showSosChoosePathSheet = false
+                            showSosOnboardingFlow = true
+                        }
+                    )
+                }
 
-                // Unified Single-Toggle Controls Card
-                UnifiedControlsCard(
-                    appState = appState,
-                    currentMode = currentOperationMode,
-                    onSelectMode = onSelectMode,
-                    onPauseForDuration = onPauseForDuration,
-                    isDark = isDark,
-                    modifier = Modifier.padding(bottom = 12.dp)
-                )
-
-                // Realistic Vintage Pull-Cord Light Switch Theme Toggle Card
-                VintagePullLightToggle(
-                    currentTheme = appState.themeMode,
-                    onThemeSelected = onSelectTheme,
-                    isDark = isDark,
-                    onBulbPositioned = { bulbScreenPosition = it },
-                    modifier = Modifier.padding(bottom = 16.dp)
-                )
-
-                // System & Background Permissions Section (DND, Battery Saver, Autostart)
-                SystemPermissionsSection(
-                    hasPolicyAccess = hasNotificationPolicyAccess,
-                    isBatteryOptIgnored = isBatteryOptimizationIgnored,
-                    onRequestPolicyAccess = onRequestPolicyAccess,
-                    onRequestBatteryOptimization = onRequestBatteryOptimization,
-                    onRequestAutostart = onRequestAutostart,
-                    isDark = isDark,
-                    modifier = Modifier.padding(bottom = 6.dp)
-                )
-
-                // Developer Story & Philosophy Footer
-                DeveloperStoryFooter(
-                    isDark = isDark,
-                    modifier = Modifier.padding(bottom = 32.dp)
-                )
-            }
-
-            // Full-Screen Theme Wave Transition (Emits from bulb across whole screen in Light mode / Absorbed back into bulb in Dark mode)
-            FullScreenThemeWaveOverlay(
-                isDark = isDark,
-                bulbScreenPosition = bulbScreenPosition
-            )
-
-            // Info Modal Bottom Sheet
-            if (showInfoSheet) {
-                ModalBottomSheet(
-                    onDismissRequest = { showInfoSheet = false },
-                    sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-                    containerColor = if (isDark) Color(0xFF141520) else Color(0xFFFAFAFC),
-                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-                    dragHandle = null
-                ) {
-                    InfoBottomSheetContent(onClose = { showInfoSheet = false })
+                // Info Modal Bottom Sheet
+                if (showInfoSheet) {
+                    ModalBottomSheet(
+                        onDismissRequest = { showInfoSheet = false },
+                        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                        containerColor = if (isDark) Color(0xFF141520) else Color(0xFFFAFAFC),
+                        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                        dragHandle = null
+                    ) {
+                        InfoBottomSheetContent(onClose = { showInfoSheet = false })
+                    }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SosLocateCard(
+    sosState: SosLocateState,
+    onOpenSos: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val colors = AwayAssistTheme.colors
+
+    GroupedListCard(modifier = modifier) {
+        GroupedListRow(
+            title = "SOS Locate Protocol",
+            subtitle = when {
+                sosState.isSessionActive -> "🚨 Active ${sosState.sessionState.name} session running"
+                sosState.isOnboarded && !sosState.isSosEnabled -> "Disabled"
+                else -> "Offline SMS & Hardware Emergency Triggers"
+            },
+            leadingIcon = {
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (sosState.isSessionActive || sosState.isSosEnabled) RingState.copy(alpha = 0.18f)
+                            else colors.textSecondary.copy(alpha = 0.15f)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (sosState.isSessionActive) Icons.Default.LocationOn else Icons.Default.Shield,
+                        contentDescription = null,
+                        tint = if (sosState.isSessionActive || sosState.isSosEnabled) RingState else colors.textSecondary,
+                        modifier = Modifier.size(15.dp)
+                    )
+                }
+            },
+            trailingContent = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = if (!sosState.isOnboarded) "Set Up" else if (sosState.isSosEnabled) "Active" else "Manage",
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp
+                        ),
+                        color = if (sosState.isSessionActive || sosState.isSosEnabled) RingState else colors.textSecondary
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+                        contentDescription = null,
+                        tint = if (sosState.isSessionActive || sosState.isSosEnabled) RingState else colors.textSecondary.copy(alpha = 0.5f),
+                        modifier = Modifier.size(11.dp)
+                    )
+                }
+            },
+            onClick = onOpenSos
+        )
     }
 }
 
@@ -279,6 +482,8 @@ fun MainScreen(
 private fun EditorialHeader(
     currentMode: OperationMode,
     hasPolicyAccess: Boolean,
+    isEnabled: Boolean,
+    isSosActive: Boolean,
     statusColor: Color,
     isDark: Boolean,
     onInfoClick: () -> Unit
@@ -329,9 +534,9 @@ private fun EditorialHeader(
         val infoInteractionSource = remember { MutableInteractionSource() }
 
         val badgeText = when {
-            !hasPolicyAccess -> "Setup"
             currentMode == OperationMode.FORCE_RING -> "Ring"
             currentMode == OperationMode.PAUSE -> "Paused"
+            !hasPolicyAccess && currentMode == OperationMode.AUTO -> "Setup"
             else -> "Auto"
         }
 
@@ -360,7 +565,7 @@ private fun EditorialHeader(
                 Box(
                     modifier = Modifier
                         .size(6.dp)
-                        .alpha(if (hasPolicyAccess) beaconAlpha else 1f)
+                        .alpha(if (hasPolicyAccess || !isEnabled) beaconAlpha else 1f)
                         .clip(CircleShape)
                         .background(statusColor)
                 )
@@ -415,20 +620,31 @@ private fun CompactStatusCard(
     val colors = AwayAssistTheme.colors
 
     val (statusColor, statusTitle, statusSubtitle, statusIcon) = when {
-        !hasPolicyAccess -> {
-            Quad(
-                colors.error,
-                "Permission Required",
-                "Grant DND access to enable ringer switching",
-                Icons.Default.Warning
-            )
-        }
         currentMode == OperationMode.FORCE_RING -> {
             Quad(
                 colors.ringState,
-                "Force Ring Active",
-                "Continuous audible ring • Ignores lock state",
+                "Always Ring",
+                "Ringer switching disabled • Continuous audible ring",
                 Icons.Default.NotificationsActive
+            )
+        }
+        currentMode == OperationMode.PAUSE -> {
+            val expiryTime = if (appState.pauseUntilTimestamp > 0L) {
+                SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(appState.pauseUntilTimestamp))
+            } else ""
+            Quad(
+                colors.warning,
+                "Paused ($countdownText)",
+                "Automation paused • Resumes at $expiryTime",
+                Icons.Default.PauseCircle
+            )
+        }
+        !hasPolicyAccess && currentMode == OperationMode.AUTO -> {
+            Quad(
+                colors.error,
+                "Permission Required",
+                "Grant DND access to enable dynamic ringer switching",
+                Icons.Default.Warning
             )
         }
         currentMode == OperationMode.PAUSE -> {
@@ -539,7 +755,7 @@ private fun CompactStatusCard(
             }
 
             // Instant Resume Button if in Force Ring or Pause mode
-            if (hasPolicyAccess && currentMode != OperationMode.AUTO) {
+            if (appState.isEnabled && hasPolicyAccess && currentMode != OperationMode.AUTO) {
                 Spacer(modifier = Modifier.height(12.dp))
                 AppleStyleButton(
                     text = "Resume Auto Mode",
@@ -654,9 +870,8 @@ private val PAUSE_OPTIONS = listOf(
 )
 
 /**
- * Unified Single-Toggle Controls Card:
- * Auto, Ring, and Pause in a single multi-state segmented toggle.
- * When Pause is chosen, only then the custom duration section appears.
+ * Unified Operational Mode Controls Card:
+ * Provides Auto (Dynamic Switch), Ring (Always Ring - Disables mute on unlock), and Pause in a liquid segmented selector.
  */
 @Composable
 private fun UnifiedControlsCard(
@@ -680,31 +895,43 @@ private fun UnifiedControlsCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp)
+                .padding(horizontal = 14.dp, vertical = 14.dp)
         ) {
-            // Mode Header Label
+            // Mode Header Label & Subtitle
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    text = "Operational Mode",
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.5.sp
-                    ),
-                    color = colors.textPrimary
-                )
+                Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                    Text(
+                        text = "Operational Mode",
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.5.sp
+                        ),
+                        color = colors.textPrimary
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = when (currentMode) {
+                            OperationMode.AUTO -> "Dynamic switching • Ring on lock, mute on unlock"
+                            OperationMode.FORCE_RING -> "Always ring • Disables automated mute-on-unlock"
+                            OperationMode.PAUSE -> "Temporarily paused"
+                        },
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.5.sp),
+                        color = colors.textSecondary
+                    )
+                }
 
                 Text(
                     text = when (currentMode) {
-                        OperationMode.AUTO -> "Dynamic Lock/Unlock"
+                        OperationMode.AUTO -> "Dynamic"
                         OperationMode.FORCE_RING -> "Always Ring"
                         OperationMode.PAUSE -> "Paused"
                     },
                     style = MaterialTheme.typography.labelSmall.copy(
-                        fontWeight = FontWeight.Medium,
+                        fontWeight = FontWeight.Bold,
                         fontSize = 11.5.sp
                     ),
                     color = when (currentMode) {
@@ -715,7 +942,7 @@ private fun UnifiedControlsCard(
                 )
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             // Unified 3-Way Mode Selector (Auto | Ring | Pause)
             LiquidModeSelector(
@@ -768,11 +995,11 @@ private fun UnifiedControlsCard(
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = "Pause Duration",
-                                style = MaterialTheme.typography.labelMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 13.sp
                                 ),
-                                color = colors.warning
+                                color = colors.textPrimary
                             )
                         }
 
@@ -793,95 +1020,95 @@ private fun UnifiedControlsCard(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                            Spacer(modifier = Modifier.height(10.dp))
 
-                    // Preset Chips Row (10m, 15m, 30m, 1h, Custom)
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(SquircleMedium)
-                            .background(if (isDark) Color(0x22FFFFFF) else Color(0x14000000))
-                            .padding(3.dp),
-                        horizontalArrangement = Arrangement.spacedBy(3.dp)
-                    ) {
-                        PAUSE_OPTIONS.forEach { option ->
-                            val isSelected = selectedOption == option
-                            val itemBg by animateColorAsState(
-                                targetValue = if (isSelected) {
-                                    if (isDark) Color(0x50FFFFFF) else Color(0xC8FFFFFF)
-                                } else Color.Transparent,
-                                animationSpec = spring(),
-                                label = "pauseChipBg"
-                            )
-                            val itemText by animateColorAsState(
-                                targetValue = if (isSelected) {
-                                    if (isDark) Color.White else colors.warning
-                                } else colors.textSecondary,
-                                animationSpec = spring(),
-                                label = "pauseChipText"
-                            )
-
-                            Box(
+                            // Preset Chips Row (10m, 15m, 30m, 1h, Custom)
+                            Row(
                                 modifier = Modifier
-                                    .weight(1f)
-                                    .height(30.dp)
+                                    .fillMaxWidth()
                                     .clip(SquircleMedium)
-                                    .background(itemBg)
-                                    .then(
-                                        if (isSelected) {
-                                            Modifier.border(
-                                                width = 0.8.dp,
-                                                color = if (isDark) Color(0x60FFFFFF) else Color(0x90FFFFFF),
-                                                shape = SquircleMedium
-                                            )
-                                        } else Modifier
-                                    )
-                                    .clickable(
-                                        interactionSource = remember { MutableInteractionSource() },
-                                        indication = null,
-                                        onClick = {
-                                            selectedOption = option
-                                            val newDuration = if (option.id == "custom") {
-                                                appState.customPauseDurationMs
-                                            } else {
-                                                option.durationMs
-                                            }
-                                            onPauseForDuration(newDuration)
-                                        }
-                                    ),
-                                contentAlignment = Alignment.Center
+                                    .background(if (isDark) Color(0x22FFFFFF) else Color(0x14000000))
+                                    .padding(3.dp),
+                                horizontalArrangement = Arrangement.spacedBy(3.dp)
                             ) {
-                                Text(
-                                    text = option.label,
-                                    style = MaterialTheme.typography.labelMedium.copy(
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                        fontSize = 11.5.sp
-                                    ),
-                                    color = itemText
+                                PAUSE_OPTIONS.forEach { option ->
+                                    val isSelected = selectedOption == option
+                                    val itemBg by animateColorAsState(
+                                        targetValue = if (isSelected) {
+                                            if (isDark) Color(0x50FFFFFF) else Color(0xC8FFFFFF)
+                                        } else Color.Transparent,
+                                        animationSpec = spring(),
+                                        label = "pauseChipBg"
+                                    )
+                                    val itemText by animateColorAsState(
+                                        targetValue = if (isSelected) {
+                                            if (isDark) Color.White else colors.warning
+                                        } else colors.textSecondary,
+                                        animationSpec = spring(),
+                                        label = "pauseChipText"
+                                    )
+
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(30.dp)
+                                            .clip(SquircleMedium)
+                                            .background(itemBg)
+                                            .then(
+                                                if (isSelected) {
+                                                    Modifier.border(
+                                                        width = 0.8.dp,
+                                                        color = if (isDark) Color(0x60FFFFFF) else Color(0x90FFFFFF),
+                                                        shape = SquircleMedium
+                                                    )
+                                                } else Modifier
+                                            )
+                                            .clickable(
+                                                interactionSource = remember { MutableInteractionSource() },
+                                                indication = null,
+                                                onClick = {
+                                                    selectedOption = option
+                                                    val newDuration = if (option.id == "custom") {
+                                                        appState.customPauseDurationMs
+                                                    } else {
+                                                        option.durationMs
+                                                    }
+                                                    onPauseForDuration(newDuration)
+                                                }
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = option.label,
+                                            style = MaterialTheme.typography.labelMedium.copy(
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                                fontSize = 11.5.sp
+                                            ),
+                                            color = itemText
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Custom Real-Time Clock Picker (When "Custom" chip is selected)
+                            if (selectedOption?.id == "custom") {
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                LiquidClockPicker(
+                                    initialTargetTimestamp = if (appState.pauseUntilTimestamp > System.currentTimeMillis()) {
+                                        appState.pauseUntilTimestamp
+                                    } else {
+                                        System.currentTimeMillis() + appState.customPauseDurationMs
+                                    },
+                                    onDurationChanged = onPauseForDuration,
+                                    isDark = isDark
                                 )
                             }
                         }
                     }
-
-                    // Custom Real-Time Clock Picker (When "Custom" chip is selected)
-                    if (selectedOption?.id == "custom") {
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        LiquidClockPicker(
-                            initialTargetTimestamp = if (appState.pauseUntilTimestamp > System.currentTimeMillis()) {
-                                appState.pauseUntilTimestamp
-                            } else {
-                                System.currentTimeMillis() + appState.customPauseDurationMs
-                            },
-                            onDurationChanged = onPauseForDuration,
-                            isDark = isDark
-                        )
-                    }
                 }
             }
         }
-    }
-}
 
 /**
  * Compact Missing Permission Banner
@@ -943,6 +1170,7 @@ private fun CompactPermissionCard(
 private fun SystemPermissionsSection(
     hasPolicyAccess: Boolean,
     isBatteryOptIgnored: Boolean,
+    isRingerEnabled: Boolean,
     onRequestPolicyAccess: () -> Unit,
     onRequestBatteryOptimization: () -> Unit,
     onRequestAutostart: () -> Unit,
@@ -987,23 +1215,37 @@ private fun SystemPermissionsSection(
         // Card 1: Do Not Disturb Access
         GroupedListCard(modifier = Modifier.padding(bottom = 10.dp)) {
             Column(modifier = Modifier.fillMaxWidth()) {
+                val dndSubtitle = when {
+                    hasPolicyAccess -> "Access granted"
+                    !isRingerEnabled -> "Optional (Automation disabled)"
+                    else -> "Action required"
+                }
+                val dndTint = when {
+                    hasPolicyAccess -> colors.ringState
+                    !isRingerEnabled -> colors.textSecondary
+                    else -> colors.error
+                }
+                val dndStatusText = when {
+                    hasPolicyAccess -> "Granted"
+                    !isRingerEnabled -> "Optional"
+                    else -> "Grant"
+                }
+
                 GroupedListRow(
                     title = "Do Not Disturb Access",
-                    subtitle = if (hasPolicyAccess) "Access granted" else "Action required",
+                    subtitle = dndSubtitle,
                     leadingIcon = {
                         Box(
                             modifier = Modifier
                                 .size(28.dp)
                                 .clip(CircleShape)
-                                .background(
-                                    if (hasPolicyAccess) colors.ringState.copy(alpha = 0.15f) else colors.error.copy(alpha = 0.15f)
-                                ),
+                                .background(dndTint.copy(alpha = 0.15f)),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Shield,
                                 contentDescription = null,
-                                tint = if (hasPolicyAccess) colors.ringState else colors.error,
+                                tint = dndTint,
                                 modifier = Modifier.size(15.dp)
                             )
                         }
@@ -1011,12 +1253,12 @@ private fun SystemPermissionsSection(
                     trailingContent = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                text = if (hasPolicyAccess) "Granted" else "Grant",
+                                text = dndStatusText,
                                 style = MaterialTheme.typography.bodyMedium.copy(
                                     fontWeight = FontWeight.SemiBold,
                                     fontSize = 13.sp
                                 ),
-                                color = if (hasPolicyAccess) colors.ringState else colors.error
+                                color = dndTint
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Icon(

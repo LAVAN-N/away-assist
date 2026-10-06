@@ -36,10 +36,15 @@ import com.awayassist.app.ui.MainScreen
 import com.awayassist.app.ui.components.OperationMode
 import com.awayassist.app.ui.theme.AwayAssistTheme
 import com.awayassist.app.util.RingerModeController
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
+    private val activityScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private lateinit var preferences: AwayAssistPreferences
     private lateinit var ringerController: RingerModeController
 
@@ -102,6 +107,19 @@ class MainActivity : ComponentActivity() {
                     appState = appState,
                     hasNotificationPolicyAccess = hasPolicyAccess,
                     isBatteryOptimizationIgnored = isBatteryOptIgnored,
+                    onToggleRingerAutomation = { enabled ->
+                        scope.launch {
+                            preferences.setEnabled(enabled)
+                            if (enabled) {
+                                if (hasPolicyAccess) {
+                                    RingerService.startService(this@MainActivity)
+                                    sendServiceAction(NotificationHelper.ACTION_RESUME)
+                                } else {
+                                    openNotificationPolicyAccessSettings()
+                                }
+                            }
+                        }
+                    },
                     onSelectMode = { mode ->
                         when (mode) {
                             OperationMode.AUTO -> {
@@ -145,12 +163,61 @@ class MainActivity : ComponentActivity() {
                         scope.launch {
                             preferences.setThemeMode(mode)
                         }
+                    },
+                    onToggleSosEnabled = { enabled ->
+                        scope.launch {
+                            preferences.setSosEnabled(enabled)
+                            if (enabled) {
+                                RingerService.startService(this@MainActivity)
+                            }
+                        }
+                    },
+                    onCompleteSosOnboarding = { emergencyNumber, prefix ->
+                        scope.launch {
+                            preferences.completeSosOnboarding(true, emergencyNumber, prefix)
+                            RingerService.startService(this@MainActivity)
+                        }
+                    },
+                    onUpdateSosPrefix = { prefix ->
+                        scope.launch {
+                            preferences.setSosPrefix(prefix)
+                        }
+                    },
+                    onUpdateSosEmergencyNumber = { number ->
+                        scope.launch {
+                            preferences.setEmergencyAlertNumber(number)
+                        }
+                    },
+                    onDismissSosRotationReminder = {
+                        scope.launch {
+                            preferences.setPrefixRotationNeeded(false)
+                        }
+                    },
+                    onUpdateSosTriggers = { sim, shutdown, sms, boot ->
+                        scope.launch {
+                            preferences.setSosTriggers(sim, shutdown, sms, boot)
+                        }
+                    },
+                    onUpdateSosTimeoutHours = { hours ->
+                        scope.launch {
+                            preferences.setAutoTimeoutHours(hours)
+                        }
+                    },
+                    onUpdateSosTraceInterval = { mins ->
+                        scope.launch {
+                            preferences.setTraceIntervalMins(mins)
+                        }
+                    },
+                    onStopSosActiveSession = {
+                        scope.launch {
+                            preferences.stopSosSession()
+                        }
                     }
                 )
             }
         }
 
-        // Auto-start foreground service on launch if enabled and permission granted
+        // Auto-start foreground service on launch if enabled and permission granted or SOS active
         startServiceIfEligible()
     }
 
@@ -159,9 +226,17 @@ class MainActivity : ComponentActivity() {
         startServiceIfEligible()
     }
 
+    override fun onDestroy() {
+        activityScope.cancel()
+        super.onDestroy()
+    }
+
     private fun startServiceIfEligible() {
-        if (ringerController.isNotificationPolicyAccessGranted()) {
-            RingerService.startService(this)
+        activityScope.launch {
+            val appState = preferences.getAppState()
+            if (ringerController.isNotificationPolicyAccessGranted() || appState.sosLocateState.isSosEnabled) {
+                RingerService.startService(this@MainActivity)
+            }
         }
     }
 
