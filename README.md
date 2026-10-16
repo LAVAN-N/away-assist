@@ -51,7 +51,8 @@ No manual toggling. No complex geofences. No battery drain.
 ### Option 1: Download from GitHub Releases
 1. Go to the [Releases](https://github.com/LAVAN-N/away-assist/releases) page.
 2. Download the latest `app-release.apk`.
-3. Open the downloaded file on your Android device and tap **Install** (allow "Install unknown apps" for your browser/file manager if prompted).
+3. Open the downloaded file on your Android device and tap **Install** (allow "Install unknown apps" if prompted).
+   > **Note on Google Play Protect**: Due to privileged on-device security capabilities (`SMS`, anti-theft triggers), Play Protect may display a warning. Tap **More details ➔ Install anyway**, or temporarily toggle off *"Scan apps with Play Protect"* in the Play Store app settings during installation.
 
 ### Option 2: Build from Source
 ```bash

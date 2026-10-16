@@ -2,6 +2,26 @@
 
 > **Emergency GPS Locate, Autonomous Anti-Theft Triggers, 1-Tap Shizuku Privileged Controls & Always Ring Mode.**
 
+---
+
+### ⚠️ Important Installation Notice: Google Play Protect Warning
+
+Because Away-Assist contains privileged security capabilities (e.g. `SEND_SMS`, `RECEIVE_SMS`, device administration for anti-theft, and `WRITE_SECURE_SETTINGS`) and is installed directly outside the Google Play Store (sideloaded APK), **Google Play Protect may block installation** by default.
+
+#### 🔧 How to Install:
+* **Option A (Quick Bypass in Installer Dialog)**:
+  When prompted with *"Blocked by Play Protect"*, tap **More details** ➔ **Install anyway**.
+* **Option B (Temporarily Toggle Off in Play Store)**:
+  If installation is completely blocked without an "Install anyway" button:
+  1. Open the **Google Play Store** app.
+  2. Tap your **Profile icon** (top right) ➔ **Play Protect**.
+  3. Tap the **⚙️ Settings (Gear icon)** in the top right corner.
+  4. Toggle **OFF** **"Scan apps with Play Protect"**.
+  5. Install `app-release.apk`.
+  6. *(Recommended)* You may toggle Play Protect back ON after installation.
+
+---
+
 Away-Assist v1.1.0 expands upon the core screen-lock ringer automation with a comprehensive, 100% on-device **SOS Remote Locate & Anti-Theft** suite designed to help you locate and secure your lost or misplaced device via SMS without relying on internet connectivity.
 
 ---

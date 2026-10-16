@@ -46,10 +46,13 @@ fun SosLocateChoosePathSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val context = LocalContext.current
 
+    val isDark = AwayAssistTheme.colors.isDark
+    val opaqueBg = if (isDark) androidx.compose.ui.graphics.Color(0xFF141520) else androidx.compose.ui.graphics.Color(0xFFF6EADB)
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = AwayAssistTheme.colors.cardSurface
+        containerColor = opaqueBg
     ) {
         Column(
             modifier = Modifier
