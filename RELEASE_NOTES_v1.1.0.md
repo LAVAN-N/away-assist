@@ -45,6 +45,10 @@ Away-Assist v1.1.0 expands upon the core screen-lock ringer automation with a co
 - **Direct Privileged Permission**: Grant `WRITE_SECURE_SETTINGS` with a single tap on-device via Shizuku (no PC or terminal apps needed).
 - **Automated GPS & Mobile Data Activation**: Automatically turns on Location Services and persistent Mobile Data when emergency commands are received.
 - **Interactive ADB Guide**: Built-in instructions and direct settings shortcuts for users configuring via a computer.
+- **📌 Note on Shizuku Wireless Debugging Setup**:
+  For reliable pairing and connection over Wireless Debugging:
+  1. **Network Environment**: Do **not** use corporate, university, office, or public Wi-Fi networks (they frequently enforce client isolation and block local ADB port discovery). Use your home private Wi-Fi or a temporary mobile hotspot.
+  2. **Wi-Fi MAC Address Setting**: In **Wi-Fi Settings ➔ [Your Network] ➔ Privacy**, switch from *"Use randomized MAC"* to **"Use device MAC"**. Randomized MACs can cause the IP/pairing handshake to drop unexpectedly.
 
 #### 🔔 4. Dedicated "Always Ring" Operational Mode
 - Easily select **Ring (Always Ring)** in the operational mode selector to disable automated mute-on-unlock transitions while keeping SOS Remote Locate and Anti-Theft fully active.

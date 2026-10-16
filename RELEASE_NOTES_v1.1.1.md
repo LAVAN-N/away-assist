@@ -32,6 +32,9 @@ Because Away-Assist contains privileged security capabilities (`SEND_SMS`, `RECE
 - 📖 **Documentation & Troubleshooting Updates**:
   - Added comprehensive Google Play Protect sideloading guidance to release notes and README.
   - Linked the complete security architecture whitepaper ([`SECURITY_AND_PERMISSIONS.md`](SECURITY_AND_PERMISSIONS.md)).
+  - **📌 Shizuku Wireless Debugging Setup Requirements**:
+    1. **Avoid Corporate / Enterprise Wi-Fi**: Do not use office, university, or public networks (they enforce client isolation and block local ADB port discovery). Use private home Wi-Fi or a mobile hotspot.
+    2. **Set Device MAC Address**: In **Wi-Fi Settings ➔ [Your Wi-Fi Network] ➔ Privacy**, switch from *"Use randomized MAC"* to **"Use device MAC"** to prevent IP/handshake drops during pairing.
 
 ---
 
