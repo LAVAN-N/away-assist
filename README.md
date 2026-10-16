@@ -106,7 +106,8 @@ Away-Assist is engineered with strict sandboxing and privacy-first principles:
 
 ## 📦 Releases & Changelogs
 
-- **[Latest Release v1.1.0 Notes](RELEASE_NOTES_v1.1.0.md)** — SOS Remote Locate, Anti-Theft Protection, Shizuku Integration & Always Ring Mode.
+- **[Latest Release v1.1.1 Notes](RELEASE_NOTES_v1.1.1.md)** — UI Contrast Patch & Play Protect Installation Guide.
+- **[Release v1.1.0 Notes](RELEASE_NOTES_v1.1.0.md)** — SOS Remote Locate, Anti-Theft Protection, Shizuku Integration & Always Ring Mode.
 - **[Initial Release v1.0.0 Notes](RELEASE_NOTES_v1.0.0.md)** — Smart Lock/Unlock Automation, Widgets & Vintage Ambient Theme.
 
 ---
