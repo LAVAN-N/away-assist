@@ -37,10 +37,12 @@ No manual toggling. No complex geofences. No battery drain.
 - **Deterministic Hardware Automation**: Driven purely by system broadcast events (`ACTION_SCREEN_OFF` and `ACTION_USER_PRESENT`).
 - **Zero Polling & 0% Idle Battery Drain**: No background alarms, no timers, and no battery loops. The app sleeps when idle and executes in fractions of a millisecond during screen transitions.
 - **100% On-Device Privacy**: Contains **zero internet permission**, no analytics, no crash reporters, and no remote servers. Everything runs entirely on your device.
-- **Customizable Pause System**: Pause automation for `10m`, `15m`, `30m`, `1h`, or choose an exact duration with the digital clock dial picker.
+- **🚨 SOS Remote Locate & Anti-Theft**: Recover your lost device over SMS without internet access. High-accuracy GPS fixes (`FIND <PIN>`), continuous route tracing (`TRACE <PIN>`), remote audible alarm (`RING <PIN>`), and autonomous alerts on SIM card swap, device shutdown, or reboot.
+- **⚡ 1-Tap Shizuku Privileged Controls**: Effortlessly grant `WRITE_SECURE_SETTINGS` on-device via Shizuku to automatically force-enable GPS and persistent Mobile Data on emergency commands.
+- **Customizable Pause & Always Ring**: Pause automation for presets or custom durations, or select `Always Ring` to keep audible alerts continuously while keeping SOS security active.
 - **Synced Home Screen Widget & Notification**: Control Auto mode, Force Ring, or trigger custom pause durations directly from your home screen widget or notification drawer.
 - **Calm Indigo & Warm Vintage Theme**: High-end continuous squircle UI with interactive pull-cord vintage lamp toggle, gyroscope pendulum physics, and full-screen ambient lighting.
-- **Ultra Lightweight**: Built with pure Kotlin & Jetpack Compose. Release APK size is only **~1.7 MB**.
+- **Ultra Lightweight**: Built with pure Kotlin & Jetpack Compose. Release APK size is only **~2.2 MB**.
 
 ---
 
@@ -87,6 +89,24 @@ To ensure smooth and reliable background automation on all Android versions and 
 - **Background Architecture**: Foreground Service (`RingerService`) + dynamic hardware `BroadcastReceiver` (`ScreenStateReceiver`)
 - **Module Structure**: Single Gradle module (`app`)
 - **Min SDK**: 26 (Android 8.0 Oreo) • **Target SDK**: 35 (Android 15)
+
+---
+
+## 🔒 Security & Privacy Architecture
+
+Away-Assist is engineered with strict sandboxing and privacy-first principles:
+- **No Internet Access**: The app requests `0%` internet permissions (`android.permission.INTERNET` is absent). No location data or telemetry ever leaves your phone over the web.
+- **Permission Sandboxing**: Privileged permissions like `WRITE_SECURE_SETTINGS` (for auto-enabling GPS/Mobile Data during emergencies) are bound strictly to Away-Assist's Linux UID and cannot be accessed, shared, or exploited by other apps.
+- **Salted SHA-256 PIN Verification**: Remote SMS commands (`FIND`, `TRACE`, `RING`, `MUTE`) require your personal PIN, validated entirely on-device.
+
+👉 **Read the complete security model and threat analysis:** [`SECURITY_AND_PERMISSIONS.md`](SECURITY_AND_PERMISSIONS.md)
+
+---
+
+## 📦 Releases & Changelogs
+
+- **[Latest Release v1.1.0 Notes](RELEASE_NOTES_v1.1.0.md)** — SOS Remote Locate, Anti-Theft Protection, Shizuku Integration & Always Ring Mode.
+- **[Initial Release v1.0.0 Notes](RELEASE_NOTES_v1.0.0.md)** — Smart Lock/Unlock Automation, Widgets & Vintage Ambient Theme.
 
 ---
 
